@@ -1,0 +1,37 @@
+# Python bytecode & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Compiled binaries and local debug logs (Keeps git repo clean and lightweight)
+*.exe
+*.dll
+*.log
+launcher_debug.log
+.pytest_cache/
+.coverage
+htmlcov/
+*.pdf
+*.vbs
+*.cs
+*.ps1
+app/resources/*_preview.png
+app/resources/checkbox_test.png
+app_icon.ico
+app_icon.png
+
+# Local credentials and machine secrets (Never commit personal API keys)
+.env
+config.local.json
+config.json
+
