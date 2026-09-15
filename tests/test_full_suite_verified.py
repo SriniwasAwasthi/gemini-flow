@@ -88,16 +88,9 @@ def run_all_tests():
         "code_dev_custom": {
             "name": "Developer Code & Technical Assistant",
             "check": lambda text: ("1." in text or "•" in text or "*" in text or "Windows" in text) and len(text.split()) > 10
-        },
-        "ai_prompt_engineer_custom": {
-            "name": "AI Prompt Engineer (LLM Meta-Prompt)",
-            "check": lambda text: ("Role" in text or "Objective" in text or "Context" in text or "Steps" in text) and len(text) > 100
-        },
-        "meeting_notes_custom": {
-            "name": "Meeting Minutes & Action Items",
-            "check": lambda text: ("Action" in text or "Decisions" in text or "•" in text or "*" in text) and ("\n" in text)
         }
     }
+
 
     for p_obj in DEFAULT_SAVED_PROMPTS:
         p_id = p_obj["id"]

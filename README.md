@@ -29,12 +29,10 @@ Speak naturally in any Windows software—VS Code, Microsoft Word, Slack, WhatsA
 ## ✨ Key Features
 
 - 🎙️ **Universal Auto-Typing**: Hold or toggle a global hotkey anywhere in Windows to speak; text types out smoothly into whatever field or editor has focus.
-- ⚡ **5-Style AI Dictation & Transformation Engine**:
+- ⚡ **3-Style AI Dictation Engine**:
   - **Clean Speech & Grammar Enhancement**: Flawless punctuation, clean paragraphs, removes verbal fillers (`uh`, `um`, `ah`, `basically`, `means`, `matlab`, `yaani`), and stutters (`12 12 12` $\rightarrow$ `12`, `12th 12th` $\rightarrow$ `12th`).
   - **Smart Executive Polish**: Converts stream-of-consciousness thoughts into structured executive-grade prose with clean bullet points (`• `) and paragraph breaks.
   - **Developer Code & Technical Assistant**: Transcribes programming terminology, variable names in `camelCase`/`snake_case`, syntax, and terminal commands cleanly.
-  - **AI Prompt Engineer (LLM Meta-Prompt)**: Transforms conversational ideas into structured meta-prompts with Role, Objective, Context, Steps, and Output format.
-  - **Meeting Minutes & Action Items**: Extracts key decisions and assigned tasks with owners and deadlines.
 - 🇮🇳 **Hinglish & Indian Idiom Polish**: Preserves everyday cultural expressions (`bhai`, `jugaad`, `lakhs/crores`, `prepone`) while eliminating broken grammar or translation glitches.
 - 🎧 **DSP Audio Filter & Ceiling Fan Gate**:
   - Real-time 85 Hz Butterworth High-Pass Filter cuts motor drone and fan rumble.
@@ -116,7 +114,7 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ### 10. Multi-Mode AI Dictation & Prompt Library
 ![AI Dictation & Polish Modes](images/09_ai_dictation.png)
-> **Versatile Transformation Modes**: Seamlessly switch between *Clean Speech*, *Smart Executive Polish*, *Developer Code*, *AI Prompt Engineer*, and *Meeting Minutes*.  
+> **Versatile Transformation Modes**: Seamlessly switch between *Clean Speech*, *Smart Executive Polish*, and *Developer Code*.  
 > **Instant Activation & Custom Vocab Input**: Quickly edit or switch prompts with real-time preset syncing and direct vocabulary definition.
 
 ---

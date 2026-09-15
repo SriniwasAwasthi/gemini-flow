@@ -140,35 +140,9 @@ DEFAULT_SAVED_PROMPTS = [
             "Output ONLY the resulting code or text without explanation."
         ),
         "is_active": False
-    },
-    {
-        "id": "ai_prompt_engineer_custom",
-        "title": "AI Prompt Engineer (LLM Meta-Prompt)",
-        "prompt": (
-            "You are a World-Class AI Prompt Engineer. Transform the user's raw thoughts into an exceptionally clear, "
-            "comprehensive, and structured prompt for ChatGPT, Claude, or Gemini with:\n"
-            "- # Role & Objective\n"
-            "- # Context & Requirements\n"
-            "- # Step-by-Step Instructions\n"
-            "- # Expected Output Format\n"
-            "Eliminate fillers and repetitions. Output ONLY the finalized optimized prompt without conversational filler."
-        ),
-        "is_active": False
-    },
-    {
-        "id": "meeting_notes_custom",
-        "title": "Meeting Minutes & Action Items",
-        "prompt": (
-            "You are an executive meeting assistant. Convert spoken discussion or meeting debriefs into clean, structured "
-            "meeting minutes with:\n"
-            "**Key Decisions**\n"
-            "**Action Items & Responsibilities** (formatted as bullet points '• ' with owners and deadlines on separate lines)\n\n"
-            "Strip all verbal fillers, repetitions ('12 12' -> '12'), and format line breaks cleanly. "
-            "Output ONLY the finalized meeting notes."
-        ),
-        "is_active": False
     }
 ]
+
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "api_key": "",

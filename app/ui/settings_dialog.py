@@ -3217,9 +3217,7 @@ class SettingsDialog(QDialog):
             id_to_preset = {
                 "clean_dictation_custom": "clean_dictation",
                 "smart_polish_custom": "smart_polish",
-                "code_dev_custom": "code_assistant",
-                "ai_prompt_engineer_custom": "prompt_enhancer",
-                "meeting_notes_custom": "meeting_notes"
+                "code_dev_custom": "code_assistant"
             }
             matched_preset = id_to_preset.get(p_id, "clean_dictation")
             
