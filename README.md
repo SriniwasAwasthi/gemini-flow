@@ -240,18 +240,19 @@ python main.py
 ## 💡 How to Use
 
 1. **Initial Setup**:
-   - When Gemini Flow launches, open **Settings** from the system tray or HUD.
+   - When Gemini Flow launches, open **Settings** by right-clicking the system tray icon or clicking the HUD gear icon.
    - In **API & General**, enter your Gemini API Key and click **Test Connection**.
    - In **Audio Device**, select your microphone and verify the live volume bar.
-2. **Push-to-Talk Dictation**:
+2. **Standard Voice Dictation (Ctrl + Space)**:
    - Place your cursor in any application (VS Code, Word, Chrome, WhatsApp, etc.).
-   - Press and hold **`Ctrl + Shift + Space`** (or your custom hotkey).
-   - Speak naturally.
-   - Release the keys—Gemini Flow will instantly transcribe, polish grammar, and type out the result.
-3. **Hands-Free Toggle Mode**:
-   - Press **`Ctrl + Shift + T`** once to begin recording hands-free.
-   - Press **`Ctrl + Shift + T`** again to finish and type.
-4. **Emergency Offline Fallback**:
+   - Press **`Ctrl + Space`** (or your custom hotkey).
+   - In **Toggle Mode**: Tap once to start speaking, tap again to finish and auto-type.
+   - In **Push-to-Talk Mode**: Hold keys down while speaking, release to finish and auto-type.
+3. **AI Prompt Engineering Mode (Ctrl + Shift + P)**:
+   - Press **`Ctrl + Shift + P`** to dictate instructions. Gemini Flow will convert your spoken thoughts into a structured LLM meta-prompt (Role, Objective, Steps, Output) and type it into your active AI window.
+4. **In-Place Text Transformation (Ctrl + Shift + T)**:
+   - Highlight any existing text in any application and press **`Ctrl + Shift + T`** to open the Quick Transform bar or polish selected text directly in place.
+5. **Emergency Offline Fallback**:
    - If your internet disconnects, Gemini Flow automatically switches to Windows SAPI speech recognition so your typing workflow never stops.
 
 ---
@@ -260,11 +261,11 @@ python main.py
 
 | Shortcut | Action | Description |
 |---|---|---|
-| `Ctrl + Shift + Space` | **Push to Talk** | Hold down while speaking, release to transcribe & auto-type. |
-| `Ctrl + Shift + T` | **Hands-Free Toggle** | Tap once to begin recording, tap again to finish. |
-| `Ctrl + Shift + M` | **Mode Switcher** | Switch between Dictation, Smart Polish, and Prompt modes. |
-| `Ctrl + Shift + S` | **Open Settings** | Instant shortcut to open the Settings Control Center. |
-| `Esc` | **Cancel Recording** | Discards current audio recording without transcribing. |
+| `Ctrl + Space` | **Voice Dictation** | Primary trigger for voice typing. Supports both Hands-Free Toggle and Push-to-Talk (configurable in Settings). |
+| `Ctrl + Shift + P` | **AI Prompt Mode** | Dictate ideas and generate structured meta-prompts for ChatGPT, Claude, or Gemini. |
+| `Ctrl + Shift + T` | **Text Transformer** | Highlight text in any application and transform/polish it in-place using Gemini AI. |
+| `Esc` | **Cancel Recording** | Instantly aborts the active recording, discards audio, and hides the HUD. |
+
 
 ---
 
