@@ -143,7 +143,7 @@ class GeminiEngine:
         exec_res = FallbackHandler.execute_with_resilience(
             call_fn=call_model,
             primary_model=primary_model,
-            max_retries_per_model=2
+            max_retries_per_model=1
         )
 
         # 3. If online transcription failed due to network / connection drops, invoke local offline fallback
@@ -230,13 +230,8 @@ class GeminiEngine:
         try:
             start_t = time.time()
             approx_sec = len(wav_bytes) / 32000.0
-            req_timeout = max(35, min(120, int(approx_sec * 1.8) + 20))
+            req_timeout = max(6.0, min(15.0, int(approx_sec * 1.2) + 4.0))
             response = self.session.post(url, headers=headers, json=payload, timeout=req_timeout)
-
-            # If 400 with thinkingConfig unsupported, retry once without thinkingConfig
-            if response.status_code == 400 and "thinkingConfig" in response.text:
-                payload["generationConfig"].pop("thinkingConfig", None)
-                response = self.session.post(url, headers=headers, json=payload, timeout=req_timeout)
 
             elapsed = time.time() - start_t
             logger.info(f"Gemini transcription with {model} completed in {elapsed:.2f}s (Status: {response.status_code})")
@@ -326,7 +321,7 @@ class GeminiEngine:
                 }
             }
             try:
-                resp = self.session.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=20)
+                resp = self.session.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=10)
                 if resp.status_code == 200:
                     data = resp.json()
                     candidates = data.get("candidates", [])
@@ -348,7 +343,7 @@ class GeminiEngine:
         exec_res = FallbackHandler.execute_with_resilience(
             call_fn=call_model,
             primary_model=primary_model,
-            max_retries_per_model=2
+            max_retries_per_model=1
         )
 
         # 5. Vocabulary Normalization & Metrics
