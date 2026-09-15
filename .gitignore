@@ -30,8 +30,11 @@ app/resources/checkbox_test.png
 app_icon.ico
 app_icon.png
 
-# Local credentials and machine secrets (Never commit personal API keys)
+# Local credentials, test media and machine secrets (Never commit personal API keys or recordings)
 .env
 config.local.json
 config.json
-
+*.wav
+*.mp3
+*.m4a
+*.ogg

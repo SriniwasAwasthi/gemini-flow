@@ -436,11 +436,10 @@ class GeminiEngine:
         filler_pattern = re.compile(r'\b(uh|um|ah|er|eh|uhm|ahm|umm|ahh|uhh)\b[,;:]*', re.IGNORECASE)
         text = filler_pattern.sub('', text)
 
-        # Remove repeated identical words (e.g. "and and", "the the", "if if", "in in", "is is")
-        repeat_pattern = re.compile(r'\b([a-zA-Z]{2,})\s+\1\b', re.IGNORECASE)
-        # Apply twice for triplets like "and and and"
-        text = repeat_pattern.sub(r'\1', text)
-        text = repeat_pattern.sub(r'\1', text)
+        # Remove repeated identical words, numbers, and phrases (e.g., "12, 12, 12", "12th 12th", "and and", "if if")
+        for _ in range(3):
+            text = re.sub(r'\b(\w+(?:\s+\w+){1,3})(?:[\s,;—\-]+)\1\b', r'\1', text, flags=re.IGNORECASE)
+            text = re.sub(r'\b(\w+)(?:[\s,;—\-]+)\1\b', r'\1', text, flags=re.IGNORECASE)
 
         # Normalize multiple spaces and cleanup dangling punctuation from removed fillers
         text = re.sub(r'[,;]\s*(na|ya)\s*([.?!]?)$', r'\2', text, flags=re.IGNORECASE)

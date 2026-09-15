@@ -5,8 +5,11 @@ Tests config loading, dictionary replacement, snippet expansion, prompt enhancer
 import sys
 import os
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add project root directory to path
+from pathlib import Path
+PROJECT_DIR = Path(__file__).parent.parent.resolve()
+if str(PROJECT_DIR) not in sys.path:
+    sys.path.insert(0, str(PROJECT_DIR))
 
 def test_all():
     print("Testing Config Manager...")

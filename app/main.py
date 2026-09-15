@@ -563,10 +563,9 @@ class GeminiFlowApp:
             active_profile = self.config.get("active_profile", "coding")
             auto_cost_mode = self.config.get("auto_cost_mode", True)
 
-            # 3. Construct Clean Speech Transcription System Prompt
-            # When transcribing audio, we ALWAYS use clean dictation to guarantee that
-            # raw_spoken_text captures the exact normal words spoken by the user.
-            prompt = self.config.get_system_prompt(preset_override="clean_dictation", app_context=app_context)
+            # 3. Construct Active Speech Transcription System Prompt (from active prompt library or preset)
+            active_mode = self.config.get("mode_preset", "clean_dictation")
+            prompt = self.config.get_system_prompt(app_context=app_context)
 
             # 4. Transcribe with Gemini (Resilient execution + ModelRouter + Cost Optimization + Offline Fallback)
             success, raw_result = self.gemini.transcribe_audio(
@@ -582,14 +581,14 @@ class GeminiFlowApp:
                 return
 
             if not success or not raw_result:
-                self.signals.finished.emit(False, raw_result or "Transcription failed.", duration, "clean_dictation", app_name, self.gemini.last_model_used, "")
+                self.signals.finished.emit(False, raw_result or "Transcription failed.", duration, active_mode, app_name, self.gemini.last_model_used, "")
                 return
 
             # Apply Custom Dictionary & Snippet Expansions to normal speech
             raw_spoken_text = GeminiEngine.apply_dictionary(raw_result, self.config.get_dictionary())
             raw_spoken_text = GeminiEngine.apply_snippets(raw_spoken_text, self.config.get_snippets())
 
-            mode = "clean_dictation"
+            mode = active_mode
             final_text = raw_spoken_text
 
             # 5. Check if active window is a Prompt-Generation Interface (Antigravity, VS Code, Windsurf, Cursor, etc.)

@@ -174,9 +174,9 @@ class ModelRouter:
             task = (task_type or "").upper()
             if task in ("SUMMARIZE", "CONVERT_TO_DOCUMENTATION") and (duration_sec > 60.0 or text_length > 2000):
                 return RoutingResult(
-                    model_name="gemini-2.5-pro",
-                    metadata=self.model_registry["gemini-2.5-pro"],
-                    reason="Auto Cost Mode: Reserved Pro model for deep long-form document synthesis",
+                    model_name="gemini-3.6-flash",
+                    metadata=self.model_registry["gemini-3.6-flash"],
+                    reason="Auto Cost Mode: Selected 3.6 Flash for deep long-form document synthesis",
                     is_auto=True
                 )
             if task in ("GENERATE_CODE", "CODE_ASSISTANT") and duration_sec > 30.0:
@@ -206,9 +206,9 @@ class ModelRouter:
 
         if task in ("SUMMARIZE", "CREATE_TASK", "CONVERT_TO_DOCUMENTATION") or duration_sec > 45.0 or text_length > 1500:
             return RoutingResult(
-                model_name="gemini-2.5-pro",
-                metadata=self.model_registry["gemini-2.5-pro"],
-                reason="Deep synthesis / Long input routed to Deep Thought Pro model",
+                model_name="gemini-3.6-flash",
+                metadata=self.model_registry["gemini-3.6-flash"],
+                reason="Deep synthesis / Long input routed to High-Reasoning 3.6 Flash",
                 is_auto=True
             )
 

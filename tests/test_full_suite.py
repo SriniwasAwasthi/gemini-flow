@@ -8,8 +8,8 @@ import sys
 import time
 from pathlib import Path
 
-# Ensure project directory is in python path
-APP_DIR = Path(__file__).parent.resolve()
+# Ensure project root directory is in python path
+APP_DIR = Path(__file__).parent.parent.resolve()
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 

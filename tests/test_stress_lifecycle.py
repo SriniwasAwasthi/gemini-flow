@@ -13,7 +13,7 @@ from pathlib import Path
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
-PROJECT_DIR = Path(__file__).parent.resolve()
+PROJECT_DIR = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_DIR))
 
 def test_startup_persistence():
@@ -67,7 +67,7 @@ def test_timer_stability_and_methods():
 
 def test_multi_cycle_ipc_and_reopen():
     print("\n--- 3. Testing Multi-Cycle Launch, IPC Reopen & Self-Healing Mutex ---")
-    py_exe = r"E:\PYTHON\python.exe"
+    py_exe = sys.executable
     main_script = str(PROJECT_DIR / "main_standalone.py")
     
     for cycle in range(1, 6):

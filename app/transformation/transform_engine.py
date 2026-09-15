@@ -114,7 +114,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Elaborate upon the provided text with rich context, supporting nuance, and comprehensive "
             "detail. Output ONLY the expanded content."
         ),
-        recommended_model="gemini-2.5-pro",
+        recommended_model="gemini-3.6-flash",
         temperature=0.5,
         icon="📖"
     ),
@@ -126,7 +126,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Summarize the provided content into a tight executive summary with high-signal bullet "
             "points highlighting core conclusions and action items. Output ONLY the summary."
         ),
-        recommended_model="gemini-2.5-pro",
+        recommended_model="gemini-3.6-flash",
         temperature=0.2,
         icon="📋"
     ),
@@ -234,7 +234,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Organize the provided text into clean, structured meeting/project notes in markdown with "
             "key headings, bullet points, and action items with checkboxes. Output ONLY the notes."
         ),
-        recommended_model="gemini-2.5-pro",
+        recommended_model="gemini-3.6-flash",
         temperature=0.3,
         icon="📝"
     ),
@@ -264,15 +264,15 @@ class TransformEngine:
     @classmethod
     def build_system_instruction(
         cls,
-        transform_type: TransformType,
+        transform_type: TransformType = TransformType.IMPROVE,
         app_context: Optional[AppContext] = None,
         custom_instruction: str = ""
     ) -> str:
-        preset = cls.get_preset(transform_type)
-        instruction = preset.system_instruction
-
-        if transform_type == TransformType.CUSTOM and custom_instruction:
-            instruction = f"{custom_instruction.strip()}\nOutput ONLY the final transformed text."
+        if custom_instruction and custom_instruction.strip():
+            instruction = f"{custom_instruction.strip()}\n\nOutput ONLY the final transformed text."
+        else:
+            preset = cls.get_preset(transform_type)
+            instruction = preset.system_instruction
 
         if app_context and app_context.system_prompt_addition:
             instruction += f"\n\nContext Directive for {app_context.app_name} ({app_context.category}):\n{app_context.system_prompt_addition}"
@@ -292,5 +292,5 @@ class TransformEngine:
 
         preset = cls.get_preset(transform_type)
         if text_length > 3000:
-            return "gemini-2.5-pro"
+            return "gemini-3.6-flash"
         return preset.recommended_model

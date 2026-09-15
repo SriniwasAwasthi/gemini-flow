@@ -14,7 +14,7 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-APP_DIR = Path(__file__).parent.resolve()
+APP_DIR = Path(__file__).parent.parent.resolve()
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 

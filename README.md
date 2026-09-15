@@ -12,7 +12,7 @@
 
 <br />
 
-[Features](#-key-features) • [Application Showcase](#-application-showcase--ui-tour) • [Architecture](#-system-architecture) • [Setup Guide](#-step-by-step-implementation--setup-guide) • [How to Use](#-how-to-use) • [Shortcuts](#-keyboard-shortcuts-reference) • [License](#-license)
+[Features](#-key-features) • [Application Showcase](#-application-showcase--ui-tour) • [Architecture](#-system-architecture) • [Setup Guide](#-step-by-step-implementation--setup-guide) • [How to Use](#-how-to-use) • [Shortcuts](#-keyboard-shortcuts-reference) • [Verification Tests](#-verification--test-suite) • [License](#-license)
 
 </div>
 
@@ -22,17 +22,19 @@
 
 **Gemini Flow** is an open-source, high-performance, and privacy-conscious AI voice dictation desktop assistant for Windows. Designed as a free, customizable alternative to *Wispr Flow*, Gemini Flow connects directly to **Google Gemini 3.5 & 3.6 Flash** models via your personal Google AI Studio API key.
 
-Speak naturally in any Windows software—VS Code, Microsoft Word, Slack, WhatsApp, Telegram, or your favorite web browser—and Gemini Flow will filter background noise, remove verbal hesitation, polish Indian English/Hinglish idioms, format code syntax, and type the refined text directly at your cursor location.
+Speak naturally in any Windows software—VS Code, Microsoft Word, Slack, WhatsApp, Telegram, or your favorite web browser—and Gemini Flow will filter background noise, remove verbal hesitation and stuttering, polish Indian English/Hinglish idioms, format structured markdown lists, and type the refined text directly at your cursor location.
 
 ---
 
 ## ✨ Key Features
 
 - 🎙️ **Universal Auto-Typing**: Hold or toggle a global hotkey anywhere in Windows to speak; text types out smoothly into whatever field or editor has focus.
-- ⚡ **Multi-Mode AI Engine**:
-  - **Dictation Mode**: Flawless punctuation, clean paragraphs, removes filler words (`um`, `uh`, `matlab`, `yaani`), and formats bullet points.
-  - **Prompt Mode**: Turns rambling verbal thoughts into structured, crystal-clear prompts ready for AI models and coding agents.
-  - **Raw Mode**: Verbatim speech-to-text without AI reformatting.
+- ⚡ **5-Style AI Dictation & Transformation Engine**:
+  - **Clean Speech & Grammar Enhancement**: Flawless punctuation, clean paragraphs, removes verbal fillers (`uh`, `um`, `ah`, `basically`, `means`, `matlab`, `yaani`), and stutters (`12 12 12` $\rightarrow$ `12`, `12th 12th` $\rightarrow$ `12th`).
+  - **Smart Executive Polish**: Converts stream-of-consciousness thoughts into structured executive-grade prose with clean bullet points (`• `) and paragraph breaks.
+  - **Developer Code & Technical Assistant**: Transcribes programming terminology, variable names in `camelCase`/`snake_case`, syntax, and terminal commands cleanly.
+  - **AI Prompt Engineer (LLM Meta-Prompt)**: Transforms conversational ideas into structured meta-prompts with Role, Objective, Context, Steps, and Output format.
+  - **Meeting Minutes & Action Items**: Extracts key decisions and assigned tasks with owners and deadlines.
 - 🇮🇳 **Hinglish & Indian Idiom Polish**: Preserves everyday cultural expressions (`bhai`, `jugaad`, `lakhs/crores`, `prepone`) while eliminating broken grammar or translation glitches.
 - 🎧 **DSP Audio Filter & Ceiling Fan Gate**:
   - Real-time 85 Hz Butterworth High-Pass Filter cuts motor drone and fan rumble.
@@ -41,6 +43,7 @@ Speak naturally in any Windows software—VS Code, Microsoft Word, Slack, WhatsA
 - 🎨 **Sleek Glassmorphic Floating HUD**: Minimal, non-intrusive floating overlay with dynamic pulse audio waveforms, status badges, and subtle glow animations.
 - 🎛️ **Intelligent Cost Economizer & Token Tracking**: Per-API key token tracker, daily 1,000,000 free token monitor, cost productivity calculator, and automatic cost-saving model selector.
 - 📚 **Custom Vocabulary & Sound-Alikes**: Define technical terms, acronyms, and phonetic substitutions to ensure 100% transcription accuracy for custom terminology.
+- 📜 **Expanded Searchable History**: Stores up to 5,000 previous dictations with quick search, app filtering, and instant one-click clipboard copy.
 
 ---
 
@@ -111,17 +114,17 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ---
 
-### 10. Multi-Mode AI Dictation & Polish Modes
+### 10. Multi-Mode AI Dictation & Prompt Library
 ![AI Dictation & Polish Modes](images/09_ai_dictation.png)
-> **Versatile Transformation Modes**: Seamlessly switch between *Dictation*, *Smart Polish*, *Prompt Engineering*, and *Raw Transcription*.  
-> **Hinglish & Indian English Polish**: Seamlessly refines colloquial Indian idioms (`bhai`, `jugaad`, `lakhs/crores`, `prepone`) into fluent English.
+> **Versatile Transformation Modes**: Seamlessly switch between *Clean Speech*, *Smart Executive Polish*, *Developer Code*, *AI Prompt Engineer*, and *Meeting Minutes*.  
+> **Instant Activation & Custom Vocab Input**: Quickly edit or switch prompts with real-time preset syncing and direct vocabulary definition.
 
 ---
 
 ### 11. Intelligent AI Model Router & Orchestrator
 ![AI Model Router](images/10_ai_model_router.png)
-> **Dynamic Load Balancing**: Automatically routes speech requests between Gemini 3.5 Flash, 3.6 Flash, and fallback models for lowest latency.  
-> **Built-In Benchmarks**: Integrated benchmarking suite lets you measure real-time API response times and accuracy scores directly.
+> **Dynamic Load Balancing**: Automatically routes speech requests between Gemini 3.5 Flash, 3.6 Flash, and Flash-Lite for lowest latency.  
+> **Model Synchronization**: Bidirectionally synchronizes active models between General Settings and the Router orchestrator.
 
 ---
 
@@ -138,7 +141,7 @@ Explore the core modules and visual interface of Gemini Flow:
 flowchart TD
     A[🎤 Microphone Audio Capture] --> B[🎧 Audio DSP Pipeline]
     B -->|85Hz Butterworth High-Pass| C[🔇 RMS Noise Gate]
-    C --> D[📦 PySide6 Audio Recorder]
+    C --> D[📦 PyAudio Stream Recorder]
     
     D --> E{🌐 Internet Connected?}
     E -- Yes --> F[🚀 Google Gemini API Engine]
@@ -164,6 +167,7 @@ flowchart TD
     J -.-> M
     N -.-> H
 ```
+
 
 ---
 
@@ -264,6 +268,26 @@ python main.py
 
 ---
 
+## 🧪 Verification & Test Suite
+
+Gemini Flow comes with an exhaustive test suite to ensure system stability, grammar transformation accuracy, and background lifecycle resilience:
+
+```powershell
+# Run Component Level Unit Tests
+python tests/test_components.py
+
+# Run Full UI & 11-Tab Settings Audit
+python tests/test_full_suite.py
+
+# Run Multi-Model Grammar Polish & Query Verification Suite
+python tests/test_grammar_and_queries.py
+
+# Run Process Lifecycle & Multi-Cycle Stress Test
+python tests/test_stress_lifecycle.py
+```
+
+---
+
 ## 🔒 Privacy & API Key Security
 
 - **Strictly Local Storage**: Your Google Gemini API Key is stored securely on your local PC in `%APPDATA%\GeminiFlow\config.json`.
@@ -279,22 +303,31 @@ gemini-flow/
 ├── app/
 │   ├── audio_recorder.py       # PyAudio stream, 85Hz high-pass filter & RMS noise gate
 │   ├── config.py               # Settings manager & local JSON persistence
-│   ├── gemini_engine.py        # Google Gemini API client, latency tracker & prompt logic
-│   ├── history_manager.py      # SQLite / JSON storage for dictation history
-│   ├── hotkey_manager.py       # Global Windows keyboard & mouse hooks
+│   ├── cost_awareness.py       # Token economizer, quota tracking & savings estimator
+│   ├── gemini_engine.py        # Google Gemini API client, latency tracker & regex cleaners
+│   ├── hotkey_manager.py       # Global Windows keyboard & mouse hooks with debounce
 │   ├── main.py                 # Core application controller & system tray integration
 │   ├── text_injector.py        # Simulated keystroke & clipboard injection engine
+│   ├── intelligence/           # Context-aware application detection
+│   ├── intent/                 # Spoken intent classification engine
 │   ├── offline/
 │   │   └── offline_engine.py   # Windows SAPI offline speech fallback module
+│   ├── profiles/               # Per-application customization profiles
+│   ├── reliability/            # Fallback handlers and connection retry policies
 │   ├── router/
-│   │   └── model_router.py     # Intelligent AI model router & fallback selector
+│   │   └── model_router.py     # Intelligent AI model router & dynamic load balancer
+│   ├── security/
+│   │   └── security_manager.py # Windows DPAPI secret encryption module
+│   ├── transformation/
+│   │   └── transform_engine.py # In-place text transformation engine
 │   ├── vocabulary/
 │   │   └── vocab_engine.py     # Custom jargon & phonetic vocabulary engine
-│   ├── resources/              # UI checkmarks, radio buttons, and icons
+│   ├── resources/              # UI checkmarks, radio buttons, and SVG assets
 │   └── ui/
 │       ├── floating_hud.py     # Glassmorphic Qt floating overlay window
 │       └── settings_dialog.py  # 11-module Settings Control Center
-├── images/                     # UI screenshots and visual documentation assets
+├── images/                     # Refreshed UI screenshots and visual documentation assets
+├── tests/                      # Exhaustive test & verification suites
 ├── requirements.txt            # Python package dependencies
 ├── run.bat                     # Windows one-click launcher script
 ├── main.py                     # Root application entry point
@@ -306,11 +339,12 @@ gemini-flow/
 
 ## 🛠️ Built With
 
-- **[PySide6 (Qt6)](https://wiki.qt.io/Qt_for_Python)** - Modern desktop graphical user interface
+- **[PyQt6](https://pypi.org/project/PyQt6/)** - Modern desktop graphical user interface
 - **[Google Generative AI SDK](https://github.com/google-gemini/generative-ai-python)** - Ultra-fast Gemini 3.5 & 3.6 Flash models
 - **[PyAudio & SciPy](https://pypi.org/project/PyAudio/)** - Low-latency audio streaming & Butterworth DSP noise filtering
 - **[Pynput & PyWin32](https://pypi.org/project/pynput/)** - Global Windows hotkey hooks and simulated keystroke typing
 - **[Windows SAPI](https://docs.microsoft.com/en-us/previous-versions/windows/desktop/ee125663(v=vs.85))** - Local offline speech recognition fallback
+
 
 ---
 

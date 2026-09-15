@@ -1149,6 +1149,7 @@ class SettingsDialog(QDialog):
             "gemini-2.5-flash (Standard Flash)",
             "gemini-2.5-pro (Deep Thought & Document Generation)"
         ])
+        self.model_combo.currentIndexChanged.connect(self._on_general_model_combo_changed)
         layout.addWidget(self.model_combo)
 
         # Auto-paste & Sound options
@@ -1392,6 +1393,32 @@ class SettingsDialog(QDialog):
         self.router_rule_info.setStyleSheet("color: #E2E8F0; font-size: 12px; line-height: 1.4; border: none;")
         sf_layout.addWidget(self.router_rule_info)
         layout.addWidget(status_frame)
+
+        # Direct Model Selection Card on Router Tab
+        sel_card = QFrame(self)
+        sel_card.setStyleSheet("QFrame { background-color: #1E293B; border: 1px solid #0284C7; border-radius: 8px; padding: 12px; }")
+        sel_layout = QVBoxLayout(sel_card)
+        sel_layout.setSpacing(6)
+
+        sel_title = QLabel("🎯 Select Active AI Model or Auto-Intelligence Router:", sel_card)
+        sel_title.setStyleSheet("color: #38BDF8; font-weight: 700; font-size: 13px; border: none;")
+        sel_layout.addWidget(sel_title)
+
+        self.router_model_combo = QComboBox(sel_card)
+        self.router_model_combo.setView(QListView())
+        self.router_model_combo.addItems([
+            "auto (Intelligent AI Model Router — Dynamic Per-Task Selection)",
+            "gemini-3.5-flash-lite (Lowest Latency < 1.5s — Recommended)",
+            "gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
+            "gemini-3.6-flash (Fast Advanced Reasoning & Polish)",
+            "gemini-flash-latest (Auto Latest Production Flash)",
+            "gemini-3.7-flash (Advanced Reasoning & Technical Dictation)",
+            "gemini-2.5-flash (Standard Flash)",
+            "gemini-2.5-pro (Deep Thought & Document Generation)"
+        ])
+        self.router_model_combo.currentIndexChanged.connect(self._on_router_model_combo_changed)
+        sel_layout.addWidget(self.router_model_combo)
+        layout.addWidget(sel_card)
 
         # Registry table
         mat_label = QLabel("Model Matrix & Capabilities:")
@@ -1993,58 +2020,34 @@ class SettingsDialog(QDialog):
         ai_desc.setWordWrap(True)
         layout.addWidget(ai_desc)
 
-        # 1. Preset Style Section
-        preset_box = QVBoxLayout()
-        preset_box.setSpacing(4)
-        preset_label = QLabel("Dictation Style Preset (Quick Built-in Behavior):", self)
-        preset_label.setStyleSheet("font-weight: 600; color: #E2E8F0;")
-        preset_box.addWidget(preset_label)
-
-        self.preset_combo = QComboBox(self)
-        self.preset_combo.setView(QListView())
-        self.preset_combo.addItem("Clean Dictation (Wispr Flow Style — removes fillers & stutters)", "clean_dictation")
-        self.preset_combo.addItem("Verbatim (Exact word-for-word transcription)", "verbatim")
-        self.preset_combo.addItem("Smart Polish (Converts thoughts into executive prose/notes)", "smart_polish")
-        self.preset_combo.addItem("Code & Dev Assistant (Technical jargon, syntax & camelCase)", "code_assistant")
-        self.preset_combo.addItem("Prompt Enhancer (Directly formats spoken ideas into AI Prompts)", "prompt_enhancer")
-        preset_box.addWidget(self.preset_combo)
-        layout.addLayout(preset_box)
-
-        # 2. Vocabulary Input
-        vocab_box = QVBoxLayout()
-        vocab_box.setSpacing(4)
-        vocab_label = QLabel("Custom Vocabulary / Jargon (comma separated):", self)
-        vocab_label.setStyleSheet("font-weight: 600; color: #E2E8F0;")
-        vocab_box.addWidget(vocab_label)
-        self.vocab_input = QLineEdit(self)
-        self.vocab_input.setPlaceholderText("e.g. Srinivas, Awasthi, Gemini, Wispr, PyTorch, LeetCode, TypeScript...")
-        vocab_box.addWidget(self.vocab_input)
-        layout.addLayout(vocab_box)
-
-        # 3. Saved Custom Prompts Library Card
+        # 1. Unified Dictation Styles & Prompts Card
         prompt_card = QFrame(self)
-        prompt_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
+        prompt_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 14px; }")
         pc_layout = QVBoxLayout(prompt_card)
-        pc_layout.setSpacing(8)
+        pc_layout.setSpacing(10)
 
         # Header with active badge
         pc_header = QHBoxLayout()
-        pc_title = QLabel("📚 Saved Custom Prompts Library", prompt_card)
+        pc_title = QLabel("📚 Active Dictation Style & System Prompt", prompt_card)
         pc_title.setStyleSheet("font-weight: 700; font-size: 14px; color: #F59E0B; border: none;")
         pc_header.addWidget(pc_title)
         pc_header.addStretch()
 
-        self.active_prompt_badge = QLabel("Active: Clean Speech Dictation", prompt_card)
+        self.active_prompt_badge = QLabel("Active: Clean Speech & Grammar Enhancement", prompt_card)
         self.active_prompt_badge.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 3px 8px; border: none;")
         pc_header.addWidget(self.active_prompt_badge)
         pc_layout.addLayout(pc_header)
 
         # Selector Row
         sel_row = QHBoxLayout()
-        sel_row.addWidget(QLabel("Select Saved Prompt:", prompt_card))
+        sel_lbl = QLabel("Choose Dictation Style / Prompt:", prompt_card)
+        sel_lbl.setStyleSheet("font-weight: 600; color: #E2E8F0;")
+        sel_row.addWidget(sel_lbl)
         self.saved_prompts_combo = QComboBox(prompt_card)
         self.saved_prompts_combo.setView(QListView())
         self.saved_prompts_combo.currentIndexChanged.connect(self._on_saved_prompt_selected)
+        sel_row.addWidget(self.saved_prompts_combo, stretch=2)
+        pc_layout.addLayout(sel_row)
         sel_row.addWidget(self.saved_prompts_combo, stretch=2)
         pc_layout.addLayout(sel_row)
 
@@ -2095,6 +2098,23 @@ class SettingsDialog(QDialog):
         pc_layout.addWidget(self.prompt_status_label)
 
         layout.addWidget(prompt_card)
+
+        # 2. Custom Vocabulary Input
+        vocab_card = QFrame(self)
+        vocab_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
+        vc_layout = QVBoxLayout(vocab_card)
+        vc_layout.setSpacing(6)
+        
+        vocab_label = QLabel("🔤 Custom Vocabulary & Jargon (Comma Separated):", vocab_card)
+        vocab_label.setStyleSheet("font-weight: 700; font-size: 13px; color: #38BDF8; border: none;")
+        vc_layout.addWidget(vocab_label)
+        
+        self.vocab_input = QLineEdit(vocab_card)
+        self.vocab_input.setPlaceholderText("e.g. Srinivas, Awasthi, Gemini, Wispr, PyTorch, LeetCode, TypeScript...")
+        self.vocab_input.setStyleSheet("font-size: 13px; padding: 6px 10px;")
+        vc_layout.addWidget(self.vocab_input)
+        layout.addWidget(vocab_card)
+
         layout.addStretch()
 
         scroll.setWidget(tab)
@@ -3074,6 +3094,11 @@ class SettingsDialog(QDialog):
             if not found:
                 self.model_combo.setCurrentIndex(0)
 
+        if hasattr(self, 'router_model_combo'):
+            self.router_model_combo.blockSignals(True)
+            self.router_model_combo.setCurrentIndex(self.model_combo.currentIndex())
+            self.router_model_combo.blockSignals(False)
+
         # Modes
         mode = self.config.get("hotkey_mode", "toggle")
         if mode == "push_to_talk":
@@ -3115,11 +3140,8 @@ class SettingsDialog(QDialog):
         self.cb_auto_prompt.setChecked(self.config.get("auto_prompt_conversion", False))
         self.cb_start_with_windows.setChecked(self.config.get("start_with_windows", True))
 
-        # Preset
+        # Preset Mode
         preset = self.config.get("mode_preset", "clean_dictation")
-        idx = self.preset_combo.findData(preset)
-        if idx >= 0:
-            self.preset_combo.setCurrentIndex(idx)
 
         vocab = self.config.get("custom_vocabulary", [])
         self.vocab_input.setText(", ".join(vocab))
@@ -3181,6 +3203,8 @@ class SettingsDialog(QDialog):
         if not hasattr(self, 'saved_prompts_combo'):
             return
         p_id = self.saved_prompts_combo.currentData()
+        if not p_id:
+            return
         self._editing_prompt_id = p_id
         prompts = self.config.get_saved_prompts()
         matched = next((p for p in prompts if p.get("id") == p_id), None)
@@ -3188,17 +3212,28 @@ class SettingsDialog(QDialog):
             self.prompt_title_input.setText(matched.get("title", ""))
             self.custom_prompt_edit.setPlainText(matched.get("prompt", ""))
             self._original_editing_title = matched.get("title", "")
-            if matched.get("is_active", False):
-                self.active_prompt_badge.setText(f"Active: {matched.get('title')}")
-                self.active_prompt_badge.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 3px 8px; border: none;")
-                self.btn_apply_prompt.setEnabled(False)
-                self.btn_apply_prompt.setText("✓ Currently Active")
-            else:
-                self.active_prompt_badge.setText(f"Loaded: {matched.get('title')}")
-                self.active_prompt_badge.setStyleSheet("color: #94A3B8; font-weight: 500; font-size: 11px; background: #1E293B; border-radius: 4px; padding: 3px 8px; border: none;")
-                self.btn_apply_prompt.setEnabled(True)
-                self.btn_apply_prompt.setText("⚡ Set as Active Prompt")
+
+            # Map prompt id to preset mode
+            id_to_preset = {
+                "clean_dictation_custom": "clean_dictation",
+                "smart_polish_custom": "smart_polish",
+                "code_dev_custom": "code_assistant",
+                "ai_prompt_engineer_custom": "prompt_enhancer",
+                "meeting_notes_custom": "meeting_notes"
+            }
+            matched_preset = id_to_preset.get(p_id, "clean_dictation")
+            
+            # Activate immediately on selection
+            self.config.set_active_saved_prompt(p_id)
+            self.config.set("mode_preset", matched_preset)
+            self.config.save_config()
+
+            self.active_prompt_badge.setText(f"Active: {matched.get('title')}")
+            self.active_prompt_badge.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 3px 8px; border: none;")
+            self.btn_apply_prompt.setEnabled(False)
+            self.btn_apply_prompt.setText("✓ Currently Active")
             self.btn_delete_prompt.setEnabled(len(prompts) > 1)
+            self.settings_applied.emit()
 
     def _on_new_saved_prompt(self):
         self._editing_prompt_id = None
@@ -3266,7 +3301,17 @@ class SettingsDialog(QDialog):
         self.prompt_status_label.setText(f"✓ '{title}' is now your active dictation system prompt!")
         self.prompt_status_label.setStyleSheet("color: #10B981; font-weight: bold; font-size: 12px; border: none;")
         self.settings_applied.emit()
-        QTimer.singleShot(3000, lambda: self.prompt_status_label.setText(""))
+    def _on_general_model_combo_changed(self, index: int):
+        if hasattr(self, 'router_model_combo') and self.router_model_combo.currentIndex() != index:
+            self.router_model_combo.blockSignals(True)
+            self.router_model_combo.setCurrentIndex(index)
+            self.router_model_combo.blockSignals(False)
+
+    def _on_router_model_combo_changed(self, index: int):
+        if hasattr(self, 'model_combo') and self.model_combo.currentIndex() != index:
+            self.model_combo.blockSignals(True)
+            self.model_combo.setCurrentIndex(index)
+            self.model_combo.blockSignals(False)
 
     def notify_history_changed(self):
         """Called live by main coordinator when new transcription or prompt finishes."""
@@ -4176,7 +4221,7 @@ class SettingsDialog(QDialog):
         trans_disp = self.transform_hotkey_btn.display_str
         trans_inter = self.transform_hotkey_btn.internal_str
 
-        preset = self.preset_combo.currentData()
+        preset = self.config.get("mode_preset", "clean_dictation")
         custom_prompt = self.custom_prompt_edit.toPlainText().strip()
 
         vocab_raw = self.vocab_input.text()
