@@ -17,6 +17,30 @@ APP_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_FILE = APP_DIR / "config.json"
 HISTORY_FILE = APP_DIR / "history.json"
 
+
+def sanitize_api_key(raw_key: Any) -> str:
+    """
+    Cleans raw API key strings by stripping whitespace, carriage returns,
+    surrounding quotes (single or double), and common variable prefixes like 'GEMINI_API_KEY='.
+    """
+    if not raw_key:
+        return ""
+    k = str(raw_key).strip().strip("\r\n\t ")
+    # Strip quotes
+    if (k.startswith('"') and k.endswith('"')) or (k.startswith("'") and k.endswith("'")):
+        k = k[1:-1].strip()
+    # Strip common variable assignment prefixes if user copied whole line from .env or terminal
+    prefixes = [
+        "GEMINI_API_KEY=", "GOOGLE_API_KEY=", "API_KEY=",
+        "export GEMINI_API_KEY=", "export GOOGLE_API_KEY=",
+        "set GEMINI_API_KEY=", "set GOOGLE_API_KEY="
+    ]
+    for prefix in prefixes:
+        if k.upper().startswith(prefix.upper()):
+            k = k[len(prefix):].strip().strip('"\'').strip()
+    return k
+
+
 DEFAULT_PROMPTS = {
     "clean_dictation": (
         "You are an elite, world-class speech-to-text transcriber and real-time voice dictation assistant. "
@@ -49,11 +73,13 @@ DEFAULT_PROMPTS = {
         "6. Output ONLY the polished final text directly without conversational remarks or markdown code fences."
     ),
     "code_assistant": (
-        "You are a developer dictation assistant. The user is dictating code, technical instructions, or documentation. "
-        "Strip all verbal hesitation sounds ('uh', 'ah', 'um', 'like', 'means', 'etcetera') and repetitions. "
-        "Fix spoken grammar and format technical terms, variable names (camelCase, snake_case if spoken), syntax, and code comments cleanly. "
-        "Format spoken commands like 'new line', 'colon', 'semicolon', 'bullet point' accurately on new lines. "
-        "Output ONLY the resulting code or technical text without explanation."
+        "You are an elite Developer Dictation Assistant and Technical Writing Expert. The user is dictating code, technical instructions, PR descriptions, architectural decisions, or documentation.\n\n"
+        "Mandatory Rules:\n"
+        "1. Complete Filler & Hesitation Elimination: Strip ALL verbal hesitation sounds ('uh', 'ah', 'um', 'er', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'matlab', 'yaani', 'etcetera') and repetitions/stutters.\n"
+        "2. Technical & Code Formatting: Intelligently format programming terms, frameworks, API endpoints (e.g. FastAPI, Docker, PyTorch), variable/function names in camelCase or snake_case, syntax, and terminal commands cleanly.\n"
+        "3. Superior Grammar & Technical Polish: Refine spoken grammar and elevate conversational phrasing into articulate, concise, professional technical communication.\n"
+        "4. Spoken Formatting Commands: If the speaker says 'bullet point', 'new line', 'next line', 'colon', 'semicolon', insert the exact formatting and line breaks.\n"
+        "5. Output ONLY the finalized polished technical text or code directly without preamble, quotes, markdown code fences, or conversational remarks."
     ),
     "prompt_enhancer": (
         "You are a World-Class AI Prompt Engineer. The user has dictated raw, unstructured thoughts or instructions for an AI/LLM (ChatGPT, Claude, Gemini, Antigravity).\n"
@@ -133,11 +159,13 @@ DEFAULT_SAVED_PROMPTS = [
         "id": "code_dev_custom",
         "title": "Developer Code & Technical Assistant",
         "prompt": (
-            "You are a developer dictation assistant. The user is dictating code, technical instructions, or documentation. "
-            "Strip all verbal hesitation sounds and repetitions. "
-            "Transcribe technical terms, variable names in camelCase or snake_case, syntax, and terminal commands cleanly. "
-            "Format spoken formatting commands ('new line', 'colon', 'semicolon', 'bullet point') accurately on separate lines. "
-            "Output ONLY the resulting code or text without explanation."
+            "You are an elite Developer Dictation Assistant and Technical Writing Expert. The user is dictating code, technical instructions, PR descriptions, architectural decisions, or documentation.\n\n"
+            "Mandatory Rules:\n"
+            "1. Complete Filler & Hesitation Elimination: Strip ALL verbal hesitation sounds ('uh', 'ah', 'um', 'er', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'matlab', 'yaani', 'etcetera') and repetitions/stutters.\n"
+            "2. Technical & Code Formatting: Intelligently format programming terms, frameworks, API endpoints (e.g. FastAPI, Docker, PyTorch), variable/function names in camelCase or snake_case, syntax, and terminal commands cleanly.\n"
+            "3. Superior Grammar & Technical Polish: Refine spoken grammar and elevate conversational phrasing into articulate, concise, professional technical communication.\n"
+            "4. Spoken Formatting Commands: If the speaker says 'bullet point', 'new line', 'next line', 'colon', 'semicolon', insert the exact formatting and line breaks.\n"
+            "5. Output ONLY the finalized polished technical text or code directly without preamble, quotes, markdown code fences, or conversational remarks."
         ),
         "is_active": False
     }
@@ -211,8 +239,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 
 def setup_windows_startup(enable: bool) -> bool:
     """
-    Configures Gemini Flow to start automatically with Windows in the background.
-    Sets both HKCU Run registry key AND Startup folder launcher for 100% startup reliability.
+    Configures Gemini Flow to start automatically with Windows cleanly via HKCU Run.
+    Removes any duplicate VBS startup scripts to eliminate double-instance boot collisions.
     """
     import winreg
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -229,7 +257,7 @@ def setup_windows_startup(enable: bool) -> bool:
     else:
         cmd = f'"{py_bin}" "{script_path}" --startup'
 
-    # 1. Windows Run Registry Key (HKCU)
+    # 1. Windows Run Registry Key (HKCU) - The clean standard for Windows
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE) as key:
             if enable:
@@ -244,36 +272,24 @@ def setup_windows_startup(enable: bool) -> bool:
     except Exception as e:
         logger.error(f"Failed to update Windows startup registry: {e}")
 
-    # 2. Windows Startup Folder (shell:startup)
+    # 2. Windows Startup Folder (shell:startup) - Clean up any legacy VBS file to avoid duplicate launch race condition
     try:
         startup_dir = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
         if startup_dir.exists():
             vbs_file = startup_dir / "GeminiFlow.vbs"
-            if enable:
-                vbs_content = (
-                    'Set WshShell = CreateObject("WScript.Shell")\n'
-                    f'WshShell.CurrentDirectory = "{app_dir}"\n'
-                    f'WshShell.Run """{py_bin}"" ""{script_path}"" --startup", 0, False\n'
-                )
-                with open(vbs_file, "w", encoding="utf-8") as f:
-                    f.write(vbs_content)
-                logger.info(f"Created Windows Startup folder launcher: {vbs_file}")
-            else:
-                if vbs_file.exists():
-                    vbs_file.unlink()
+            if vbs_file.exists():
+                vbs_file.unlink()
+                logger.info(f"Cleaned up duplicate legacy startup script: {vbs_file}")
     except Exception as e:
-        logger.warning(f"Could not update Startup folder launcher: {e}")
+        logger.debug(f"Startup folder cleanup note: {e}")
 
-    # 3. Also ensure Desktop shortcuts are fresh
-    ensure_desktop_shortcuts()
     return True
 
 
 def ensure_desktop_shortcuts() -> None:
-    """Ensures Gemini Flow desktop shortcuts are correctly placed on active desktop locations."""
+    """Ensures Gemini Flow desktop shortcuts are correctly placed on active desktop locations without blocking."""
     try:
         import win32com.client
-        shell = win32com.client.Dispatch("WScript.Shell")
         app_dir = Path(__file__).parent.parent.resolve()
         exe_path = app_dir / "Gemini Flow.exe"
         icon_path = app_dir / "app_icon.ico"
@@ -303,21 +319,27 @@ def ensure_desktop_shortcuts() -> None:
         if ws_parent.exists() and ws_parent not in desktop_targets:
             desktop_targets.append(ws_parent)
 
+        shell = None
         for dt in desktop_targets:
             if dt.exists():
                 try:
-                    lnk_path = str(dt / "Gemini Flow.lnk")
-                    shortcut = shell.CreateShortcut(lnk_path)
-                    if exe_path.exists():
-                        shortcut.TargetPath = str(exe_path)
-                        shortcut.Arguments = ""
-                    else:
-                        shortcut.TargetPath = str(py_bin)
-                        shortcut.Arguments = f'"{str(script_path)}"'
-                    shortcut.WorkingDirectory = str(app_dir)
-                    shortcut.IconLocation = f"{str(icon_path)},0"
-                    shortcut.Description = "Gemini Flow — Voice AI (Ctrl+Space)"
-                    shortcut.Save()
+                    lnk_path = dt / "Gemini Flow.lnk"
+                    # Only create or update if it doesn't already exist or points wrong
+                    if not lnk_path.exists():
+                        if shell is None:
+                            shell = win32com.client.Dispatch("WScript.Shell")
+                        shortcut = shell.CreateShortcut(str(lnk_path))
+                        if exe_path.exists():
+                            shortcut.TargetPath = str(exe_path)
+                            shortcut.Arguments = ""
+                        else:
+                            shortcut.TargetPath = str(py_bin)
+                            shortcut.Arguments = f'"{str(script_path)}"'
+                        shortcut.WorkingDirectory = str(app_dir)
+                        if icon_path.exists():
+                            shortcut.IconLocation = f"{str(icon_path)},0"
+                        shortcut.Description = "Gemini Flow — Voice AI (Ctrl+Space)"
+                        shortcut.Save()
                 except Exception as ex:
                     logger.debug(f"Could not create desktop shortcut in {dt}: {ex}")
     except Exception as e:
@@ -342,6 +364,7 @@ class ConfigManager:
         self.load_config()
 
     def load_config(self) -> Dict[str, Any]:
+        needs_save = False
         if CONFIG_FILE.exists():
             try:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -349,48 +372,65 @@ class ConfigManager:
                     self.config.update(loaded)
                     # Update API Key if outdated or matching old test keys
                     curr_key = self.config.get("api_key", "")
-                    if not curr_key or "KLd4Prd" in curr_key or "ISb0Ozd" in curr_key:
+                    if not curr_key or "KLd4Prd" in curr_key or "ISb0Ozd" in curr_key or "mock_working_key" in curr_key:
                         self.config["api_key"] = DEFAULT_CONFIG["api_key"]
+                        needs_save = True
                     # Ensure defaults for all advanced features
-                    if "model_name" not in self.config or self.config.get("model_name") in ("gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"):
-                        self.config["model_name"] = "gemini-3.5-flash-lite"
+                    if "model_name" not in self.config:
+                        self.config["model_name"] = "gemini-2.0-flash"
+                        needs_save = True
                     if "model_mode" not in self.config:
                         self.config["model_mode"] = "auto"
+                        needs_save = True
                     if "active_profile" not in self.config:
                         self.config["active_profile"] = "coding"
+                        needs_save = True
                     if "hotkey" not in self.config:
                         self.config["hotkey"] = "<ctrl>+<space>"
                         self.config["hotkey_display"] = "Ctrl + Space"
+                        needs_save = True
                     if "transform_hotkey" not in self.config:
                         self.config["transform_hotkey"] = "<ctrl>+<shift>+t"
                         self.config["transform_hotkey_display"] = "Ctrl + Shift + T"
+                        needs_save = True
                     if "transform_hotkey_history" not in self.config or not self.config["transform_hotkey_history"]:
                         self.config["transform_hotkey_history"] = DEFAULT_CONFIG["transform_hotkey_history"].copy()
+                        needs_save = True
                     if "security" not in self.config:
                         self.config["security"] = DEFAULT_CONFIG["security"].copy()
+                        needs_save = True
                     # Ensure dictionary and snippets exist
                     if "dictionary" not in self.config or not self.config["dictionary"]:
                         self.config["dictionary"] = DEFAULT_DICTIONARY.copy()
+                        needs_save = True
                     if "snippets" not in self.config or not self.config["snippets"]:
                         self.config["snippets"] = DEFAULT_SNIPPETS.copy()
+                        needs_save = True
                     if "prompt_hotkey" not in self.config:
                         self.config["prompt_hotkey"] = "<ctrl>+<shift>+p"
                         self.config["prompt_hotkey_display"] = "Ctrl + Shift + P"
+                        needs_save = True
                     if "voice_hotkey_history" not in self.config or not self.config["voice_hotkey_history"]:
                         self.config["voice_hotkey_history"] = DEFAULT_CONFIG["voice_hotkey_history"].copy()
+                        needs_save = True
                     if "prompt_hotkey_history" not in self.config or not self.config["prompt_hotkey_history"]:
                         self.config["prompt_hotkey_history"] = DEFAULT_CONFIG["prompt_hotkey_history"].copy()
+                        needs_save = True
                     if "saved_prompts" not in self.config or not self.config["saved_prompts"]:
                         self.config["saved_prompts"] = [p.copy() for p in DEFAULT_SAVED_PROMPTS]
+                        needs_save = True
                     if "auto_cost_mode" not in self.config:
                         self.config["auto_cost_mode"] = True
+                        needs_save = True
                     if "auto_prompt_conversion" not in self.config:
                         self.config["auto_prompt_conversion"] = False
+                        needs_save = True
                     if "settings_window_state" not in self.config:
                         self.config["settings_window_state"] = DEFAULT_CONFIG["settings_window_state"].copy()
-                    # Ensure clean_dictation prompt is updated with grammar enhancement
-                    self.save_config()
-                    logger.info("Configuration loaded successfully.")
+                        needs_save = True
+                    if needs_save:
+                        self.save_config()
+                    logger.debug("Configuration loaded.")
             except Exception as e:
                 logger.error(f"Failed to load config: {e}")
         else:
@@ -414,14 +454,15 @@ class ConfigManager:
         try:
             from app.security.security_manager import SecurityManager
             sec = SecurityManager(APP_DIR)
-            return sec.load_api_key(self.config.get("api_key", ""))
+            raw = sec.load_api_key(self.config.get("api_key", ""))
+            return sanitize_api_key(raw)
         except Exception as e:
             logger.error(f"Error retrieving secure API key: {e}")
-            return self.config.get("api_key", "").strip()
+            return sanitize_api_key(self.config.get("api_key", ""))
 
     def set_api_key(self, api_key: str) -> None:
         """Securely stores API key using Windows DPAPI if enabled."""
-        cleaned = api_key.strip()
+        cleaned = sanitize_api_key(api_key)
         try:
             from app.security.security_manager import SecurityManager
             sec = SecurityManager(APP_DIR)
@@ -634,7 +675,7 @@ class ConfigManager:
         try:
             from app.vocabulary.vocab_engine import VocabEngine
             ve = VocabEngine()
-            vocab_prompt = ve.format_prompt_injection()
+            vocab_prompt = ve.get_prompt_injection()
             if vocab_prompt:
                 base_prompt += f"\n\n{vocab_prompt}"
         except Exception:
@@ -651,9 +692,23 @@ class ConfigManager:
             retention_days = self.config.get("security", {}).get("history_retention_days", 30)
             from app.security.security_manager import SecurityManager
             sec = SecurityManager(APP_DIR)
-            sec.enforce_history_retention(HISTORY_FILE, days=retention_days)
+            history = self.get_history()
+            retained, purged = sec.enforce_history_retention(history, retention_days)
+            if purged > 0:
+                self._save_history(retained)
+                logger.info(f"Purged {purged} expired history records based on {retention_days}-day retention policy.")
         except Exception as e:
             logger.debug(f"Retention enforcement note: {e}")
+
+    def _save_history(self, history: List[Dict[str, Any]]) -> bool:
+        """Internal helper to atomically serialize history records to disk."""
+        try:
+            with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump(history, f, indent=2)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save history: {e}")
+            return False
 
     def get_history(self) -> List[Dict[str, Any]]:
         if not HISTORY_FILE.exists():

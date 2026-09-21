@@ -163,14 +163,24 @@ class VocabularyEngine:
 
     def add_entry(
         self,
-        canonical_term: str,
+        canonical_term: Any,
         aliases: Optional[List[str]] = None,
         category: str = "Custom",
         enabled: bool = True,
         case_sensitive: bool = False,
         notes: str = ""
     ) -> Optional[VocabularyEntry]:
-        cleaned_term = canonical_term.strip()
+        if isinstance(canonical_term, VocabularyEntry):
+            entry_obj = canonical_term
+            cleaned_term = entry_obj.canonical_term.strip()
+            aliases = entry_obj.aliases
+            category = entry_obj.category
+            enabled = entry_obj.enabled
+            case_sensitive = entry_obj.case_sensitive
+            notes = entry_obj.notes
+        else:
+            cleaned_term = str(canonical_term).strip()
+
         if not cleaned_term:
             return None
 
@@ -184,6 +194,8 @@ class VocabularyEngine:
                             e.aliases.append(a.strip())
                 e.category = category
                 e.enabled = enabled
+                e.case_sensitive = case_sensitive
+                e.notes = notes or e.notes
                 self.save_vocabulary()
                 return e
 
@@ -219,9 +231,13 @@ class VocabularyEngine:
                 return True
         return False
 
-    def delete_entry(self, entry_id: str) -> bool:
+    def delete_entry(self, entry_id_or_term: str) -> bool:
+        target = str(entry_id_or_term).strip().lower()
         initial = len(self.entries)
-        self.entries = [e for e in self.entries if e.id != entry_id]
+        self.entries = [
+            e for e in self.entries
+            if e.id != entry_id_or_term and e.canonical_term.lower() != target
+        ]
         if len(self.entries) < initial:
             self.save_vocabulary()
             return True
@@ -266,6 +282,9 @@ class VocabularyEngine:
 
         return injection
 
+    format_prompt_injection = get_prompt_injection
+    save = save_vocabulary
+
     def normalize(self, text: str) -> str:
         """
         Post-processes recognized text. Replaces any spoken variants or aliases
@@ -294,9 +313,11 @@ class VocabularyEngine:
 
         return result
 
-    def normalize_text(self, text: str) -> str:
-        """Instance method alias for normalize."""
-        return self.normalize(text)
+    @classmethod
+    def normalize_text(cls, text: str) -> str:
+        """Classmethod helper to quickly normalize text with default vocabulary."""
+        engine = cls()
+        return engine.normalize(text)
 
     @classmethod
     def normalize_string(cls, text: str) -> str:

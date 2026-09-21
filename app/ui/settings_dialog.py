@@ -471,6 +471,8 @@ class HotkeyCaptureButton(QPushButton):
     def start_recording(self):
         self.is_recording = True
         self._pressed_keys.clear()
+        self._max_combo_disp = ""
+        self._max_combo_inter = ""
         self._update_button_text()
 
         # Start pynput keyboard listener to reliably capture Windows/Cmd, Ctrl, Shift, Alt
@@ -486,6 +488,9 @@ class HotkeyCaptureButton(QPushButton):
         if self._listener:
             self._listener.stop()
             self._listener = None
+        if getattr(self, "_max_combo_disp", "") and getattr(self, "_max_combo_inter", ""):
+            self.display_str = self._max_combo_disp
+            self.internal_str = self._max_combo_inter
         self._update_button_text()
 
     def _on_pynput_press(self, key):
@@ -497,7 +502,6 @@ class HotkeyCaptureButton(QPushButton):
     def _on_pynput_release(self, key):
         if not self.is_recording:
             return
-        self._process_pressed_keys(is_release=True)
         # When all keys are released, automatically finalize recording
         if key in self._pressed_keys:
             self._pressed_keys.discard(key)
@@ -544,7 +548,10 @@ class HotkeyCaptureButton(QPushButton):
         if display_parts:
             disp = " + ".join(display_parts)
             inter = "+".join(internal_parts)
-            self.signals.key_combo_updated.emit(disp, inter)
+            if len(display_parts) >= len(getattr(self, "_max_combo_disp", "").split(" + ")):
+                self._max_combo_disp = disp
+                self._max_combo_inter = inter
+                self.signals.key_combo_updated.emit(disp, inter)
 
     def _on_combo_updated(self, disp: str, inter: str):
         self.display_str = disp
@@ -933,6 +940,9 @@ class HistoryTranscriptDelegate(QStyledItemDelegate):
 
 class SettingsDialog(QDialog):
     settings_applied = pyqtSignal()
+    api_test_finished = pyqtSignal(bool, str, str)  # (ok, msg, key)
+    benchmark_step = pyqtSignal(object, int)  # (result, step)
+    benchmark_done = pyqtSignal(str)  # (model)
 
     def __init__(self, config_manager, gemini_engine, text_injector=None, main_app=None, parent=None):
         super().__init__(parent)
@@ -942,6 +952,11 @@ class SettingsDialog(QDialog):
         self.main_app = main_app
         self.test_recorder = None
         self.mic_test_timer = None
+
+        # Connect background worker signals
+        self.api_test_finished.connect(self._on_api_test_result)
+        self.benchmark_step.connect(self._on_benchmark_step)
+        self.benchmark_done.connect(self._on_benchmark_done)
 
         # Advanced History Filter & Selection State
         self._history_search_query = ""
@@ -1110,29 +1125,65 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(14)
 
-        # API Key Section
-        api_label = QLabel("Google Gemini API Key:")
-        layout.addWidget(api_label)
+        # API Key Section Card
+        api_card = QFrame(self)
+        api_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #1E293B; border-radius: 10px; padding: 14px; }")
+        api_card_layout = QVBoxLayout(api_card)
+        api_card_layout.setSpacing(10)
+
+        api_header_layout = QHBoxLayout()
+        api_label = QLabel("🔑 Google Gemini API Key:", api_card)
+        api_label.setStyleSheet("font-size: 14px; font-weight: 700; color: #38BDF8; border: none;")
+        api_header_layout.addWidget(api_label)
+        api_header_layout.addStretch()
+
+        self.btn_get_api_key = QPushButton("🔗 Get Free API Key (AI Studio) ↗", api_card)
+        self.btn_get_api_key.setStyleSheet("background-color: #1E293B; color: #38BDF8; border: 1px solid #38BDF8; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600;")
+        self.btn_get_api_key.setToolTip("Opens Google AI Studio (aistudio.google.com) in browser to generate a free Gemini API key")
+        self.btn_get_api_key.clicked.connect(self._open_ai_studio_link)
+        api_header_layout.addWidget(self.btn_get_api_key)
+        api_card_layout.addLayout(api_header_layout)
 
         key_box = QHBoxLayout()
-        self.api_key_input = QLineEdit(self)
+        key_box.setSpacing(8)
+        self.api_key_input = QLineEdit(api_card)
         self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.api_key_input.setPlaceholderText("Enter your Gemini API key (AQ.Ab8... or AIzaSy...)")
-        key_box.addWidget(self.api_key_input)
+        self.api_key_input.setPlaceholderText("Paste your Gemini API key here (starts with AIzaSy... or AQ....)")
+        self.api_key_input.returnPressed.connect(self._test_api)
+        self.api_key_input.textChanged.connect(self._on_api_key_text_changed)
+        self.api_key_input.editingFinished.connect(self._on_api_key_editing_finished)
+        key_box.addWidget(self.api_key_input, stretch=4)
 
-        self.btn_toggle_key = QPushButton("👁️ Show", self)
+        self.btn_toggle_key = QPushButton("👁️ Show", api_card)
         self.btn_toggle_key.setObjectName("secondaryBtn")
         self.btn_toggle_key.clicked.connect(self._toggle_key_echo)
         key_box.addWidget(self.btn_toggle_key)
 
-        self.btn_test_api = QPushButton("Test API", self)
-        self.btn_test_api.setObjectName("secondaryBtn")
+        self.btn_paste_key = QPushButton("📋 Paste & Test", api_card)
+        self.btn_paste_key.setObjectName("secondaryBtn")
+        self.btn_paste_key.setToolTip("Paste API key from clipboard, sanitize, and test automatically")
+        self.btn_paste_key.clicked.connect(self._paste_api_key)
+        key_box.addWidget(self.btn_paste_key)
+
+        self.btn_clear_key = QPushButton("✖ Clear", api_card)
+        self.btn_clear_key.setObjectName("secondaryBtn")
+        self.btn_clear_key.setToolTip("Clear API key")
+        self.btn_clear_key.clicked.connect(self._clear_api_key)
+        key_box.addWidget(self.btn_clear_key)
+
+        self.btn_test_api = QPushButton("⚡ Test & Save", api_card)
+        self.btn_test_api.setStyleSheet("background-color: #0284C7; color: white; font-weight: 700; border-radius: 6px; padding: 6px 14px;")
+        self.btn_test_api.setToolTip("Validates connection to Gemini API and automatically activates the key")
         self.btn_test_api.clicked.connect(self._test_api)
         key_box.addWidget(self.btn_test_api)
-        layout.addLayout(key_box)
+        api_card_layout.addLayout(key_box)
 
-        self.api_status_label = QLabel("")
-        layout.addWidget(self.api_status_label)
+        self.api_status_label = QLabel("", api_card)
+        self.api_status_label.setStyleSheet("border: none; font-size: 12px;")
+        self.api_status_label.setWordWrap(True)
+        api_card_layout.addWidget(self.api_status_label)
+
+        layout.addWidget(api_card)
 
         # Model Selection (Intelligent Router + Models)
         model_label = QLabel("Gemini AI Model / Routing Mode:")
@@ -1166,7 +1217,40 @@ class SettingsDialog(QDialog):
         self.cb_start_with_windows = QCheckBox("Start Gemini Flow automatically when Windows starts (Recommended)")
         layout.addWidget(self.cb_start_with_windows)
 
-        layout.addStretch()
+        # Privacy, History Retention & Governance Card
+        sec_card = QFrame(self)
+        sec_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
+        sec_layout = QVBoxLayout(sec_card)
+        sec_layout.setSpacing(10)
+
+        sec_header = QLabel("🔒 Privacy & History Retention Governance", sec_card)
+        sec_header.setStyleSheet("font-weight: 700; color: #38BDF8; font-size: 13px; border: none;")
+        sec_layout.addWidget(sec_header)
+
+        ret_box = QHBoxLayout()
+        ret_lbl = QLabel("History Auto-Retention:", sec_card)
+        ret_lbl.setStyleSheet("color: #E2E8F0; font-size: 13px; border: none;")
+        ret_box.addWidget(ret_lbl)
+        self.retention_combo = QComboBox(sec_card)
+        self.retention_combo.setView(QListView())
+        self.retention_combo.addItem("7 Days", 7)
+        self.retention_combo.addItem("14 Days", 14)
+        self.retention_combo.addItem("30 Days (Recommended)", 30)
+        self.retention_combo.addItem("90 Days", 90)
+        self.retention_combo.addItem("Keep Forever (0 Days)", 0)
+        ret_box.addWidget(self.retention_combo, stretch=2)
+
+        self.btn_purge_history = QPushButton("🗑️ Purge Expired Now", sec_card)
+        self.btn_purge_history.setObjectName("secondaryBtn")
+        self.btn_purge_history.clicked.connect(self._purge_expired_history)
+        ret_box.addWidget(self.btn_purge_history)
+        sec_layout.addLayout(ret_box)
+
+        self.cb_log_redaction = QCheckBox("Redact sensitive keys and personal entities in application logs", sec_card)
+        sec_layout.addWidget(self.cb_log_redaction)
+
+        layout.addWidget(sec_card)
+
         layout.addStretch()
         scroll.setWidget(tab)
         return scroll
@@ -1337,15 +1421,65 @@ class SettingsDialog(QDialog):
             self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
             self.btn_toggle_key.setText("👁️ Show")
 
+    def _open_ai_studio_link(self):
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtCore import QUrl
+        QDesktopServices.openUrl(QUrl("https://aistudio.google.com/app/apikey"))
+
+    def _on_api_key_text_changed(self, text: str):
+        cleaned = text.strip()
+        if not cleaned:
+            self.api_status_label.setText("⚠️ Gemini API key not configured. Click '📋 Paste & Test' or paste your key above.")
+            self.api_status_label.setStyleSheet("color: #F59E0B; border: none;")
+        elif len(cleaned) >= 20:
+            self.api_status_label.setText("💡 Key entered. Click '⚡ Test & Save' or press Enter to verify and activate.")
+            self.api_status_label.setStyleSheet("color: #38BDF8; border: none;")
+
+    def _on_api_key_editing_finished(self):
+        from ..config import sanitize_api_key
+        key = sanitize_api_key(self.api_key_input.text())
+        if key and key != self.config.get_api_key():
+            self.config.set_api_key(key)
+            self.gemini.set_api_key(key)
+            self.gemini.warm_connection()
+            logger.info("Gemini API key automatically persisted on input finish.")
+
+    def _paste_api_key(self):
+        from ..config import sanitize_api_key
+        text = QApplication.clipboard().text().strip()
+        cleaned = sanitize_api_key(text)
+        if not cleaned:
+            self.api_status_label.setText("⚠️ Clipboard is empty or contains invalid text.")
+            self.api_status_label.setStyleSheet("color: #F59E0B; border: none;")
+            return
+        self.api_key_input.setText(cleaned)
+        self.config.set_api_key(cleaned)
+        self.gemini.set_api_key(cleaned)
+        self.api_status_label.setText("📋 Key pasted from clipboard. Verifying & activating...")
+        self.api_status_label.setStyleSheet("color: #38BDF8; border: none;")
+        self._test_api()
+
+    def _clear_api_key(self):
+        self.api_key_input.clear()
+        self.config.set_api_key("")
+        self.gemini.set_api_key("")
+        self.api_status_label.setText("API key cleared. Paste your key and click '⚡ Test & Save'.")
+        self.api_status_label.setStyleSheet("color: #94A3B8; border: none;")
+        self.api_key_input.setFocus()
+
     def _purge_expired_history(self):
-        days = self.retention_combo.currentData()
+        sec_cfg = self.config.get("security", {})
+        days = self.retention_combo.currentData() if hasattr(self, 'retention_combo') and self.retention_combo else sec_cfg.get("history_retention_days", 30)
         if days == 0:
             QMessageBox.information(self, "Retention", "Retention is set to 'Keep Forever'. No entries purged.")
             return
         from ..security.security_manager import SecurityManager
-        from ..config import APP_DIR, HISTORY_FILE
+        from ..config import APP_DIR
         sec = SecurityManager(APP_DIR)
-        purged = sec.enforce_history_retention(str(HISTORY_FILE), days=days)
+        history = self.config.get_history()
+        retained, purged = sec.enforce_history_retention(history, days)
+        if purged > 0:
+            self.config._save_history(retained)
         self._refresh_history()
         QMessageBox.information(self, "Purge Complete", f"Successfully purged {purged} expired entries older than {days} days.")
 
@@ -1604,7 +1738,274 @@ class SettingsDialog(QDialog):
         tab.setObjectName("profileScrollChild")
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(14)
+        layout.setSpacing(16)
+
+        # =========================================================================
+        # SECTION 1: COMPLETE LIST OF SPEAKING COMMANDS (ALL 16 CATEGORIES)
+        # =========================================================================
+        cmd_header = QLabel("🎙️ Complete List of Voice Commands & Intent Categories (All 16 Built-in Modes)")
+        cmd_header.setStyleSheet("font-size: 16px; font-weight: bold; color: #38BDF8;")
+        layout.addWidget(cmd_header)
+
+        cmd_desc = QLabel(
+            "Speak any trigger command phrase at the <b>START</b> of your dictation (e.g. <i>\"Make this professional: ...\"</i>), "
+            "or highlight text on your screen, press the hotkey, and speak only the command trigger."
+        )
+        cmd_desc.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        cmd_desc.setWordWrap(True)
+        layout.addWidget(cmd_desc)
+
+        # Unified Example Hero Card
+        sample_card = QFrame(self)
+        sample_card.setStyleSheet("""
+            QFrame {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0B132B, stop:1 #1C2541);
+                border: 2px solid #38BDF8;
+                border-radius: 10px;
+                padding: 12px;
+            }
+        """)
+        sc_layout = QVBoxLayout(sample_card)
+        sc_layout.setContentsMargins(14, 12, 14, 12)
+        sc_layout.setSpacing(8)
+
+        sc_top = QHBoxLayout()
+        sc_title = QLabel("📌 Unified Spoken Sample Dictation (Raw Speech Input):", sample_card)
+        sc_title.setStyleSheet("font-weight: 700; font-size: 13px; color: #38BDF8; border: none;")
+        sc_top.addWidget(sc_title)
+        sc_top.addStretch()
+
+        sc_badge = QLabel("⚡ Live Output Transformation Showcase", sample_card)
+        sc_badge.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px; background: #0284C7; border-radius: 4px; padding: 3px 8px; border: none;")
+        sc_top.addWidget(sc_badge)
+        sc_layout.addLayout(sc_top)
+
+        sample_box = QLabel(
+            "\"hey team we gotta delay the launch to friday cause database test failed also Srinivas will prepare the slides and keep budget under five grand\"",
+            sample_card
+        )
+        sample_box.setWordWrap(True)
+        sample_box.setStyleSheet("""
+            background-color: #0F172A;
+            border: 1px solid #1E293B;
+            border-radius: 6px;
+            padding: 10px 14px;
+            color: #FDE047;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: Consolas, 'Segoe UI';
+        """)
+        sc_layout.addWidget(sample_box)
+
+        sc_note = QLabel("💡 See in the table below how prefixing this single speech sample with different command triggers produces 16 completely different, high-value outputs:", sample_card)
+        sc_note.setStyleSheet("color: #CBD5E1; font-size: 11px; border: none;")
+        sc_layout.addWidget(sc_note)
+
+        layout.addWidget(sample_card)
+
+        # 16-Category Table Widget
+        cmd_table = QTableWidget(self)
+        cmd_table.setColumnCount(6)
+        cmd_table.setHorizontalHeaderLabels([
+            "#",
+            "Command Category",
+            "Spoken Triggers (Say at start)",
+            "AI Model Routed",
+            "Purpose & Transformation Effect",
+            "Example Transformed Output (From Sample Above)"
+        ])
+        cmd_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        cmd_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        cmd_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        cmd_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
+        cmd_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
+        cmd_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+
+        cmd_table.setColumnWidth(0, 36)
+        cmd_table.setColumnWidth(1, 140)
+        cmd_table.setColumnWidth(2, 210)
+        cmd_table.setColumnWidth(3, 145)
+        cmd_table.setColumnWidth(4, 230)
+        cmd_table.verticalHeader().setVisible(False)
+        cmd_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        cmd_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        cmd_table.setWordWrap(True)
+        cmd_table.setMinimumHeight(440)
+
+        commands_data = [
+            (
+                "1",
+                "👔 Professionalize",
+                "Make this professional:\nMake it formal:\nFormalize this:",
+                "gemini-2.5-flash",
+                "Converts informal speech into executive, articulate business prose.",
+                "Dear Team,\n\nWe need to adjust our launch timeline to Friday due to unresolved database test failures. Additionally, Srinivas Awasthi will prepare the stakeholder presentation slides, and we will ensure all associated expenses remain within the $5,000 budget."
+            ),
+            (
+                "2",
+                "✍️ Fix Grammar",
+                "Fix the grammar:\nFix grammar:\nCorrect grammar:\nProofread this:",
+                "gemini-2.5-flash (Deterministic)",
+                "Zero hallucination. Strictly fixes spelling, typos, punctuation & phrasing.",
+                "Hey team, we've got to delay the launch to Friday because database tests failed. Also, Srinivas will prepare the slides and keep the budget under five grand."
+            ),
+            (
+                "3",
+                "💻 Generate Code",
+                "Generate code in Python:\nWrite a python script to:\nWrite code in [Lang]:",
+                "gemini-3.7-flash (Technical)",
+                "Generates clean, runnable code with proper syntax, variables & comments.",
+                "import sys\n\ndef verify_database_and_schedule():\n    # Check database test status\n    db_tests_passed = run_db_tests()\n    if not db_tests_passed:\n        print('Database test failed. Rescheduling launch to Friday.')\n        assign_task('Srinivas', 'Prepare presentation slides')\n        enforce_budget_cap(max_usd=5000)"
+            ),
+            (
+                "4",
+                "📋 Summarize / TLDR",
+                "Summarize this:\nGive me a summary:\nTLDR:\nBrief summary of:",
+                "gemini-2.5-pro",
+                "Extracts key decisions, deliverables & bulleted action items.",
+                "• Launch Status: Postponed to Friday due to database test failure.\n• Presentation: Srinivas to prepare slides for executive review.\n• Budget Limit: Strictly capped under $5,000 total expenditure."
+            ),
+            (
+                "5",
+                "✨ Create AI Prompt",
+                "Turn this into a prompt:\nCreate a prompt from this:\nPrompt enhancer:",
+                "gemini-3.5-flash",
+                "Formats raw ideas into structured prompts with Role, Objective & Steps.",
+                "Role: Technical Project Lead\nObjective: Coordinate launch postponement and stakeholder update.\nContext: Database test failure identified prior to release.\nInstructions:\n1. Update deployment schedule to Friday.\n2. Request slide deck from Srinivas.\n3. Audit project burn to ensure it remains <= $5,000."
+            ),
+            (
+                "6",
+                "💬 Make Casual",
+                "Make this casual:\nMake it friendly:\nFriendly tone:",
+                "gemini-3.5-flash-lite",
+                "Friendly, conversational tone for chats, Slack & social messaging.",
+                "Hey everyone! Looks like we need to push the launch back to Friday since the DB tests ran into some snags. Srinivas is on slides, and we'll keep everything under $5k!"
+            ),
+            (
+                "7",
+                "✂️ Shorten / Concise",
+                "Make this shorter:\nShorten this:\nMake it concise:\nTrim this:",
+                "gemini-3.5-flash-lite",
+                "Cuts word count into punchy brevity while keeping core facts.",
+                "Launch delayed to Friday due to database test failure. Srinivas preparing slides; budget capped at $5,000."
+            ),
+            (
+                "8",
+                "📖 Expand / Elaborate",
+                "Expand this:\nElaborate on this:\nAdd more detail to:",
+                "gemini-2.5-pro",
+                "Adds explanatory depth, strategic context, and thorough prose.",
+                "Team Update: Following comprehensive database test runs, critical regressions were identified that necessitate shifting our target deployment date to Friday. Srinivas Awasthi will oversee slide preparations for executive review. Fiscal oversight remains active to ensure total burn stays well below the $5,000 ceiling."
+            ),
+            (
+                "9",
+                "💡 Explain Concept",
+                "Explain this:\nWhat does this mean:\nBreak down this:",
+                "gemini-3.7-flash",
+                "Step-by-step educational explanations and operational breakdowns.",
+                "This project update contains three operational components:\n1. Release Delay: Moving the target date to Friday allows engineering to stabilize failing database tests.\n2. Ownership: Srinivas is designated to build the deck for team alignment.\n3. Cost Control: A strict $5k spending limit is maintained."
+            ),
+            (
+                "10",
+                "🌐 Translate",
+                "Translate this to Spanish:\nTranslate to German:\nTranslate to French:",
+                "gemini-3.5-flash",
+                "Accurate, natural translation into the requested target language.",
+                "[Spanish Translation]:\nHola equipo, tenemos que retrasar el lanzamiento para el viernes porque la prueba de la base de datos falló. Además, Srinivas preparará las diapositivas y mantendrá el presupuesto por debajo de cinco mil dólares."
+            ),
+            (
+                "11",
+                "📧 Draft Email",
+                "Create an email:\nDraft an email to team about:\nWrite an email:",
+                "gemini-3.5-flash",
+                "Complete email with Subject line, greeting, body, and sign-off.",
+                "Subject: Project Launch Update & Friday Timeline\n\nHi Team,\n\nPlease be advised that our project launch is rescheduled to Friday due to database testing delays. Srinivas will lead the presentation prep, and all operations remain within our $5,000 budget cap.\n\nBest regards,\nProject Lead"
+            ),
+            (
+                "12",
+                "🐛 GitHub Issue",
+                "Create a GitHub issue:\nNew GitHub issue:\nBug report for:",
+                "gemini-3.7-flash",
+                "Structured Markdown issue with Title, Description & Tasks.",
+                "## [BUG] Database Test Failures Blocking Release\n\n### Summary\nLaunch postponed to Friday to resolve database test failures.\n\n### Tasks\n- [ ] Fix failing database tests\n- [ ] Srinivas: Finalize presentation deck\n- [ ] Confirm total project costs remain < $5,000"
+            ),
+            (
+                "13",
+                "🚀 GitHub PR",
+                "Create a pull request:\nCreate PR:\nPR description for:",
+                "gemini-3.7-flash",
+                "Summary of Changes, Motivation & Testing Verification checklist.",
+                "### Summary of Changes\n- Addresses database test blockers ahead of Friday release.\n- Added stakeholder slide assets by Srinivas.\n- Confirmed budget compliance (< $5,000)."
+            ),
+            (
+                "14",
+                "☑️ Task List",
+                "Create task list:\nCreate action items:\nGenerate todo list:",
+                "gemini-2.5-pro",
+                "Extracts actionable checklist with check-boxes [ ].",
+                "- [ ] Resolve failing database test suites\n- [ ] Reschedule release deployment to Friday\n- [ ] Srinivas: Prepare presentation slides\n- [ ] Verify budget remains below $5,000"
+            ),
+            (
+                "15",
+                "📊 Format Table",
+                "Format this into a table:\nFormat as a markdown table:\nFormat into table:",
+                "gemini-3.5-flash",
+                "Converts unstructured points into clean Markdown tables.",
+                "| Milestone / Task | Detail | Owner | Status |\n|---|---|---|---|\n| Launch Date | Delayed to Friday | Team | Rescheduled |\n| Database Tests | Fix Failures | Dev Team | In Progress |\n| Presentation | Prepare Slides | Srinivas | In Progress |\n| Budget | Under $5,000 | Finance | Active |"
+            ),
+            (
+                "16",
+                "🔄 Rewrite / Polish",
+                "Rewrite this:\nRephrase this:\nPolish this:",
+                "gemini-3.5-flash",
+                "Polishes sentence flow and vocabulary while preserving the exact meaning.",
+                "Hey team, we must postpone the launch until Friday following recent database test failures. Srinivas will prepare the presentation slides, and we will ensure the overall budget stays strictly below $5,000."
+            ),
+        ]
+
+        for r_idx, (num, cat, trigs, mdl, purp, ex_out) in enumerate(commands_data):
+            cmd_table.insertRow(r_idx)
+            cmd_table.setRowHeight(r_idx, 80)
+
+            item_num = QTableWidgetItem(num)
+            item_num.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_num.setForeground(QColor("#38BDF8"))
+            item_num.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            cmd_table.setItem(r_idx, 0, item_num)
+
+            item_cat = QTableWidgetItem(cat)
+            item_cat.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            item_cat.setForeground(QColor("#F8FAFC"))
+            cmd_table.setItem(r_idx, 1, item_cat)
+
+            item_trigs = QTableWidgetItem(trigs)
+            item_trigs.setForeground(QColor("#FDE047"))
+            item_trigs.setFont(QFont("Consolas", 9, QFont.Weight.Bold))
+            cmd_table.setItem(r_idx, 2, item_trigs)
+
+            item_mdl = QTableWidgetItem(mdl)
+            item_mdl.setForeground(QColor("#38BDF8"))
+            item_mdl.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
+            cmd_table.setItem(r_idx, 3, item_mdl)
+
+            item_purp = QTableWidgetItem(purp)
+            item_purp.setForeground(QColor("#CBD5E1"))
+            cmd_table.setItem(r_idx, 4, item_purp)
+
+            item_out = QTableWidgetItem(ex_out)
+            item_out.setForeground(QColor("#10B981"))
+            item_out.setFont(QFont("Consolas", 9))
+            cmd_table.setItem(r_idx, 5, item_out)
+
+        layout.addWidget(cmd_table)
+
+        # =========================================================================
+        # SECTION 2: DEVELOPER PRODUCTIVITY PROFILES
+        # =========================================================================
+        prof_separator = QFrame(self)
+        prof_separator.setFrameShape(QFrame.Shape.HLine)
+        prof_separator.setStyleSheet("background-color: #334155; margin: 10px 0;")
+        layout.addWidget(prof_separator)
 
         header = QLabel("⚡ Developer Productivity Profiles")
         header.setStyleSheet("font-size: 16px; font-weight: bold; color: #F59E0B;")
@@ -1646,6 +2047,7 @@ class SettingsDialog(QDialog):
 
         df_layout.addWidget(QLabel("Profile System Directives (Injected into Gemini system instructions):", self))
         self.profile_prompt_edit = QTextEdit(self)
+        self.profile_prompt_edit.setReadOnly(True)
         self.profile_prompt_edit.setMinimumHeight(100)
         self.profile_prompt_edit.setPlaceholderText("Profile directives...")
         df_layout.addWidget(self.profile_prompt_edit)
@@ -1777,14 +2179,13 @@ class SettingsDialog(QDialog):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             data = dlg.get_data()
             ve = VocabularyEngine()
-            ve.add_entry(VocabularyEntry(
-                id=str(time.time()),
+            ve.add_entry(
                 canonical_term=data["canonical_term"],
                 aliases=data["aliases"],
                 category=data["category"],
                 enabled=data["enabled"],
                 notes=data["notes"]
-            ))
+            )
             self._refresh_vocab_table()
             self._on_vocab_test_changed(self.vocab_test_input.text())
 
@@ -1792,9 +2193,12 @@ class SettingsDialog(QDialog):
         row = self.vocab_table.currentRow()
         if row < 0:
             return
-        c_term = self.vocab_table.item(row, 0).text()
+        item = self.vocab_table.item(row, 0)
+        if not item:
+            return
+        c_term = item.text()
         ve = VocabularyEngine()
-        entry = next((e for e in ve.entries if e.canonical_term == c_term), None)
+        entry = next((e for e in ve.entries if e.canonical_term.lower() == c_term.lower()), None)
         if not entry:
             return
         dlg = VocabEditDialog(
@@ -1812,7 +2216,7 @@ class SettingsDialog(QDialog):
             entry.category = data["category"]
             entry.enabled = data["enabled"]
             entry.notes = data["notes"]
-            ve.save()
+            ve.save_vocabulary()
             self._refresh_vocab_table()
             self._on_vocab_test_changed(self.vocab_test_input.text())
 
@@ -1820,7 +2224,10 @@ class SettingsDialog(QDialog):
         row = self.vocab_table.currentRow()
         if row < 0:
             return
-        c_term = self.vocab_table.item(row, 0).text()
+        item = self.vocab_table.item(row, 0)
+        if not item:
+            return
+        c_term = item.text()
         res = QMessageBox.question(self, "Delete Term", f"Delete '{c_term}' from your vocabulary engine?")
         if res == QMessageBox.StandardButton.Yes:
             ve = VocabularyEngine()
@@ -1968,11 +2375,10 @@ class SettingsDialog(QDialog):
             for i, tc in enumerate(BENCHMARK_TEST_SUITE):
                 res = BenchmarkEngine.run_single_test(model, tc, key)
                 results.append(res)
-                # Update progress on UI thread
-                QTimer.singleShot(0, lambda r=res, step=i+1: self._on_benchmark_step(r, step))
-                time.sleep(0.2)
+                self.benchmark_step.emit(res, i + 1)
+                time.sleep(0.1)
 
-            QTimer.singleShot(0, lambda: self._on_benchmark_done(model))
+            self.benchmark_done.emit(model)
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -2046,8 +2452,6 @@ class SettingsDialog(QDialog):
         self.saved_prompts_combo = QComboBox(prompt_card)
         self.saved_prompts_combo.setView(QListView())
         self.saved_prompts_combo.currentIndexChanged.connect(self._on_saved_prompt_selected)
-        sel_row.addWidget(self.saved_prompts_combo, stretch=2)
-        pc_layout.addLayout(sel_row)
         sel_row.addWidget(self.saved_prompts_combo, stretch=2)
         pc_layout.addLayout(sel_row)
 
@@ -2335,6 +2739,13 @@ class SettingsDialog(QDialog):
         self.btn_filter_by.setMinimumHeight(36)
         self.btn_filter_by.clicked.connect(self._show_filter_menu)
         top_box.addWidget(self.btn_filter_by)
+
+        self.btn_history_retention = QPushButton("🔒 Retention & Purge", self)
+        self.btn_history_retention.setObjectName("secondaryBtn")
+        self.btn_history_retention.setMinimumHeight(36)
+        self.btn_history_retention.setToolTip("Configure auto-retention days and purge expired history records")
+        self.btn_history_retention.clicked.connect(self._show_retention_dialog)
+        top_box.addWidget(self.btn_history_retention)
 
         self.btn_clear_history = QPushButton("🗑️ Clear History", self)
         self.btn_clear_history.setObjectName("dangerBtn")
@@ -3077,7 +3488,14 @@ class SettingsDialog(QDialog):
 
     def _load_values(self):
         # API Key
-        self.api_key_input.setText(self.config.get_api_key())
+        current_k = self.config.get_api_key()
+        self.api_key_input.setText(current_k)
+        if not current_k:
+            self.api_status_label.setText("⚠️ Gemini API key not configured. Click '📋 Paste & Test' or paste your key above.")
+            self.api_status_label.setStyleSheet("color: #F59E0B; border: none;")
+        else:
+            self.api_status_label.setText("🔑 Key loaded. Click '⚡ Test & Save' or press Enter to verify connection anytime.")
+            self.api_status_label.setStyleSheet("color: #94A3B8; border: none;")
 
         # Model / Routing Mode
         model_mode = self.config.get("model_mode", "auto")
@@ -3338,11 +3756,13 @@ class SettingsDialog(QDialog):
                 c_mtime = CONFIG_FILE.stat().st_mtime
                 if self._last_config_mtime == 0.0:
                     self._last_config_mtime = c_mtime
-                elif c_mtime > self._last_config_mtime + 1.0:
+                elif c_mtime > self._last_config_mtime + 2.0:
                     self._last_config_mtime = c_mtime
                     focused = QApplication.focusWidget()
                     if focused not in (self.custom_prompt_edit, self.prompt_title_input, self.vocab_input, self.api_key_input):
                         self.config.load_config()
+                        if CONFIG_FILE.exists():
+                            self._last_config_mtime = CONFIG_FILE.stat().st_mtime
                         self._refresh_saved_prompts()
                         self._refresh_dictionary()
                         self._refresh_snippets()
@@ -3376,6 +3796,7 @@ class SettingsDialog(QDialog):
             self.dict_table.insertRow(row)
             self.dict_table.setRowHeight(row, 46)
             item_spoken = QTableWidgetItem(entry.get("spoken", ""))
+            item_spoken.setData(Qt.ItemDataRole.UserRole, row)
             item_spoken.setFont(item_font)
             item_spoken.setForeground(QColor("#FFFFFF"))
             item_spoken.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
@@ -3412,13 +3833,17 @@ class SettingsDialog(QDialog):
         row = self.dict_table.currentRow()
         if row < 0:
             return
+        item = self.dict_table.item(row, 0)
+        actual_idx = item.data(Qt.ItemDataRole.UserRole) if item else row
+        if actual_idx is None:
+            actual_idx = row
         dictionary = self.config.get_dictionary()
-        if row >= len(dictionary):
+        if actual_idx >= len(dictionary):
             return
-        entry = dictionary[row]
+        entry = dictionary[actual_idx]
         dlg = DictEditDialog(spoken=entry.get("spoken", ""), replacement=entry.get("replacement", ""), parent=self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
-            dictionary[row] = dlg.get_data()
+            dictionary[actual_idx] = dlg.get_data()
             self.config.set_dictionary(dictionary)
             self._refresh_dictionary()
 
@@ -3426,9 +3851,13 @@ class SettingsDialog(QDialog):
         row = self.dict_table.currentRow()
         if row < 0:
             return
+        item = self.dict_table.item(row, 0)
+        actual_idx = item.data(Qt.ItemDataRole.UserRole) if item else row
+        if actual_idx is None:
+            actual_idx = row
         dictionary = self.config.get_dictionary()
-        if row < len(dictionary):
-            dictionary.pop(row)
+        if actual_idx < len(dictionary):
+            dictionary.pop(actual_idx)
             self.config.set_dictionary(dictionary)
             self._refresh_dictionary()
 
@@ -3442,6 +3871,7 @@ class SettingsDialog(QDialog):
             self.snippet_table.insertRow(row)
             self.snippet_table.setRowHeight(row, 46)
             item_trig = QTableWidgetItem(snip.get("trigger", ""))
+            item_trig.setData(Qt.ItemDataRole.UserRole, row)
             item_trig.setFont(item_font)
             item_trig.setForeground(QColor("#FFFFFF"))
             item_trig.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
@@ -3473,13 +3903,17 @@ class SettingsDialog(QDialog):
         row = self.snippet_table.currentRow()
         if row < 0:
             return
+        item = self.snippet_table.item(row, 0)
+        actual_idx = item.data(Qt.ItemDataRole.UserRole) if item else row
+        if actual_idx is None:
+            actual_idx = row
         snippets = self.config.get_snippets()
-        if row >= len(snippets):
+        if actual_idx >= len(snippets):
             return
-        entry = snippets[row]
+        entry = snippets[actual_idx]
         dlg = SnippetEditDialog(trigger=entry.get("trigger", ""), content=entry.get("content", ""), parent=self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
-            snippets[row] = dlg.get_data()
+            snippets[actual_idx] = dlg.get_data()
             self.config.set_snippets(snippets)
             self._refresh_snippets()
 
@@ -3487,9 +3921,13 @@ class SettingsDialog(QDialog):
         row = self.snippet_table.currentRow()
         if row < 0:
             return
+        item = self.snippet_table.item(row, 0)
+        actual_idx = item.data(Qt.ItemDataRole.UserRole) if item else row
+        if actual_idx is None:
+            actual_idx = row
         snippets = self.config.get_snippets()
-        if row < len(snippets):
-            snippets.pop(row)
+        if actual_idx < len(snippets):
+            snippets.pop(actual_idx)
             self.config.set_snippets(snippets)
             self._refresh_snippets()
 
@@ -3529,8 +3967,8 @@ class SettingsDialog(QDialog):
         # 2. Filter by Model Submenu
         model_menu = menu.addMenu("🤖 Filter by Model")
         for m in [
-            "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest",
-            "gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.5-pro"
+            "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash",
+            "gemini-flash-latest", "gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.5-pro"
         ]:
             model_menu.addAction(m, lambda checked=False, val=m: self._set_filter("model", val, f"Model: {val}"))
 
@@ -4158,26 +4596,165 @@ class SettingsDialog(QDialog):
                 f"✓ Successfully cleared {cleared} unpinned transcript(s).\n📌 {preserved} pinned item(s) were preserved."
             )
 
-    def _test_api(self):
-        key = self.api_key_input.text().strip()
-        if not key:
-            self.api_status_label.setText("❌ Please enter an API key first.")
-            self.api_status_label.setStyleSheet("color: #EF4444;")
+    def _purge_expired_history(self):
+        ret_days = self.retention_combo.currentData() if hasattr(self, 'retention_combo') else 30
+        if ret_days == 0:
+            QMessageBox.information(
+                self,
+                "Retention Setting",
+                "History Auto-Retention is set to 'Keep Forever (0 Days)'.\nNo records will be purged."
+            )
             return
 
-        self.api_status_label.setText("⏳ Testing connection to Gemini...")
-        self.api_status_label.setStyleSheet("color: #38BDF8;")
-        QApplication.processEvents()
+        from ..security.security_manager import SecurityManager
+        sec = SecurityManager(Path(__file__).parent.parent)
+        history = self.config.get_history()
+        retained, purged = sec.enforce_history_retention(history, ret_days)
+        if purged > 0:
+            self.config._save_history(retained)
+            self._refresh_history()
+            QMessageBox.information(
+                self,
+                "Purge Complete",
+                f"✓ Successfully purged {purged} expired unpinned history record(s) older than {ret_days} days.\n"
+                f"📌 All pinned and recent records were preserved."
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Purge Complete",
+                f"No unpinned records older than {ret_days} days found.\nYour history is already up to date!"
+            )
+
+    def _show_retention_dialog(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("🔒 Privacy & History Retention Governance")
+        dlg.setFixedSize(480, 260)
+        dlg.setStyleSheet(DARK_STYLE)
+
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(20, 20, 20, 20)
+        lay.setSpacing(14)
+
+        header = QLabel("🔒 Privacy & History Retention Governance", dlg)
+        header.setStyleSheet("font-size: 15px; font-weight: bold; color: #38BDF8;")
+        lay.addWidget(header)
+
+        sub = QLabel("Configure automatic history pruning and data privacy protection.", dlg)
+        sub.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        lay.addWidget(sub)
+
+        ret_box = QHBoxLayout()
+        ret_lbl = QLabel("History Auto-Retention:", dlg)
+        ret_lbl.setStyleSheet("color: #E2E8F0; font-size: 13px;")
+        ret_box.addWidget(ret_lbl)
+
+        ret_combo = QComboBox(dlg)
+        ret_combo.setView(QListView())
+        ret_combo.addItem("7 Days", 7)
+        ret_combo.addItem("14 Days", 14)
+        ret_combo.addItem("30 Days (Recommended)", 30)
+        ret_combo.addItem("90 Days", 90)
+        ret_combo.addItem("Keep Forever (0 Days)", 0)
+
+        sec_cfg = self.config.get("security", {})
+        cur_days = sec_cfg.get("history_retention_days", 30)
+        idx = ret_combo.findData(cur_days)
+        if idx >= 0:
+            ret_combo.setCurrentIndex(idx)
+        ret_box.addWidget(ret_combo, stretch=2)
+        lay.addLayout(ret_box)
+
+        cb_redact = QCheckBox("Redact sensitive keys and personal entities in application logs", dlg)
+        cb_redact.setChecked(sec_cfg.get("log_redaction", True))
+        lay.addWidget(cb_redact)
+
+        btn_box = QHBoxLayout()
+        btn_purge = QPushButton("🗑️ Purge Expired Now", dlg)
+        btn_purge.setObjectName("secondaryBtn")
+        btn_box.addWidget(btn_purge)
+
+        btn_box.addStretch()
+        btn_save = QPushButton("Save & Apply", dlg)
+        btn_box.addWidget(btn_save)
+        lay.addLayout(btn_box)
+
+        def _do_purge():
+            days = ret_combo.currentData()
+            if days == 0:
+                QMessageBox.information(dlg, "Retention Setting", "Retention is set to 'Keep Forever (0 Days)'. No records will be purged.")
+                return
+            from ..security.security_manager import SecurityManager
+            sec = SecurityManager(Path(__file__).parent.parent)
+            history = self.config.get_history()
+            retained, purged = sec.enforce_history_retention(history, days)
+            if purged > 0:
+                self.config._save_history(retained)
+                self._refresh_history()
+                QMessageBox.information(dlg, "Purge Complete", f"✓ Successfully purged {purged} expired unpinned record(s) older than {days} days.")
+            else:
+                QMessageBox.information(dlg, "Purge Complete", f"No unpinned records older than {days} days found.")
+
+        def _do_save():
+            new_days = ret_combo.currentData()
+            new_redact = cb_redact.isChecked()
+            self.config.set("security", {
+                "encrypt_keys": True,
+                "history_retention_days": new_days,
+                "telemetry_enabled": True,
+                "log_redaction": new_redact
+            })
+            if hasattr(self, 'retention_combo'):
+                r_idx = self.retention_combo.findData(new_days)
+                if r_idx >= 0:
+                    self.retention_combo.setCurrentIndex(r_idx)
+            if hasattr(self, 'cb_log_redaction'):
+                self.cb_log_redaction.setChecked(new_redact)
+            self.config.enforce_retention()
+            self._refresh_history()
+            dlg.accept()
+
+        btn_purge.clicked.connect(_do_purge)
+        btn_save.clicked.connect(_do_save)
+        dlg.exec()
+
+    def _test_api(self):
+        from ..config import sanitize_api_key
+        key = sanitize_api_key(self.api_key_input.text())
+        if not key:
+            self.api_status_label.setText("❌ Please enter or paste your Gemini API key first.")
+            self.api_status_label.setStyleSheet("color: #EF4444; border: none;")
+            return
+
+        self.api_key_input.setText(key)
+        self.btn_test_api.setEnabled(False)
+        self.btn_test_api.setText("⏳ Testing...")
+        self.api_status_label.setText("⏳ Testing connection to Google Gemini API (verifying models & latency)...")
+        self.api_status_label.setStyleSheet("color: #38BDF8; border: none;")
 
         model_code = self.model_combo.currentText().split()[0]
         self.gemini.set_model(model_code)
-        ok, msg = self.gemini.test_connection(key)
+
+        def _bg_test():
+            ok, msg = self.gemini.test_connection(key)
+            self.api_test_finished.emit(ok, msg, key)
+
+        threading.Thread(target=_bg_test, daemon=True, name="SettingsApiTest").start()
+
+    def _on_api_test_result(self, ok: bool, msg: str, key: str):
+        self.btn_test_api.setEnabled(True)
+        self.btn_test_api.setText("⚡ Test & Save")
         if ok:
-            self.api_status_label.setText("✅ " + msg)
-            self.api_status_label.setStyleSheet("color: #10B981;")
+            # Automatically persist and activate valid key immediately!
+            self.config.set_api_key(key)
+            self.gemini.set_api_key(key)
+            self.gemini.warm_connection()
+            self.api_status_label.setText(f"✅ {msg} — Key automatically saved & activated!")
+            self.api_status_label.setStyleSheet("color: #10B981; font-weight: 600; border: none;")
+            self.settings_applied.emit()
         else:
-            self.api_status_label.setText("❌ " + msg)
-            self.api_status_label.setStyleSheet("color: #EF4444;")
+            self.api_status_label.setText(f"❌ {msg}")
+            self.api_status_label.setStyleSheet("color: #EF4444; border: none;")
 
     def _toggle_mic_test(self):
         if self.test_recorder and self.test_recorder.is_recording:
@@ -4209,7 +4786,9 @@ class SettingsDialog(QDialog):
         self._stop_mic_test()
 
         # Save to config
-        key = self.api_key_input.text().strip()
+        from ..config import sanitize_api_key
+        key = sanitize_api_key(self.api_key_input.text())
+        self.api_key_input.setText(key)
         model_code = self.model_combo.currentText().split()[0]
         mode = "push_to_talk" if self.radio_ptt.isChecked() else "toggle"
         hotkey_disp = self.hotkey_btn.display_str
@@ -4230,6 +4809,8 @@ class SettingsDialog(QDialog):
 
         # Secure key persistence (Windows DPAPI)
         self.config.set_api_key(key)
+        self.gemini.set_api_key(key)
+        self.gemini.warm_connection()
 
         # Model / Router
         if model_code == "auto":
@@ -4443,6 +5024,19 @@ class SettingsDialog(QDialog):
 
     def closeEvent(self, event):
         self._stop_mic_test()
+        # Auto-persist API key if user typed or pasted a new key and simply closed the window
+        try:
+            from ..config import sanitize_api_key
+            raw_k = self.api_key_input.text().strip()
+            cleaned_k = sanitize_api_key(raw_k)
+            if cleaned_k and cleaned_k != self.config.get_api_key():
+                self.config.set_api_key(cleaned_k)
+                self.gemini.set_api_key(cleaned_k)
+                self.gemini.warm_connection()
+                self.settings_applied.emit()
+        except Exception as e:
+            logger.debug(f"Auto-save on close note: {e}")
+
         if hasattr(self, 'live_sync_timer') and self.live_sync_timer:
             self.live_sync_timer.stop()
         if hasattr(self, '_debounce_save_timer') and self._debounce_save_timer.isActive():

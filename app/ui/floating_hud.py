@@ -89,6 +89,7 @@ class FloatingHUD(QWidget):
     STATE_CANCELLED = "cancelled"
     STATE_PROMPT = "prompt"
     STATE_OFFLINE = "offline"
+    STATE_READY = "ready"
 
     def __init__(self, config_manager):
         super().__init__()
@@ -324,6 +325,22 @@ class FloatingHUD(QWidget):
             self._resize_and_anchor(max(135, needed_w), 40)
             self.show()
             self.hide_timer.start(2400)
+
+        elif state == self.STATE_READY:
+            self.wave_widget.hide()
+            self.status_icon.setText("🟢")
+            self.status_icon.setStyleSheet("font-size: 14px; border: none; background: transparent;")
+            self.status_icon.show()
+            msg = message or "Ready"
+            self.status_label.setText(msg)
+            self.status_label.setStyleSheet("color: #6EE7B7; border: none; background: transparent;")
+            self.status_label.show()
+            self._apply_glass_style(border_color="rgba(16, 185, 129, 0.70)")
+            fm = self.status_label.fontMetrics()
+            needed_w = fm.horizontalAdvance(msg) + 55
+            self._resize_and_anchor(max(130, needed_w), 40)
+            self.show()
+            self.hide_timer.start(1500)
 
     def _apply_glass_style(self, border_color: str):
         self.current_border_color = border_color

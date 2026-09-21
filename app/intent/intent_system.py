@@ -9,6 +9,8 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict, Any
 
+from app.transformation.transform_engine import TransformType
+
 logger = logging.getLogger("GeminiFlow.IntentSystem")
 
 
@@ -31,6 +33,28 @@ class IntentCategory(str, Enum):
     GENERATE_CODE = "GENERATE_CODE"
     FORMAT_TEXT = "FORMAT_TEXT"
     QUICK_TEXT = "QUICK_TEXT"
+
+
+INTENT_TO_TRANSFORM_MAP: Dict[IntentCategory, TransformType] = {
+    IntentCategory.DICTATE: TransformType.IMPROVE,
+    IntentCategory.REWRITE: TransformType.IMPROVE,
+    IntentCategory.GRAMMAR_FIX: TransformType.FIX_GRAMMAR,
+    IntentCategory.PROFESSIONALIZE: TransformType.PROFESSIONAL,
+    IntentCategory.MAKE_CASUAL: TransformType.CASUAL,
+    IntentCategory.SUMMARIZE: TransformType.SUMMARIZE,
+    IntentCategory.EXPAND: TransformType.EXPAND,
+    IntentCategory.SHORTEN: TransformType.CONCISE,
+    IntentCategory.CREATE_PROMPT: TransformType.CONVERT_PROMPT,
+    IntentCategory.EXPLAIN: TransformType.EXPLAIN,
+    IntentCategory.TRANSLATE: TransformType.CUSTOM,
+    IntentCategory.CREATE_EMAIL: TransformType.CONVERT_EMAIL,
+    IntentCategory.CREATE_GITHUB_ISSUE: TransformType.CONVERT_GITHUB_ISSUE,
+    IntentCategory.CREATE_GITHUB_PR: TransformType.CONVERT_GITHUB_PR,
+    IntentCategory.CREATE_TASK: TransformType.CONVERT_NOTES,
+    IntentCategory.GENERATE_CODE: TransformType.TECHNICAL,
+    IntentCategory.FORMAT_TEXT: TransformType.IMPROVE,
+    IntentCategory.QUICK_TEXT: TransformType.IMPROVE,
+}
 
 
 @dataclass

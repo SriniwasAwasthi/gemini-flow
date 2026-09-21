@@ -110,6 +110,7 @@ def run_all_tests():
         validator = style_assertions[p_id]["check"]
         assert validator(res.text), f"Formatting validation failed for {title}!"
         print(f"  ✓ Validated distinctive structure, line breaks, and content rules for: {title}")
+        time.sleep(1.2)
 
     # TEST 3: Active Models Execution Verification
     print("\n" + "-" * 80)

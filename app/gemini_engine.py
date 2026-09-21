@@ -13,6 +13,9 @@ import logging
 from typing import Tuple, Optional, List, Dict, Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import threading
 
 from app.router.model_router import ModelRouter
 from app.reliability.fallback_handler import FallbackHandler, ExecutionResult, APIErrorType
@@ -25,19 +28,38 @@ from app.offline.offline_engine import OfflineSpeechEngine
 logger = logging.getLogger("GeminiFlow.GeminiEngine")
 
 FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
     "gemini-3.5-flash-lite",
     "gemini-3.6-flash",
     "gemini-3.7-flash",
-    "gemini-3.5-flash",
-    "gemini-2.5-flash"
+    "gemini-3.5-flash"
 ]
 
 
 class GeminiEngine:
-    def __init__(self, api_key: str = "", model_name: str = "gemini-3.5-flash-lite"):
-        self.api_key = api_key.strip()
+    def __init__(self, api_key: str = "", model_name: str = "gemini-2.5-flash"):
+        from .config import sanitize_api_key
+        self.api_key = sanitize_api_key(api_key)
         self.model_name = model_name
         self.session = requests.Session()
+        
+        # Configure robust connection pooling, keep-alive, and HTTP-level retry adapter
+        retries = Retry(
+            total=2,
+            backoff_factor=0.3,
+            status_forcelist=[500, 502, 503, 504],
+            raise_on_status=False
+        )
+        adapter = HTTPAdapter(
+            pool_connections=10,
+            pool_maxsize=20,
+            max_retries=retries
+        )
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+
         self.metrics = MetricsTracker()
         self.last_result: Optional[ExecutionResult] = None
         self.last_model_used: str = model_name
@@ -45,23 +67,46 @@ class GeminiEngine:
         self.last_fallback: bool = False
 
     def set_api_key(self, api_key: str):
-        self.api_key = api_key.strip()
+        from .config import sanitize_api_key
+        self.api_key = sanitize_api_key(api_key)
+        if self.api_key:
+            self.warm_connection()
 
     def set_model(self, model_name: str):
         self.model_name = model_name
 
-    def test_connection(self, api_key: Optional[str] = None) -> Tuple[bool, str]:
-        """Tests the Gemini API connection with a simple prompt."""
-        key = (api_key or self.api_key).strip()
-        if not key:
-            return False, "API Key is empty."
+    def warm_connection(self):
+        """
+        Pre-warms DNS resolution and TLS 1.3 keep-alive session in a background thread
+        so that the first dictation or API request completes with near-zero latency.
+        """
+        def _warm_worker():
+            try:
+                # Lightweight HEAD/GET request to prime TLS session cache & DNS
+                url = "https://generativelanguage.googleapis.com/$discovery/rest?version=v1beta"
+                self.session.get(url, timeout=(5.0, 5.0))
+                logger.info("Gemini HTTP Keep-Alive connection warmed up successfully.")
+            except Exception as e:
+                logger.debug(f"Connection pre-warm note: {e}")
 
-        models_to_try = [self.model_name] if self.model_name and self.model_name != "auto" else []
-        for m in ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"]:
-            if m not in models_to_try:
-                models_to_try.append(m)
+        t = threading.Thread(target=_warm_worker, daemon=True, name="GeminiConnWarmup")
+        t.start()
+
+    def test_connection(self, api_key: Optional[str] = None) -> Tuple[bool, str]:
+        """Tests the Gemini API connection with robust timeouts, headers, and model fallback."""
+        from .config import sanitize_api_key
+        key = sanitize_api_key(api_key or self.api_key)
+        if not key:
+            return False, "API Key is empty. Please enter your Gemini API key."
+
+        # Prioritize live Google AI Studio production models verified for sub-second generation
+        models_to_try = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"]
+        if self.model_name and self.model_name not in ("auto", "gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"):
+            models_to_try.append(self.model_name)
 
         last_error = ""
+        test_timeout = (5.0, 10.0)
+
         for model in models_to_try:
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
@@ -74,16 +119,42 @@ class GeminiEngine:
                         }
                     ]
                 }
-                headers = {"Content-Type": "application/json"}
-                response = self.session.post(url, headers=headers, json=payload, timeout=8)
+                headers = {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": key
+                }
+                t0 = time.time()
+                response = self.session.post(url, headers=headers, json=payload, timeout=test_timeout)
+                latency = time.time() - t0
                 if response.status_code == 200:
-                    return True, f"Connection successful! Gemini API is active (using {model})."
+                    return True, f"Connection successful! Gemini API is active ({model}, latency: {latency:.2f}s)."
                 else:
                     try:
                         err_json = response.json()
                         last_error = err_json.get("error", {}).get("message", response.text)
                     except Exception:
                         last_error = response.text
+
+                    # If credentials/key are invalid, fail fast without waiting through other models
+                    lower_err = last_error.lower()
+                    is_invalid_key = (
+                        response.status_code in (401, 403)
+                        or "api_key_invalid" in lower_err
+                        or "api key not valid" in lower_err
+                        or "unauthenticated" in lower_err
+                        or "unauthorized" in lower_err
+                        or "permission_denied" in lower_err
+                    )
+                    if is_invalid_key:
+                        return False, f"Invalid API Key ({response.status_code}): {last_error}\nTip: Ensure your key is active at https://aistudio.google.com/app/apikey"
+
+                    # 404 or unsupported model for this endpoint: proceed to next fallback model
+                    if response.status_code in (404, 400):
+                        logger.info(f"Model {model} returned {response.status_code}, testing next fallback model...")
+                        continue
+            except requests.exceptions.Timeout:
+                last_error = f"Connection to {model} timed out after 10s. Checking fallback model..."
+                logger.warning(last_error)
             except Exception as e:
                 last_error = str(e)
 
@@ -143,7 +214,7 @@ class GeminiEngine:
         exec_res = FallbackHandler.execute_with_resilience(
             call_fn=call_model,
             primary_model=primary_model,
-            max_retries_per_model=1
+            max_retries_per_model=2
         )
 
         # 3. If online transcription failed due to network / connection drops, invoke local offline fallback
@@ -226,11 +297,15 @@ class GeminiEngine:
             "generationConfig": gen_config
         }
 
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": self.api_key
+        }
         try:
             start_t = time.time()
             approx_sec = len(wav_bytes) / 32000.0
-            req_timeout = max(6.0, min(15.0, int(approx_sec * 1.2) + 4.0))
+            # Generous connect timeout (10s) and read timeout (max 90s, minimum 25s) to avoid false timeouts on cold start / slow connections
+            req_timeout = (10.0, max(25.0, min(90.0, float(approx_sec * 2.5) + 20.0)))
             response = self.session.post(url, headers=headers, json=payload, timeout=req_timeout)
 
             elapsed = time.time() - start_t
@@ -251,6 +326,8 @@ class GeminiEngine:
                 except Exception:
                     err = response.text
                 return False, f"Gemini API Error ({response.status_code}): {err}"
+        except requests.exceptions.Timeout:
+            return False, f"Network timeout with {model}: Connection/Read timed out."
         except Exception as e:
             return False, f"Network request error: {str(e)}"
 
@@ -320,8 +397,12 @@ class GeminiEngine:
                     "maxOutputTokens": 2048
                 }
             }
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": self.api_key
+            }
             try:
-                resp = self.session.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=10)
+                resp = self.session.post(url, headers=headers, json=payload, timeout=(10.0, 35.0))
                 if resp.status_code == 200:
                     data = resp.json()
                     candidates = data.get("candidates", [])
@@ -381,7 +462,7 @@ class GeminiEngine:
 
     @staticmethod
     def apply_dictionary(text: str, dictionary: List[Dict[str, str]]) -> str:
-        """Applies phonetic dictionary replacements."""
+        """Applies phonetic dictionary replacements with word-boundary awareness."""
         if not text or not dictionary:
             return text
 
@@ -391,7 +472,12 @@ class GeminiEngine:
             replacement = entry.get("replacement", "").strip()
             if not spoken or not replacement:
                 continue
-            pattern = re.compile(re.escape(spoken), re.IGNORECASE)
+            escaped = re.escape(spoken)
+            # Use word boundaries if spoken phrase is composed of word characters
+            if re.match(r'^\w+(?:\s+\w+)*$', spoken):
+                pattern = re.compile(r'\b' + escaped + r'\b', re.IGNORECASE)
+            else:
+                pattern = re.compile(escaped, re.IGNORECASE)
             result = pattern.sub(replacement, result)
 
         return result
@@ -410,8 +496,12 @@ class GeminiEngine:
                 continue
 
             normalized_trigger = re.sub(r'[^\w\s]', '', trigger).strip().lower()
-            if normalized_text == normalized_trigger or normalized_trigger in normalized_text:
-                logger.info(f"Snippet trigger matched: '{trigger}' -> Expanding snippet.")
+            if normalized_text == normalized_trigger:
+                logger.info(f"Snippet trigger exact matched: '{trigger}' -> Expanding snippet.")
+                return content
+            elif normalized_trigger in normalized_text and len(normalized_text.split()) <= len(normalized_trigger.split()) + 3:
+                # Trigger spoken with brief surrounding words (e.g. "hey snippet trigger please")
+                logger.info(f"Snippet trigger matched in context: '{trigger}' -> Expanding snippet.")
                 return content
 
         return text

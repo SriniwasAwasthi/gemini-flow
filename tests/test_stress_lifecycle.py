@@ -24,16 +24,12 @@ def test_startup_persistence():
     setup_windows_startup(True)
     assert is_windows_startup_enabled(), "Registry Run key should be enabled"
     
-    # Check VBS file in shell:startup
+    # Verify duplicate VBS file in shell:startup is cleaned up to prevent dual-launch collisions
     startup_dir = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
     vbs_file = startup_dir / "GeminiFlow.vbs"
-    assert vbs_file.exists(), f"Startup VBS file missing at {vbs_file}"
-    with open(vbs_file, "r", encoding="utf-8") as f:
-        vbs_content = f.read()
-    assert "main_standalone.py" in vbs_content, "VBS file must reference main_standalone.py"
-    assert "--startup" in vbs_content, "VBS file must pass --startup argument"
+    assert not vbs_file.exists(), f"Startup VBS file must be cleaned up to prevent duplicate launch: {vbs_file}"
     print(f"  [OK] Windows Startup Registry verified (HKCU Run -> GeminiFlow)")
-    print(f"  [OK] Windows Startup Folder verified ({vbs_file})")
+    print(f"  [OK] Duplicate startup script prevention verified")
 
 def test_timer_stability_and_methods():
     print("\n--- 2. Testing QTimer Handlers & Stability Under Load ---")
@@ -62,8 +58,9 @@ def test_timer_stability_and_methods():
     print("  -> Testing GeminiFlowApp._on_watchdog_tick()...")
     for i in range(50):
         flow_app._on_watchdog_tick()
-    print("  [OK] 50 iterations of GeminiFlowApp watchdog completed with ZERO errors!")
     flow_app.quit_app()
+    app.processEvents()
+    time.sleep(0.5)
 
 def test_multi_cycle_ipc_and_reopen():
     print("\n--- 3. Testing Multi-Cycle Launch, IPC Reopen & Self-Healing Mutex ---")

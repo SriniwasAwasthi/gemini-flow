@@ -164,7 +164,7 @@ from .ui.floating_hud import FloatingHUD
 from .ui.tray_icon import SystemTrayManager
 from .ui.settings_dialog import SettingsDialog
 from .intelligence.app_intelligence import AppIntelligenceManager
-from .intent.intent_system import IntentClassifier, IntentCategory
+from .intent.intent_system import IntentClassifier, IntentCategory, INTENT_TO_TRANSFORM_MAP
 from .transformation.transform_engine import TransformType, TransformEngine
 from .profiles.profile_manager import ProfileManager
 from .reliability.fallback_handler import FallbackHandler
@@ -255,7 +255,7 @@ class GeminiFlowApp:
 
         # Global Hotkey Manager
         self.hotkey_mgr = HotkeyManager(
-            hotkey_str=self.config.get("hotkey", "<ctrl>+<cmd>"),
+            hotkey_str=self.config.get("hotkey", "<ctrl>+<space>"),
             mode=self.config.get("hotkey_mode", "toggle"),
             prompt_hotkey_str=self.config.get("prompt_hotkey", "<ctrl>+<shift>+p"),
             transform_hotkey_str=self.config.get("transform_hotkey", "<ctrl>+<shift>+t"),
@@ -282,20 +282,18 @@ class GeminiFlowApp:
         self.is_busy_processing = False
         self._is_cancelled = False
 
-    def _on_watchdog_tick(self):
-        """Periodic background health-check watchdog (every 5 seconds)."""
-        try:
-            # 1. Check keyboard hook health after Windows Sleep / Screen Lock
-            self.hotkey_mgr.check_health()
+        # Asynchronous zero-delay background warmup (Pre-warms Gemini TLS Keep-Alive, PortAudio mic stack, Windows startup)
+        def _async_startup_warmup():
+            try:
+                self.gemini.warm_connection()
+                self.recorder.warmup_audio()
+                if self.config.get("start_with_windows", True):
+                    setup_windows_startup(True)
+                ensure_desktop_shortcuts()
+            except Exception as ex:
+                logger.debug(f"Async startup warmup note: {ex}")
 
-            # 2. Maximum recording duration safety net (auto-stop after 300s / 5 mins)
-            if self.recorder.is_recording:
-                elapsed = time.time() - self.recorder.start_time
-                if elapsed > 300.0:
-                    logger.warning(f"Recording reached 5-minute safety limit ({elapsed:.1f}s). Auto-stopping to prevent memory leak.")
-                    self.on_stop_speech()
-        except Exception as e:
-            logger.debug(f"Watchdog tick note: {e}")
+        threading.Thread(target=_async_startup_warmup, daemon=True, name="AppStartupWarmup").start()
 
     def _on_audio_amplitude(self, amp: float):
         if self.recorder.is_recording:
@@ -635,18 +633,15 @@ class GeminiFlowApp:
                 intent_result = IntentClassifier.classify(raw_result, clipboard_fallback=active_clip)
                 if intent_result.intent != IntentCategory.DICTATE and intent_result.payload:
                     logger.info(f"Voice Command Detected: {intent_result.intent.value} with payload length {len(intent_result.payload)}")
-                    matched_transform = TransformType.IMPROVE
-                    try:
-                        matched_transform = TransformType[intent_result.intent.value]
-                    except Exception:
-                        pass
+                    matched_transform = INTENT_TO_TRANSFORM_MAP.get(intent_result.intent, TransformType.IMPROVE)
 
                     trans_res = self.gemini.transform_text(
                         raw_text=intent_result.payload,
                         transform_type=matched_transform,
                         app_context=app_context,
                         custom_instruction=intent_result.system_instruction,
-                        profile_id=active_profile
+                        profile_id=active_profile,
+                        auto_cost_mode=auto_cost_mode
                     )
                     if trans_res.success and trans_res.text:
                         final_text = trans_res.text
@@ -749,16 +744,30 @@ class GeminiFlowApp:
             self.tray.update_status("⚠️ Transcription Failed", state="ready")
 
     def _on_watchdog_tick(self):
-        """Monitors system sleep/resume and keyboard listener health."""
-        now = time.time()
-        # If interval exceeds 12s, laptop was suspended/asleep or clock jumped
-        if now - self._last_watchdog_time > 12.0:
-            logger.info("System resumed from sleep or standby. Reinitializing keyboard listener...")
-            self.hotkey_mgr.restart()
-            self.hotkey_mgr.reset_keys()
-        else:
-            self.hotkey_mgr.check_health()
-        self._last_watchdog_time = now
+        """Monitors system sleep/resume, keyboard listener health, and recording safety limit."""
+        try:
+            now = time.time()
+            # 1. Detect if laptop was suspended/asleep or clock jumped (interval exceeds 12s)
+            if hasattr(self, '_last_watchdog_time') and (now - self._last_watchdog_time > 12.0):
+                logger.info("System resumed from sleep or standby. Reinitializing keyboard listener and warming up sockets...")
+                self.hotkey_mgr.restart()
+                self.hotkey_mgr.reset_keys()
+                if hasattr(self, 'gemini') and self.gemini:
+                    self.gemini.warm_connection()
+                if hasattr(self, 'recorder') and self.recorder:
+                    threading.Thread(target=self.recorder.warmup_audio, daemon=True, name="AudioWarmupWake").start()
+            else:
+                self.hotkey_mgr.check_health()
+            self._last_watchdog_time = now
+
+            # 2. Maximum recording duration safety net (auto-stop after 300s / 5 mins)
+            if hasattr(self, 'recorder') and self.recorder and self.recorder.is_recording:
+                elapsed = time.time() - self.recorder.start_time
+                if elapsed > 300.0:
+                    logger.warning(f"Recording reached 5-minute safety limit ({elapsed:.1f}s). Auto-stopping to prevent memory leak.")
+                    self.on_stop_speech()
+        except Exception as e:
+            logger.debug(f"Watchdog tick note: {e}")
 
     def _on_ipc_connection(self):
         """Called when another instance launches and pings this running instance."""
@@ -796,15 +805,21 @@ class GeminiFlowApp:
             self.settings_dialog.finished.connect(self._on_settings_closed)
         else:
             self.settings_dialog._load_values()
+
+        if not self.config.get_api_key():
+            self.settings_dialog.tabs.setCurrentIndex(0)
+            self.settings_dialog.api_key_input.setFocus()
+            self.settings_dialog.api_key_input.selectAll()
+
         force_window_to_foreground(self.settings_dialog)
 
     def _on_settings_applied(self):
         """Called live when user clicks 'Save & Apply Changes' without closing dialog."""
-        hotkey = self.config.get("hotkey", "<ctrl>+<cmd>")
+        hotkey = self.config.get("hotkey", "<ctrl>+<space>")
         mode = self.config.get("hotkey_mode", "toggle")
         prompt_hk = self.config.get("prompt_hotkey", "<ctrl>+<shift>+p")
         trans_hk = self.config.get("transform_hotkey", "<ctrl>+<shift>+t")
-        disp_name = self.config.get("hotkey_display", "Ctrl + Win")
+        disp_name = self.config.get("hotkey_display", "Ctrl + Space")
 
         self.hotkey_mgr.update_config(hotkey, mode, prompt_hk, trans_hk)
         self.gemini.set_api_key(self.config.get_api_key())
@@ -830,11 +845,11 @@ class GeminiFlowApp:
     def _on_settings_closed(self, result):
         self.settings_dialog = None
         # Reload hotkey settings in listener
-        hotkey = self.config.get("hotkey", "<ctrl>+<cmd>")
+        hotkey = self.config.get("hotkey", "<ctrl>+<space>")
         mode = self.config.get("hotkey_mode", "toggle")
         prompt_hk = self.config.get("prompt_hotkey", "<ctrl>+<shift>+p")
         trans_hk = self.config.get("transform_hotkey", "<ctrl>+<shift>+t")
-        disp_name = self.config.get("hotkey_display", "Ctrl + Win")
+        disp_name = self.config.get("hotkey_display", "Ctrl + Space")
 
         self.hotkey_mgr.update_config(hotkey, mode, prompt_hk, trans_hk)
         self.gemini.set_api_key(self.config.get_api_key())
@@ -853,12 +868,15 @@ class GeminiFlowApp:
             except Exception:
                 pass
         try:
-            self.server.close()
+            if hasattr(self, 'server') and self.server:
+                self.server.close()
+                self.server.deleteLater()
             QLocalServer.removeServer(IPC_PIPE_NAME)
         except Exception:
             pass
         release_app_mutex()
         remove_pid_file()
+        QApplication.processEvents()
         self.app.quit()
 
     def restart_app(self):
@@ -911,8 +929,15 @@ class GeminiFlowApp:
             3500
         )
 
-        # Show Dashboard window on launch
-        if show_window:
+        # Show Dashboard window on launch (or automatically if API key is not yet configured)
+        api_key = self.config.get_api_key()
+        if not api_key:
+            logger.info("No Gemini API key configured. Bringing settings dialog to front for setup...")
+            self.open_settings()
+            if self.settings_dialog:
+                self.settings_dialog.tabs.setCurrentIndex(0)
+                self.settings_dialog.api_key_input.setFocus()
+        elif show_window:
             self.open_settings()
 
         try:
@@ -926,6 +951,20 @@ def start_app(show_window: bool = True):
     from PyQt6.QtWidgets import QApplication
     # Check CLI flags
     args = sys.argv[1:]
+    if "--set-api-key" in args:
+        idx = args.index("--set-api-key")
+        if idx + 1 < len(args):
+            new_key = args[idx + 1]
+            from .config import ConfigManager, sanitize_api_key
+            cfg = ConfigManager()
+            cfg.set_api_key(new_key)
+            cleaned_preview = sanitize_api_key(new_key)[:10] + "..." if len(new_key) > 10 else "***"
+            logger.info(f"Gemini API key configured via CLI: {cleaned_preview}")
+            print(f"Gemini API key configured successfully: {cleaned_preview}")
+            if notify_running_instance(command="RESTART"):
+                print("Running Gemini Flow instance notified to reload.")
+            sys.exit(0)
+
     if "--restart" in args or "-r" in args:
         logger.info("Restart flag passed. Notifying running instance to restart...")
         if notify_running_instance(command="RESTART"):
@@ -955,15 +994,6 @@ def start_app(show_window: bool = True):
                 pass
             time.sleep(0.2)
             acquire_app_mutex()
-
-    # 2. Check and sync Windows Startup setting & Desktop Shortcuts
-    try:
-        cfg = ConfigManager()
-        if cfg.get("start_with_windows", True):
-            setup_windows_startup(True)
-        ensure_desktop_shortcuts()
-    except Exception as e:
-        logger.warning(f"Could not verify Windows startup registry or shortcuts: {e}")
 
     app = GeminiFlowApp()
     sys.exit(app.run(show_window=show_window))

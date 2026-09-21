@@ -124,9 +124,26 @@ class SecurityManager:
     def mask_api_key(api_key: str) -> str:
         return SecurityManager.mask_key(api_key)
 
+    @staticmethod
+    def _clean_key(key: Any) -> str:
+        if not key:
+            return ""
+        k = str(key).strip().strip("\r\n\t ")
+        if (k.startswith('"') and k.endswith('"')) or (k.startswith("'") and k.endswith("'")):
+            k = k[1:-1].strip()
+        prefixes = [
+            "GEMINI_API_KEY=", "GOOGLE_API_KEY=", "API_KEY=",
+            "export GEMINI_API_KEY=", "export GOOGLE_API_KEY=",
+            "set GEMINI_API_KEY=", "set GOOGLE_API_KEY="
+        ]
+        for prefix in prefixes:
+            if k.upper().startswith(prefix.upper()):
+                k = k[len(prefix):].strip().strip('"\'').strip()
+        return k
+
     def save_api_key(self, api_key: str) -> bool:
         """Securely stores the Gemini API key using DPAPI or obfuscated storage."""
-        cleaned = api_key.strip()
+        cleaned = self._clean_key(api_key)
         if not cleaned:
             if self.cred_file.exists():
                 try:
@@ -160,7 +177,7 @@ class SecurityManager:
         # 1. Environment Variable
         env_key = os.environ.get("GEMINI_API_KEY", "").strip()
         if env_key:
-            return env_key
+            return self._clean_key(env_key)
 
         # 2. Secure credential file
         if self.cred_file.exists():
@@ -170,14 +187,24 @@ class SecurityManager:
                 if data.startswith(b"DPAPI:"):
                     decrypted = self._decrypt_dpapi(data[6:])
                     if decrypted:
-                        return decrypted
+                        cleaned = self._clean_key(decrypted)
+                        if any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd"]):
+                            return ""
+                        return cleaned
                 elif data.startswith(b"B64:"):
-                    return base64.b64decode(data[4:]).decode("utf-8", errors="ignore")
+                    dec = base64.b64decode(data[4:]).decode("utf-8", errors="ignore")
+                    cleaned = self._clean_key(dec)
+                    if any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd"]):
+                        return ""
+                    return cleaned
             except Exception as e:
                 logger.error(f"Error reading secure credentials: {e}")
 
         # 3. Fallback
-        return fallback_key.strip()
+        cleaned_fb = self._clean_key(fallback_key)
+        if any(bad in cleaned_fb for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd"]):
+            return ""
+        return cleaned_fb
 
     @staticmethod
     def mask_key(api_key: str) -> str:

@@ -44,14 +44,15 @@ class ExecutionResult:
     error_message: str = ""
 
 
-# Fallback hierarchy progression: heavy/advanced models step down to resilient flash tiers
 MODEL_FALLBACK_CHAINS = {
-    "gemini-2.5-pro": ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash"],
-    "gemini-3.7-flash": ["gemini-3.5-flash-lite", "gemini-3.5-flash"],
-    "gemini-2.5-flash": ["gemini-3.5-flash-lite", "gemini-3.5-flash"],
-    "gemini-3.6-flash": ["gemini-3.5-flash-lite", "gemini-3.5-flash"],
-    "gemini-3.5-flash": ["gemini-3.5-flash-lite", "gemini-3.6-flash"],
-    "gemini-3.5-flash-lite": ["gemini-3.5-flash", "gemini-3.6-flash"]
+    "gemini-2.5-pro": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"],
+    "gemini-3.7-flash": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.6-flash"],
+    "gemini-2.5-flash": ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"],
+    "gemini-3.6-flash": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"],
+    "gemini-3.5-flash": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"],
+    "gemini-3.5-flash-lite": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"],
+    "gemini-flash-latest": ["gemini-2.5-flash", "gemini-flash-lite-latest"],
+    "gemini-flash-lite-latest": ["gemini-2.5-flash", "gemini-flash-latest"]
 }
 
 
@@ -61,7 +62,7 @@ class FallbackHandler:
     @staticmethod
     def get_fallback_chain(primary_model: str) -> List[str]:
         chain = [primary_model]
-        fallbacks = MODEL_FALLBACK_CHAINS.get(primary_model, ["gemini-3.5-flash-lite", "gemini-3.5-flash"])
+        fallbacks = MODEL_FALLBACK_CHAINS.get(primary_model, ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-2.5-flash"])
         for m in fallbacks:
             if m not in chain:
                 chain.append(m)
@@ -76,10 +77,10 @@ class FallbackHandler:
                 APIErrorType.RATE_LIMIT_429,
                 "API rate limit reached. Switched to high-throughput fallback model automatically."
             )
-        elif status_code == 503 or "503" in lower_err or "overloaded" in lower_err or "high demand" in lower_err:
+        elif status_code == 503 or "503" in lower_err or "overloaded" in lower_err or "high demand" in lower_err or "high traffic" in lower_err:
             return (
                 APIErrorType.SERVER_UNAVAILABLE_503,
-                "Gemini service is experiencing high traffic. Retrying connection..."
+                "Gemini service is experiencing high traffic. Switching to next available model..."
             )
         elif status_code == 500 or "500" in lower_err or "internal" in lower_err:
             return (
@@ -91,10 +92,10 @@ class FallbackHandler:
                 APIErrorType.TIMEOUT,
                 "Request timed out. Falling back to faster model."
             )
-        elif status_code in (400, 403) and ("key" in lower_err or "unregistered" in lower_err or "unauthorized" in lower_err):
+        elif status_code in (401, 403) or "api_key_invalid" in lower_err or "api key not valid" in lower_err or "unauthenticated" in lower_err or ("api_key" in lower_err and status_code == 400):
             return (
                 APIErrorType.INVALID_KEY,
-                "API key is invalid or lacks access. Please verify in Settings."
+                "API key is invalid or lacks access. Expected valid Gemini API key from https://aistudio.google.com/app/apikey"
             )
         elif "connection" in lower_err or "failed to establish" in lower_err:
             return (
@@ -155,12 +156,12 @@ class FallbackHandler:
 
                         err_type, friendly_msg = cls.classify_error(status_code, text_or_err)
 
-                        # If rate limit 429, do not waste time retrying this model; fail over immediately!
-                        if err_type == APIErrorType.RATE_LIMIT_429:
-                            logger.warning(f"Model {model} hit rate limit. Instant failover to next model.")
+                        # If rate limit 429, server unavailable 503, or model not found/unsupported 404/400: failover to next model immediately!
+                        if err_type != APIErrorType.INVALID_KEY and (err_type in (APIErrorType.RATE_LIMIT_429, APIErrorType.SERVER_UNAVAILABLE_503) or status_code in (404, 400) or "not found" in text_or_err.lower()) and idx + 1 < len(models_to_try):
+                            logger.warning(f"Model {model} failed ({status_code or err_type.value}). Instant failover to {models_to_try[idx + 1]}.")
                             fallback_reason = FallbackReason(
                                 original_model=primary_model,
-                                fallback_model=models_to_try[idx + 1] if idx + 1 < len(models_to_try) else "none",
+                                fallback_model=models_to_try[idx + 1],
                                 error_type=err_type,
                                 user_message=friendly_msg
                             )

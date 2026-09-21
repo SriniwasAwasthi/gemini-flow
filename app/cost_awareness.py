@@ -208,10 +208,6 @@ class CostAwarenessTracker:
             if not ts_str:
                 continue
 
-            entry_tag = entry.get("api_key_tag")
-            if curr_tag and entry_tag and entry_tag != "default" and entry_tag != curr_tag:
-                continue
-
             all_entries.append(entry)
             try:
                 entry_date = datetime.datetime.fromisoformat(ts_str).date()
@@ -284,7 +280,13 @@ class CostAwarenessTracker:
             # Time Saved vs Manual Typing (at 40 WPM)
             typing_seconds = (total_words / TYPING_WORDS_PER_MINUTE) * 60.0
             net_time_saved_sec = max(0.0, typing_seconds - total_speaking_sec)
-            speedup = (typing_seconds / max(1.0, total_speaking_sec)) if total_speaking_sec > 0 else 3.75
+            if total_speaking_sec > 0 and total_words > 0:
+                speedup = typing_seconds / total_speaking_sec
+                speedup_str = f"{speedup:.1f}x"
+            elif total_words > 0:
+                speedup_str = "4.0x"
+            else:
+                speedup_str = "0.0x"
 
             milestone_bucket = get_milestone_info(total_words)
 
@@ -298,7 +300,7 @@ class CostAwarenessTracker:
                 "typing_time_str": format_duration(typing_seconds),
                 "time_saved_sec": net_time_saved_sec,
                 "time_saved_str": format_duration(net_time_saved_sec),
-                "speedup_multiplier": f"{speedup:.1f}x",
+                "speedup_multiplier": speedup_str,
                 "estimated_cost_usd": total_cost_usd,
                 "cost_formatted": f"${total_cost_usd:.4f}" if total_cost_usd >= 0.0001 else "< $0.0001 (Free Tier)",
                 "tokens_used": total_tokens_used,

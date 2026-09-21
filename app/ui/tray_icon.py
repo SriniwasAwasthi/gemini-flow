@@ -150,9 +150,10 @@ class SystemTrayManager(QSystemTrayIcon):
         self.main_app.config.set("hotkey_mode", new_mode)
         self.action_toggle_mode.setText("Switch to Toggle Mode" if new_mode == "push_to_talk" else "Switch to Push-to-Talk")
         self.main_app.hotkey_mgr.update_config(
-            self.main_app.config.get("hotkey", "<ctrl>+<cmd>"),
+            self.main_app.config.get("hotkey", "<ctrl>+<space>"),
             new_mode,
-            self.main_app.config.get("prompt_hotkey", "<ctrl>+<shift>+p")
+            self.main_app.config.get("prompt_hotkey", "<ctrl>+<shift>+p"),
+            self.main_app.config.get("transform_hotkey", "<ctrl>+<shift>+t")
         )
 
     def _toggle_prompt_mode_quick(self):

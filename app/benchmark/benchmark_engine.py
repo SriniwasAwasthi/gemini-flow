@@ -274,7 +274,8 @@ class BenchmarkEngine:
 
         start_t = time.time()
         try:
-            resp = http.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=12)
+            headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
+            resp = http.post(url, headers=headers, json=payload, timeout=12)
             latency = time.time() - start_t
 
             if resp.status_code == 200:

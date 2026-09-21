@@ -12,7 +12,7 @@
 
 <br />
 
-[Features](#-key-features) • [Application Showcase](#-application-showcase--ui-tour) • [Architecture](#-system-architecture) • [Setup Guide](#-step-by-step-implementation--setup-guide) • [How to Use](#-how-to-use) • [Shortcuts](#-keyboard-shortcuts-reference) • [Verification Tests](#-verification--test-suite) • [License](#-license)
+[Features](#-key-features) • [Application Showcase](#-application-showcase--ui-tour) • [Architecture](#-system-architecture) • [Setup Guide](#-step-by-step-implementation--setup-guide) • [How to Use](#-how-to-use) • [Shortcuts](#-keyboard-shortcuts-reference) • [Privacy & Security](#-privacy--api-key-security) • [Verification Tests](#-verification--test-suite) • [License](#-license)
 
 </div>
 
@@ -41,7 +41,8 @@ Speak naturally in any Windows software—VS Code, Microsoft Word, Slack, WhatsA
 - 🎨 **Sleek Glassmorphic Floating HUD**: Minimal, non-intrusive floating overlay with dynamic pulse audio waveforms, status badges, and subtle glow animations.
 - 🎛️ **Intelligent Cost Economizer & Token Tracking**: Per-API key token tracker, daily 1,000,000 free token monitor, cost productivity calculator, and automatic cost-saving model selector.
 - 📚 **Custom Vocabulary & Sound-Alikes**: Define technical terms, acronyms, and phonetic substitutions to ensure 100% transcription accuracy for custom terminology.
-- 📜 **Expanded Searchable History**: Stores up to 5,000 previous dictations with quick search, app filtering, and instant one-click clipboard copy.
+- 📜 **Expanded Searchable History & Retention**: Stores up to 5,000 previous dictations with quick search, app filtering, instant one-click clipboard copy, and configurable privacy retention rules.
+- 🔒 **Enterprise-Grade Local Security**: Windows DPAPI encryption for API secrets, zero third-party servers, local `%APPDATA%` config storage, and automated log redaction.
 
 ---
 
@@ -137,33 +138,55 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ```mermaid
 flowchart TD
-    A[🎤 Microphone Audio Capture] --> B[🎧 Audio DSP Pipeline]
-    B -->|85Hz Butterworth High-Pass| C[🔇 RMS Noise Gate]
-    C --> D[📦 PyAudio Stream Recorder]
-    
-    D --> E{🌐 Internet Connected?}
-    E -- Yes --> F[🚀 Google Gemini API Engine]
-    E -- No / Timeout --> G[💻 Windows SAPI Offline Engine]
-    
-    F --> H[🧠 Smart Model Router]
-    H -->|Gemini 3.5 / 3.6 Flash| I[📝 Context & Prompt Formatter]
-    I -->|Hinglish Polish & Custom Vocab| J[✨ Clean & Polished Text]
-    
-    G --> J
-    
-    J --> K[⌨️ Universal Auto-Typer / Clipboard Injection]
-    K --> L[🖥️ Target Active Windows Application]
-    
-    subgraph UI & Controls
-        M[🪟 Glassmorphic Floating HUD]
-        N[⚙️ Settings Control Center - 11 Modules]
-        O[⌨️ Global Keyboard Hooks]
+    subgraph Audio Capture & DSP
+        A[🎤 Microphone Input] --> B[🎧 85Hz Butterworth High-Pass Filter]
+        B --> C[🔇 Adaptive RMS Noise Gate]
+        C --> D[📦 PyAudio Low-Latency Recorder Stream]
     end
-    
-    O --> D
-    D -.-> M
-    J -.-> M
-    N -.-> H
+
+    subgraph Core AI & Routing Pipeline
+        D --> E{🌐 Online & API Available?}
+        E -- Yes --> F[🚀 Google Gemini API Engine]
+        E -- No / 429 Rate Limit --> G[💻 Windows SAPI Offline Engine]
+        
+        F --> H[🧠 Intelligent Model Router]
+        H -->|Primary: Gemini 3.5 / 3.6 Flash| I[📝 Context & Prompt Formatter]
+        H -->|Surge / Fallback: Flash-Lite| I
+        
+        I --> J[📁 Contextual Vocabulary Engine]
+        I --> K[📖 Phonetic Sound-Alikes Engine]
+        I --> L[⚡ App Profile Intelligence]
+        
+        J --> M[✨ Polished & Formatted Output]
+        K --> M
+        L --> M
+        G --> M
+    end
+
+    subgraph Injection & Windows Workspace
+        M --> N[⌨️ Win32 Keystroke & Clipboard Injector]
+        N --> O[🖥️ Active Target Application / Cursor Focus]
+    end
+
+    subgraph UI & Controls
+        P[🪟 Glassmorphic Floating HUD - Dynamic Waveform]
+        Q[⚙️ Settings Control Center - 11 Modules]
+        R[⌨️ Global Win32 Key Hooks & Watchdog]
+    end
+
+    subgraph Security & Governance
+        S[🔒 Windows DPAPI Secret Encryption]
+        T[🛡️ Automated Log Redaction]
+        U[⏳ History Retention Governance]
+    end
+
+    R --> D
+    D -.-> P
+    M -.-> P
+    Q -.-> H
+    Q -.-> S
+    Q -.-> U
+    S -.-> F
 ```
 
 
@@ -238,20 +261,21 @@ python main.py
 ## 💡 How to Use
 
 1. **Initial Setup**:
-   - When Gemini Flow launches, open **Settings** by right-clicking the system tray icon or clicking the HUD gear icon.
-   - In **API & General**, enter your Gemini API Key and click **Test Connection**.
-   - In **Audio Device**, select your microphone and verify the live volume bar.
+   - When Gemini Flow launches, the **Settings** window will open automatically if no API key is configured.
+   - In the **🔑 API_General** tab, paste your Gemini API Key or click **📋 Paste & Test** to paste, sanitize, and validate connection in one click.
+   - You can also configure your key via terminal anytime: `python main.py --set-api-key "<YOUR_KEY>"`.
+   - In **🎙️ Audio Device**, select your preferred microphone and verify the live input volume meter.
 2. **Standard Voice Dictation (Ctrl + Space)**:
-   - Place your cursor in any application (VS Code, Word, Chrome, WhatsApp, etc.).
+   - Place your cursor in any application (VS Code, Word, Chrome, WhatsApp, Telegram, etc.).
    - Press **`Ctrl + Space`** (or your custom hotkey).
    - In **Toggle Mode**: Tap once to start speaking, tap again to finish and auto-type.
    - In **Push-to-Talk Mode**: Hold keys down while speaking, release to finish and auto-type.
-3. **AI Prompt Engineering Mode (Ctrl + Shift + P)**:
-   - Press **`Ctrl + Shift + P`** to dictate instructions. Gemini Flow will convert your spoken thoughts into a structured LLM meta-prompt (Role, Objective, Steps, Output) and type it into your active AI window.
-4. **In-Place Text Transformation (Ctrl + Shift + T)**:
-   - Highlight any existing text in any application and press **`Ctrl + Shift + T`** to open the Quick Transform bar or polish selected text directly in place.
+3. **AI Prompt Engineering Mode (Alt + P / Ctrl + Shift + P)**:
+   - Press **`Alt + P`** (or **`Ctrl + Shift + P`**) to dictate ideas or highlight a rough draft. Gemini Flow converts spoken thoughts into an executive-grade structured LLM meta-prompt (Role, Objective, Steps, Expected Output) and pastes it into your active AI editor.
+4. **In-Place Text Transformation (Alt + T / Ctrl + Shift + T)**:
+   - Highlight any existing text in any application and press **`Alt + T`** (or **`Ctrl + Shift + T`**) to polish grammar, elevate phrasing, or convert speech into clean technical prose directly in place.
 5. **Emergency Offline Fallback**:
-   - If your internet disconnects, Gemini Flow automatically switches to Windows SAPI speech recognition so your typing workflow never stops.
+   - If your internet disconnects, Gemini Flow automatically switches to Windows SAPI local speech recognition so your typing workflow never stops.
 
 ---
 
@@ -260,16 +284,28 @@ python main.py
 | Shortcut | Action | Description |
 |---|---|---|
 | `Ctrl + Space` | **Voice Dictation** | Primary trigger for voice typing. Supports both Hands-Free Toggle and Push-to-Talk (configurable in Settings). |
-| `Ctrl + Shift + P` | **AI Prompt Mode** | Dictate ideas and generate structured meta-prompts for ChatGPT, Claude, or Gemini. |
-| `Ctrl + Shift + T` | **Text Transformer** | Highlight text in any application and transform/polish it in-place using Gemini AI. |
-| `Esc` | **Cancel Recording** | Instantly aborts the active recording, discards audio, and hides the HUD. |
+| `Alt + P` / `Ctrl + Shift + P` | **AI Prompt Mode** | Dictate ideas or select rough notes to generate structured meta-prompts for ChatGPT, Claude, Antigravity, or Gemini. |
+| `Alt + T` / `Ctrl + Shift + T` | **Text Transformer** | Highlight text in any application and transform/polish grammar in-place using Gemini AI. |
+| `Esc` | **Cancel Recording** | Instantly aborts active recording, discards audio buffer, and hides the HUD. |
 
+
+---
+
+## 🔒 Privacy & API Key Security
+
+Gemini Flow is engineered with strict privacy principles to protect your data and credentials:
+
+- **🔒 Windows DPAPI Secret Encryption**: Your API key can be encrypted at rest on Windows using hardware-backed Data Protection API (DPAPI).
+- **📁 Strictly Local Storage**: All settings, vocabulary, custom dictionaries, and history records are stored exclusively on your local machine in `%APPDATA%\GeminiFlow\config.json`.
+- **🚫 Zero Third-Party Telemetry**: There are no tracking scripts, intermediate analytics servers, or remote logging. Audio is streamed directly from your machine to Google AI Studio's official API endpoints.
+- **🛡️ Automatic Log Redaction**: Sensitive API tokens and personal identifier patterns are automatically masked in diagnostic logs.
+- **⏳ History Retention Governance**: Configure automatic pruning of dictation history after 7, 14, 30, or 90 days, or purge unpinned records on demand.
 
 ---
 
 ## 🧪 Verification & Test Suite
 
-Gemini Flow comes with an exhaustive test suite to ensure system stability, grammar transformation accuracy, and background lifecycle resilience:
+Gemini Flow includes an exhaustive suite of automated unit, integration, and stress tests:
 
 ```powershell
 # Run Component Level Unit Tests
@@ -283,15 +319,10 @@ python tests/test_grammar_and_queries.py
 
 # Run Process Lifecycle & Multi-Cycle Stress Test
 python tests/test_stress_lifecycle.py
+
+# Run Full Verified Suite
+python tests/test_full_suite_verified.py
 ```
-
----
-
-## 🔒 Privacy & API Key Security
-
-- **Strictly Local Storage**: Your Google Gemini API Key is stored securely on your local PC in `%APPDATA%\GeminiFlow\config.json`.
-- **Zero Third-Party Servers**: Audio streams are sent exclusively to Google's official AI Studio API endpoints directly from your computer.
-- **No Telemetry / Data Sharing**: Your transcribed text, voice snippets, and history are kept entirely on your local machine.
 
 ---
 
@@ -316,7 +347,7 @@ gemini-flow/
 │   ├── router/
 │   │   └── model_router.py     # Intelligent AI model router & dynamic load balancer
 │   ├── security/
-│   │   └── security_manager.py # Windows DPAPI secret encryption module
+│   │   └── security_manager.py # Windows DPAPI secret encryption & retention module
 │   ├── transformation/
 │   │   └── transform_engine.py # In-place text transformation engine
 │   ├── vocabulary/
@@ -324,7 +355,8 @@ gemini-flow/
 │   ├── resources/              # UI checkmarks, radio buttons, and SVG assets
 │   └── ui/
 │       ├── floating_hud.py     # Glassmorphic Qt floating overlay window
-│       └── settings_dialog.py  # 11-module Settings Control Center
+│       ├── settings_dialog.py  # 11-module Settings Control Center
+│       └── tray_icon.py        # System tray icon & context menus
 ├── images/                     # Refreshed UI screenshots and visual documentation assets
 ├── tests/                      # Exhaustive test & verification suites
 ├── requirements.txt            # Python package dependencies

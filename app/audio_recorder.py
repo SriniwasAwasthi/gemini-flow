@@ -122,6 +122,28 @@ class AudioRecorder:
     def set_device(self, device_index: Optional[int]):
         self.device_index = device_index
 
+    def warmup_audio(self):
+        """
+        Pre-warms the PortAudio driver and queries audio devices in the background
+        so that the very first user recording starts instantaneously with zero audio latency or clipping.
+        """
+        if sd is None:
+            return
+        try:
+            # 1. Query devices to initialize PortAudio driver subsystem
+            _ = sd.query_devices()
+            # 2. Briefly test opening an input stream for 50ms to prime OS audio buffer
+            target_device = self.device_index
+            try:
+                with sd.InputStream(samplerate=self.sample_rate, channels=self.channels, dtype="float32", device=target_device, blocksize=512):
+                    time.sleep(0.04)
+            except Exception:
+                with sd.InputStream(samplerate=self.sample_rate, channels=self.channels, dtype="float32", device=None, blocksize=512):
+                    time.sleep(0.04)
+            logger.info("PortAudio microphone driver warmed up successfully.")
+        except Exception as e:
+            logger.debug(f"Audio driver warmup note: {e}")
+
     def _audio_callback(self, indata: np.ndarray, frames: int, time_info: Any, status: Any):
         """Internal callback for sounddevice InputStream."""
         if status:
