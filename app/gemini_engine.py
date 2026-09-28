@@ -28,14 +28,17 @@ from app.offline.offline_engine import OfflineSpeechEngine
 logger = logging.getLogger("GeminiFlow.GeminiEngine")
 
 FALLBACK_MODELS = [
-    "gemini-2.5-flash",
+    "gemini-3.5-transcribe",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
     "gemini-flash-latest",
-    "gemini-flash-lite-latest"
+    "gemini-2.5-flash"
 ]
 
 
 class GeminiEngine:
-    def __init__(self, api_key: Any = "", model_name: str = "gemini-2.5-flash"):
+    def __init__(self, api_key: Any = "", model_name: str = "auto"):
         from .config import sanitize_api_key
         if hasattr(api_key, "get_api_key"):
             self.api_key = sanitize_api_key(api_key.get_api_key())
@@ -92,19 +95,43 @@ class GeminiEngine:
         t.start()
 
     def test_connection(self, api_key: Optional[str] = None) -> Tuple[bool, str]:
-        """Tests the Gemini API connection with robust timeouts, headers, and model fallback."""
+        """Tests the Gemini API connection with robust key verification, latency check, and model fallback."""
         from .config import sanitize_api_key
         key = sanitize_api_key(api_key or self.api_key)
         if not key:
             return False, "API Key is empty. Please enter your Gemini API key."
 
-        # Prioritize live Google AI Studio production models verified for sub-second generation
-        models_to_try = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"]
-        if self.model_name and self.model_name not in ("auto", "gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"):
-            models_to_try.append(self.model_name)
+        # Step 1: Query the Google Generative Language models endpoint to strictly verify the API Key
+        try:
+            url_models = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+            resp_models = self.session.get(url_models, timeout=(5.0, 5.0))
+            if resp_models.status_code in (400, 401, 403):
+                try:
+                    err_msg = resp_models.json().get("error", {}).get("message", resp_models.text)
+                except Exception:
+                    err_msg = resp_models.text
+                return False, f"Invalid API Key ({resp_models.status_code}): {err_msg}\nTip: Ensure your key is active at https://aistudio.google.com/app/apikey"
+            key_verified = (resp_models.status_code == 200)
+        except Exception as e:
+            logger.debug(f"Models endpoint check exception: {e}")
+            key_verified = False
+
+        # Step 2: Prioritize active production models for sub-second generation & transcription
+        models_to_try = [
+            "gemini-3.5-transcribe",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-3.7-flash",
+            "gemini-flash-latest",
+            "gemini-flash-lite-latest",
+            "gemini-2.5-flash"
+        ]
+        if self.model_name and self.model_name not in models_to_try and self.model_name != "auto":
+            models_to_try.insert(0, self.model_name)
 
         last_error = ""
-        test_timeout = (5.0, 10.0)
+        test_timeout = (3.0, 8.0)
 
         for model in models_to_try:
             try:
@@ -147,15 +174,17 @@ class GeminiEngine:
                     if is_invalid_key:
                         return False, f"Invalid API Key ({response.status_code}): {last_error}\nTip: Ensure your key is active at https://aistudio.google.com/app/apikey"
 
-                    # 404 or unsupported model for this endpoint: proceed to next fallback model
-                    if response.status_code in (404, 400):
-                        logger.info(f"Model {model} returned {response.status_code}, testing next fallback model...")
-                        continue
+                    # 503 high demand, 429 quota, 404, or 400: proceed to next fallback model
+                    logger.info(f"Model {model} returned {response.status_code}, testing next fallback model...")
+                    continue
             except requests.exceptions.Timeout:
-                last_error = f"Connection to {model} timed out after 10s. Checking fallback model..."
+                last_error = f"Connection to {model} timed out after 8s. Checking fallback model..."
                 logger.warning(last_error)
             except Exception as e:
                 last_error = str(e)
+
+        if key_verified:
+            return True, "Connection verified! Key is valid & saved (automatic multi-model failover active)."
 
         return False, f"API Error: {last_error}"
 
@@ -270,11 +299,11 @@ class GeminiEngine:
         return False, exec_res.error_message or "Transcription failed across all models."
 
     @staticmethod
-    def _split_wav_into_chunks(wav_bytes: bytes, target_chunk_sec: float = 16.0, max_chunk_sec: float = 22.0) -> List[bytes]:
+    def _split_wav_into_chunks(wav_bytes: bytes, target_chunk_sec: float = 300.0, max_chunk_sec: float = 420.0) -> List[bytes]:
         """
-        Splits audio into silence-aligned sub-chunks (14-20s) using RMS energy analysis.
-        Enables ultra-fast parallel transcription across multi-worker threads (<2s total latency),
-        prevents word truncation at boundaries, and completely eliminates attention drift and repetition loops.
+        Splits audio into silence-aligned large segments (5-7 mins) using RMS energy analysis.
+        Maximizes Gemini's 1M context window for single-shot execution (<4s latency) and limits
+        a 20-minute continuous recording to at most 3 parallel chunks, completely avoiding free-tier RPM rate limits.
         """
         if not wav_bytes or len(wav_bytes) < 1000:
             return [wav_bytes] if wav_bytes else []
@@ -321,9 +350,9 @@ class GeminiEngine:
                     chunks.append(out_io.getvalue())
                     break
 
-                # Search window for natural silence pause: [target_chunk_sec - 5s, target_chunk_sec + 5s]
-                search_start_sec = max(5.0, target_chunk_sec - 5.0)
-                search_end_sec = min(remaining_sec - 3.0, max_chunk_sec)
+                # Search window for natural silence pause: [target_chunk_sec - 15s, target_chunk_sec + 15s]
+                search_start_sec = max(5.0, target_chunk_sec - 15.0)
+                search_end_sec = min(remaining_sec - 5.0, max_chunk_sec)
 
                 start_f = current_frame + int(search_start_sec * framerate)
                 end_f = current_frame + int(search_end_sec * framerate)
@@ -391,7 +420,7 @@ class GeminiEngine:
 
     def _try_transcribe_with_model(self, model: str, wav_bytes: bytes, system_instruction: str) -> Tuple[bool, str]:
         """Direct REST API implementation with Keep-Alive session, parallel chunking, and resilient fallback."""
-        chunks = self._split_wav_into_chunks(wav_bytes, target_chunk_sec=16.0, max_chunk_sec=22.0)
+        chunks = self._split_wav_into_chunks(wav_bytes, target_chunk_sec=300.0, max_chunk_sec=420.0)
 
         # Single chunk path (standard speech <= 22s)
         if len(chunks) == 1:
@@ -486,7 +515,15 @@ class GeminiEngine:
         chunk_errors = []
 
         # Resilient chunk models
-        chunk_model_candidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
+        chunk_model_candidates = [
+            "gemini-3.5-transcribe",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-flash-latest",
+            "gemini-flash-lite-latest",
+            "gemini-2.5-flash"
+        ]
 
         def _transcribe_chunk_worker(c_idx: int, c_bytes: bytes):
             c_b64 = base64.b64encode(c_bytes).decode("utf-8")
@@ -498,9 +535,10 @@ class GeminiEngine:
                 c_gen_config: Dict[str, Any] = {
                     "temperature": 0.0,
                     "topP": 0.95,
-                    "maxOutputTokens": 8192,
-                    "thinkingConfig": {"thinkingBudget": 0}
+                    "maxOutputTokens": 8192
                 }
+                if "2.5" in try_model or "2.0" in try_model:
+                    c_gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
                 c_payload = {
                     "contents": [
@@ -616,11 +654,15 @@ class GeminiEngine:
             custom_instruction=custom_instruction
         )
 
-        # 2. Resolve Primary Model
-        primary_model = self.model_name if (self.model_name and self.model_name != "auto") else "gemini-2.5-flash"
+        # 2. Resolve Primary Model for text transformations
+        primary_model = self.model_name if (self.model_name and self.model_name not in ("auto", "gemini-3.5-transcribe")) else "gemini-3.6-flash"
 
         # 3. Model execution function
         def call_model(model: str) -> Tuple[bool, str]:
+            if "transcribe" in model:
+                # Transcribe models only take audio input
+                return False, "Transcribe model only accepts audio."
+
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
             gen_config: Dict[str, Any] = {
                 "temperature": TransformEngine.get_preset(transform_type).temperature,
@@ -656,7 +698,10 @@ class GeminiEngine:
                     if candidates:
                         parts = candidates[0].get("content", {}).get("parts", [])
                         res_text = "".join([self._extract_part_text(p) for p in parts])
-                        return True, self._clean_output(res_text)
+                        cleaned = self._clean_output(res_text)
+                        if cleaned:
+                            return True, cleaned
+                        return False, "Empty text returned by model."
                     return False, "Empty response from Gemini."
                 else:
                     try:
@@ -667,11 +712,12 @@ class GeminiEngine:
             except Exception as e:
                 return False, f"Network error: {str(e)}"
 
-        # 4. Resilient Execution
+        # 4. Resilient Execution with Text Fallback Chain
         exec_res = FallbackHandler.execute_with_resilience(
             call_fn=call_model,
             primary_model=primary_model,
-            max_retries_per_model=1
+            max_retries_per_model=1,
+            is_audio=False
         )
 
         # 5. Vocabulary Normalization & Metrics

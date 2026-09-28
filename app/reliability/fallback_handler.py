@@ -44,19 +44,40 @@ class ExecutionResult:
     error_message: str = ""
 
 
-MODEL_FALLBACK_CHAINS = {
-    "gemini-2.5-flash": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"],
-    "gemini-flash-latest": ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"],
-    "gemini-flash-lite-latest": ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash"]
+AUDIO_FALLBACK_CHAINS = {
+    "gemini-3.5-transcribe": ["gemini-3.5-transcribe", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"],
+    "gemini-3.6-flash": ["gemini-3.6-flash", "gemini-3.5-transcribe", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"],
+    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-3.5-transcribe", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"],
+    "gemini-3.5-flash": ["gemini-3.5-flash", "gemini-3.5-transcribe", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-2.5-flash"],
+    "gemini-3.7-flash": ["gemini-3.7-flash", "gemini-3.5-transcribe", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"],
+    "gemini-flash-latest": ["gemini-flash-latest", "gemini-3.5-transcribe", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"],
+    "gemini-flash-lite-latest": ["gemini-flash-lite-latest", "gemini-3.5-transcribe", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"],
+    "gemini-2.5-flash": ["gemini-2.5-flash", "gemini-3.5-transcribe", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"]
 }
+
+TEXT_FALLBACK_CHAINS = {
+    "gemini-3.6-flash": ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"],
+    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"],
+    "gemini-3.5-flash": ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"],
+    "gemini-3.7-flash": ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"],
+    "gemini-flash-latest": ["gemini-flash-latest", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"],
+    "gemini-flash-lite-latest": ["gemini-flash-lite-latest", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"],
+    "gemini-2.5-flash": ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"],
+    "gemini-3.5-transcribe": ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"]
+}
+
+MODEL_FALLBACK_CHAINS = AUDIO_FALLBACK_CHAINS
 
 
 class FallbackHandler:
     """Manages resilient execution of Gemini API requests with automatic model fallback."""
 
     @staticmethod
-    def get_fallback_chain(primary_model: str) -> List[str]:
-        return MODEL_FALLBACK_CHAINS.get(primary_model, [primary_model, "gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"])
+    def get_fallback_chain(primary_model: str, is_audio: bool = True) -> List[str]:
+        if is_audio:
+            return AUDIO_FALLBACK_CHAINS.get(primary_model, [primary_model, "gemini-3.5-transcribe", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"])
+        else:
+            return TEXT_FALLBACK_CHAINS.get(primary_model, [primary_model, "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"])
 
     @staticmethod
     def classify_error(status_code: int, error_text: str) -> Tuple[APIErrorType, str]:
@@ -103,14 +124,15 @@ class FallbackHandler:
         cls,
         call_fn: Callable[[str], Tuple[bool, str]],
         primary_model: str,
-        max_retries_per_model: int = 2
+        max_retries_per_model: int = 2,
+        is_audio: bool = True
     ) -> ExecutionResult:
         """
         Executes an API call function `call_fn(model_name) -> (success, text_or_error)`.
         Automatically handles retries with exponential backoff on 500/503/timeouts,
         and seamlessly switches models on 429/failures.
         """
-        models_to_try = cls.get_fallback_chain(primary_model)
+        models_to_try = cls.get_fallback_chain(primary_model, is_audio=is_audio)
         start_overall = time.time()
         retries_count = 0
         last_error_msg = ""

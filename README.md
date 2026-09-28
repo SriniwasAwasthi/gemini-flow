@@ -6,13 +6,13 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/PyQt6-Qt6-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
-[![Google Gemini](https://img.shields.io/badge/Google%20Gemini-Flash%203.5%20%2F%203.6-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
+[![Google Gemini](https://img.shields.io/badge/Google%20Gemini-Transcribe%203.5%20%2F%20Flash%203.6-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
 [![Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://microsoft.com/windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
 <br />
 
-[Features](#-key-features) • [Application Showcase](#-application-showcase--ui-tour) • [Architecture](#-system-architecture) • [Setup Guide](#-step-by-step-implementation--setup-guide) • [How to Use](#-how-to-use) • [Shortcuts](#-keyboard-shortcuts-reference) • [Privacy & Security](#-privacy--api-key-security) • [Verification Tests](#-verification--test-suite) • [License](#-license)
+[Features](#-key-features) • [Application Showcase](#-application-showcase--ui-tour) • [Architecture](#-system-architecture) • [Setup Guide](#-step-by-step-implementation--setup-guide) • [How to Use](#-how-to-use) • [Shortcuts](#-keyboard-shortcuts-reference) • [Privacy & Security](#-privacy--api-key-security) • [Verification Tests](#-verification--test-suite) • [Contributing](#-contributing) • [License](#-license)
 
 </div>
 
@@ -20,16 +20,19 @@
 
 ## 📖 Overview
 
-**Gemini Flow** is an open-source, high-performance, and privacy-conscious AI voice dictation desktop assistant for Windows. Designed as a free, customizable alternative to *Wispr Flow*, Gemini Flow connects directly to **Google Gemini 3.5 & 3.6 Flash** models via your personal Google AI Studio API key.
+**Gemini Flow** is an open-source, high-performance, and privacy-conscious AI voice dictation desktop assistant for Windows. Designed as a 100% free, customizable alternative to *Wispr Flow*, Gemini Flow connects directly to **Google Gemini 3.5 Transcribe & 3.6 Flash** models via your personal Google AI Studio API key.
 
-Speak naturally in any Windows software—VS Code, Microsoft Word, Slack, WhatsApp, Telegram, or your favorite web browser—and Gemini Flow will filter background noise, remove verbal hesitation and stuttering, polish Indian English/Hinglish idioms, format structured markdown lists, and type the refined text directly at your cursor location.
+Speak naturally in any Windows software—VS Code, Antigravity, Microsoft Word, Slack, WhatsApp, Telegram, or your favorite web browser—and Gemini Flow will filter background noise, remove verbal hesitation and stuttering, polish Indian English/Hinglish idioms, format structured markdown lists, and type the refined text directly at your cursor location.
 
 ---
 
-## ✨ Key Features
+## ✨ Key Features & Technical Novelty
 
-- 🎙️ **Universal Auto-Typing**: Hold or toggle a global hotkey anywhere in Windows to speak; text types out smoothly into whatever field or editor has focus.
-- ⚡ **3-Style AI Dictation Engine**:
+- 🎙️ **Universal Auto-Typing**: Hold or toggle a global hotkey (`Ctrl + Space`) anywhere in Windows to speak; text types out smoothly into whatever field or editor has active focus.
+- ⚡ **Dedicated Speech & Transcription Engine**:
+  - Powered by Google's dedicated **`gemini-3.5-transcribe`** model for sub-second, verbatim speech-to-text accuracy.
+  - **Single-Shot Continuous Dictation**: Processes up to **20 minutes of continuous speech in ~4–6 seconds** using large silence-aligned audio windows without hitting free-tier RPM rate limits.
+- 🛠️ **3-Style AI Dictation Modes**:
   - **Clean Speech & Grammar Enhancement**: Flawless punctuation, clean paragraphs, removes verbal fillers (`uh`, `um`, `ah`, `basically`, `means`, `matlab`, `yaani`), and stutters (`12 12 12` $\rightarrow$ `12`, `12th 12th` $\rightarrow$ `12th`).
   - **Smart Executive Polish**: Converts stream-of-consciousness thoughts into structured executive-grade prose with clean bullet points (`• `) and paragraph breaks.
   - **Developer Code & Technical Assistant**: Transcribes programming terminology, variable names in `camelCase`/`snake_case`, syntax, and terminal commands cleanly.
@@ -37,7 +40,10 @@ Speak naturally in any Windows software—VS Code, Microsoft Word, Slack, WhatsA
 - 🎧 **DSP Audio Filter & Ceiling Fan Gate**:
   - Real-time 85 Hz Butterworth High-Pass Filter cuts motor drone and fan rumble.
   - Adaptive RMS Noise Gate suppresses ambient background noise when silent.
-- 📶 **Offline Emergency Fallback**: Seamlessly switches to local Windows Speech Recognition (SAPI) whenever internet connection drops or API rate limits are reached.
+- 🔄 **Resilient Multi-Model Auto-Failover**:
+  - Two-stage key validation with 50+ model detection.
+  - Instant automatic failover across 8 candidate models (`gemini-3.5-transcribe`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.5-flash`, `gemini-3.7-flash`, `gemini-flash-latest`, `gemini-2.5-flash`) on HTTP 503/429 surges.
+- 📶 **Offline Emergency Fallback**: Seamlessly switches to local Windows Speech Recognition (SAPI) whenever internet connection drops.
 - 🎨 **Sleek Glassmorphic Floating HUD**: Minimal, non-intrusive floating overlay with dynamic pulse audio waveforms, status badges, and subtle glow animations.
 - 🎛️ **Intelligent Cost Economizer & Token Tracking**: Per-API key token tracker, daily 1,000,000 free token monitor, cost productivity calculator, and automatic cost-saving model selector.
 - 📚 **Custom Vocabulary & Sound-Alikes**: Define technical terms, acronyms, and phonetic substitutions to ensure 100% transcription accuracy for custom terminology.
@@ -122,7 +128,7 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ### 11. Intelligent AI Model Router & Orchestrator
 ![AI Model Router](images/10_ai_model_router.png)
-> **Dynamic Load Balancing**: Automatically routes speech requests between Gemini 3.5 Flash, 3.6 Flash, and Flash-Lite for lowest latency.  
+> **Dynamic Load Balancing**: Automatically routes speech requests to `gemini-3.5-transcribe` and `gemini-3.6-flash` for lowest latency.  
 > **Model Synchronization**: Bidirectionally synchronizes active models between General Settings and the Router orchestrator.
 
 ---
@@ -138,57 +144,57 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ```mermaid
 flowchart TD
-    subgraph Audio Capture & DSP
-        A[🎤 Microphone Input] --> B[🎧 85Hz Butterworth High-Pass Filter]
-        B --> C[🔇 Adaptive RMS Noise Gate]
-        C --> D[📦 PyAudio Low-Latency Recorder Stream]
+    subgraph Audio_Capture ["Audio Capture & DSP Layer"]
+        A["🎤 Microphone Input"] --> B["🎧 85Hz Butterworth High-Pass Filter"]
+        B --> C["🔇 Adaptive RMS Noise Gate"]
+        C --> D["📦 PyAudio Low-Latency Audio Stream"]
     end
 
-    subgraph Core AI & Routing Pipeline
-        D --> E{🌐 Online & API Available?}
-        E -- Yes --> F[🚀 Google Gemini API Engine]
-        E -- No / 429 Rate Limit --> G[💻 Windows SAPI Offline Engine]
+    subgraph Core_AI ["Core AI & Multi-Model Pipeline"]
+        D --> E{"🌐 Online & API Available?"}
+        E -->|"Yes"| F["🚀 Google Gemini API Engine"]
+        E -->|"Offline Fallback"| G["💻 Windows SAPI Offline Engine"]
         
-        F --> H[🧠 Intelligent Model Router]
-        H -->|Primary: Gemini 3.5 / 3.6 Flash| I[📝 Context & Prompt Formatter]
-        H -->|Surge / Fallback: Flash-Lite| I
+        F --> H["🧠 Intelligent Model Router"]
+        H -->|"Speech Dictation (<1.5s)"| I["🎙️ gemini-3.5-transcribe"]
+        H -->|"Prompt & Text Transformations"| J["⚡ gemini-3.6-flash"]
+        H -->|"Failover Resilience"| K["🔄 Multi-Model Fallback Chain"]
         
-        I --> J[📁 Contextual Vocabulary Engine]
-        I --> K[📖 Phonetic Sound-Alikes Engine]
-        I --> L[⚡ App Profile Intelligence]
+        I --> L["📁 Contextual Vocabulary Engine"]
+        J --> L
+        K --> L
         
-        J --> M[✨ Polished & Formatted Output]
-        K --> M
-        L --> M
-        G --> M
+        L --> M["📖 Phonetic Sound-Alikes Engine"]
+        M --> N["⚡ App Profile Intelligence"]
+        N --> O["✨ Polished & Formatted Output"]
+        G --> O
     end
 
-    subgraph Injection & Windows Workspace
-        M --> N[⌨️ Win32 Keystroke & Clipboard Injector]
-        N --> O[🖥️ Active Target Application / Cursor Focus]
+    subgraph Injection_Layer ["Injection & Windows Workspace"]
+        O --> P["⌨️ Win32 Keystroke & Clipboard Injector"]
+        P --> Q["🖥️ Active Target Application / Cursor Focus"]
     end
 
-    subgraph UI & Controls
-        P[🪟 Glassmorphic Floating HUD - Dynamic Waveform]
-        Q[⚙️ Settings Control Center - 11 Modules]
-        R[⌨️ Global Win32 Key Hooks & Watchdog]
+    subgraph UI_Layer ["UI & Controls"]
+        R["🪟 Glassmorphic Floating HUD - Dynamic Waveform"]
+        S["⚙️ Settings Control Center - 11 Modules"]
+        T["⌨️ Global Win32 Key Hooks & Watchdog"]
     end
 
-    subgraph Security & Governance
-        S[🔒 Windows DPAPI Secret Encryption]
-        T[🛡️ Automated Log Redaction]
-        U[⏳ History Retention Governance]
+    subgraph Security_Layer ["Security & Governance"]
+        U["🔒 Windows DPAPI Secret Encryption"]
+        V["🛡️ Automated Log Redaction"]
+        W["⏳ History Retention Governance"]
     end
 
-    R --> D
-    D -.-> P
-    M -.-> P
-    Q -.-> H
-    Q -.-> S
-    Q -.-> U
-    S -.-> F
+    T --> D
+    D -.-> R
+    O -.-> R
+    S -.-> H
+    S -.-> U
+    S -.-> W
+    U -.-> F
 ```
-
 
 ---
 
@@ -208,7 +214,7 @@ Follow these simple steps to set up and run Gemini Flow on your Windows machine:
 2. Sign in with your Google account.
 3. Click **Get API key** → **Create API key in new project**.
 4. Copy your API key (starts with `AIzaSy...` or `AQ...`).  
-   *(Google provides 1,000,000 free tokens per day for Gemini Flash models!)*
+   *(Google provides 1,000,000 free tokens per day for Gemini models!)*
 
 ---
 
@@ -288,42 +294,6 @@ python main.py
 | `Alt + T` / `Ctrl + Shift + T` | **Text Transformer** | Highlight text in any application and transform/polish grammar in-place using Gemini AI. |
 | `Esc` | **Cancel Recording** | Instantly aborts active recording, discards audio buffer, and hides the HUD. |
 
-
----
-
-## 🔒 Privacy & API Key Security
-
-Gemini Flow is engineered with strict privacy principles to protect your data and credentials:
-
-- **🔒 Windows DPAPI Secret Encryption**: Your API key can be encrypted at rest on Windows using hardware-backed Data Protection API (DPAPI).
-- **📁 Strictly Local Storage**: All settings, vocabulary, custom dictionaries, and history records are stored exclusively on your local machine in `%APPDATA%\GeminiFlow\config.json`.
-- **🚫 Zero Third-Party Telemetry**: There are no tracking scripts, intermediate analytics servers, or remote logging. Audio is streamed directly from your machine to Google AI Studio's official API endpoints.
-- **🛡️ Automatic Log Redaction**: Sensitive API tokens and personal identifier patterns are automatically masked in diagnostic logs.
-- **⏳ History Retention Governance**: Configure automatic pruning of dictation history after 7, 14, 30, or 90 days, or purge unpinned records on demand.
-
----
-
-## 🧪 Verification & Test Suite
-
-Gemini Flow includes an exhaustive suite of automated unit, integration, and stress tests:
-
-```powershell
-# Run Component Level Unit Tests
-python tests/test_components.py
-
-# Run Full UI & 11-Tab Settings Audit
-python tests/test_full_suite.py
-
-# Run Multi-Model Grammar Polish & Query Verification Suite
-python tests/test_grammar_and_queries.py
-
-# Run Process Lifecycle & Multi-Cycle Stress Test
-python tests/test_stress_lifecycle.py
-
-# Run Full Verified Suite
-python tests/test_full_suite_verified.py
-```
-
 ---
 
 ## 📂 Project Structure
@@ -368,14 +338,60 @@ gemini-flow/
 
 ---
 
-## 🛠️ Built With
+## 🛠️ Tech Stack
 
-- **[PyQt6](https://pypi.org/project/PyQt6/)** - Modern desktop graphical user interface
-- **[Google Generative AI SDK](https://github.com/google-gemini/generative-ai-python)** - Ultra-fast Gemini 3.5 & 3.6 Flash models
+- **[PyQt6](https://pypi.org/project/PyQt6/)** - Modern desktop graphical user interface framework
+- **[Google Generative AI SDK & REST API](https://ai.google.dev/)** - Gemini 3.5 Transcribe & 3.6 Flash models
 - **[PyAudio & SciPy](https://pypi.org/project/PyAudio/)** - Low-latency audio streaming & Butterworth DSP noise filtering
 - **[Pynput & PyWin32](https://pypi.org/project/pynput/)** - Global Windows hotkey hooks and simulated keystroke typing
 - **[Windows SAPI](https://docs.microsoft.com/en-us/previous-versions/windows/desktop/ee125663(v=vs.85))** - Local offline speech recognition fallback
 
+---
+
+## 🔒 Privacy & API Key Security
+
+Gemini Flow is engineered with strict privacy principles to protect your data and credentials:
+
+- **🔒 Windows DPAPI Secret Encryption**: Your API key can be encrypted at rest on Windows using hardware-backed Data Protection API (DPAPI).
+- **📁 Strictly Local Storage**: All settings, vocabulary, custom dictionaries, and history records are stored exclusively on your local machine in `%APPDATA%\GeminiFlow\config.json`.
+- **🚫 Zero Third-Party Telemetry**: There are no tracking scripts, intermediate analytics servers, or remote logging. Audio is streamed directly from your machine to Google AI Studio's official API endpoints.
+- **🛡️ Automatic Log Redaction**: Sensitive API tokens and personal identifier patterns are automatically masked in diagnostic logs.
+- **⏳ History Retention Governance**: Configure automatic pruning of dictation history after 7, 14, 30, or 90 days, or purge unpinned records on demand.
+
+---
+
+## 🧪 Verification & Test Suite
+
+Gemini Flow includes an exhaustive suite of automated unit, integration, and stress tests:
+
+```powershell
+# Run Component Level Unit Tests
+python tests/test_components.py
+
+# Run Full UI & 11-Tab Settings Audit
+python tests/test_full_suite.py
+
+# Run Multi-Model Grammar Polish & Query Verification Suite
+python tests/test_grammar_and_queries.py
+
+# Run Process Lifecycle & Multi-Cycle Stress Test
+python tests/test_stress_lifecycle.py
+
+# Run Full Verified Suite
+python tests/test_full_suite_verified.py
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Follow these steps to contribute:
+
+1. **Fork the Repository**: Click the "Fork" button on GitHub.
+2. **Create a Feature Branch**: `git checkout -b feature/amazing-feature`
+3. **Commit Your Changes**: `git commit -m "feat: add amazing feature"`
+4. **Push to the Branch**: `git push origin feature/amazing-feature`
+5. **Open a Pull Request**: Submit your PR on GitHub for review.
 
 ---
 
@@ -389,7 +405,10 @@ This project is licensed under the **MIT License** - see the [`LICENSE`](LICENSE
 
 Thank you for visiting and exploring the **Gemini Flow** repository! If you find this project helpful for your daily productivity and voice workflows, please consider giving it a ⭐ **Star** on GitHub.
 
-Feel free to open an [Issue](https://github.com/SriniwasAwasthi/gemini-flow/issues) or submit a [Pull Request](https://github.com/SriniwasAwasthi/gemini-flow/pulls) if you have suggestions, feature ideas, or improvements!
+Feel free to connect or reach out:
+- 🌐 **LinkedIn:** [sriniwas-awasthi](https://www.linkedin.com/in/sriniwas-awasthi/)
+- 💻 **GitHub:** [@SriniwasAwasthi](https://github.com/SriniwasAwasthi)
+- 📧 **Email:** [sriawasthi164@gmail.com](mailto:sriawasthi164@gmail.com)
 
 <div align="center">
   <sub>Crafted with passion by <b>Sriniwas Awasthi</b> • Powered by Google Gemini AI</sub>

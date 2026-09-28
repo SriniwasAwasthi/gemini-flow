@@ -1210,13 +1210,13 @@ class SettingsDialog(QDialog):
         self.model_combo.setView(QListView())
         self.model_combo.addItems([
             "auto (Intelligent AI Model Router — Dynamic Per-Task Selection)",
-            "gemini-3.5-flash-lite (Lowest Latency < 1.5s — Recommended)",
-            "gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
+            "gemini-3.5-transcribe (Dedicated Speech Model — Ultra Fast < 1.5s — Recommended)",
             "gemini-3.6-flash (Fast Advanced Reasoning & Polish)",
+            "gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
+            "gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
             "gemini-flash-latest (Auto Latest Production Flash)",
             "gemini-3.7-flash (Advanced Reasoning & Technical Dictation)",
-            "gemini-2.5-flash (Standard Flash)",
-            "gemini-2.5-pro (Deep Thought & Document Generation)"
+            "gemini-2.5-flash (Standard Flash)"
         ])
         self.model_combo.currentIndexChanged.connect(self._on_general_model_combo_changed)
         layout.addWidget(self.model_combo)
@@ -1560,13 +1560,13 @@ class SettingsDialog(QDialog):
         self.router_model_combo.setView(QListView())
         self.router_model_combo.addItems([
             "auto (Intelligent AI Model Router — Dynamic Per-Task Selection)",
-            "gemini-3.5-flash-lite (Lowest Latency < 1.5s — Recommended)",
-            "gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
+            "gemini-3.5-transcribe (Dedicated Speech Model — Ultra Fast < 1.5s — Recommended)",
             "gemini-3.6-flash (Fast Advanced Reasoning & Polish)",
+            "gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
+            "gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
             "gemini-flash-latest (Auto Latest Production Flash)",
             "gemini-3.7-flash (Advanced Reasoning & Technical Dictation)",
-            "gemini-2.5-flash (Standard Flash)",
-            "gemini-2.5-pro (Deep Thought & Document Generation)"
+            "gemini-2.5-flash (Standard Flash)"
         ])
         self.router_model_combo.currentIndexChanged.connect(self._on_router_model_combo_changed)
         sel_layout.addWidget(self.router_model_combo)

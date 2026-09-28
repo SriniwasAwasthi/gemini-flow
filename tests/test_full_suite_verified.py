@@ -43,12 +43,12 @@ def run_all_tests():
     print("-" * 80)
 
     test_routes = [
-        ("WhatsApp", "communication", 5.0, "engineering", "gemini-2.5-flash"),
-        ("Antigravity", "dev", 10.0, "engineering", "gemini-2.5-flash"),
-        ("VS Code", "dev", 35.0, "engineering", "gemini-2.5-flash"),
-        ("Outlook", "email", 12.0, "general", "gemini-2.5-flash"),
-        ("Google Meet", "general", 65.0, "general", "gemini-2.5-flash"),
-        ("Terminal", "dev", 40.0, "engineering", "gemini-2.5-flash"),
+        ("WhatsApp", "communication", 5.0, "engineering", "gemini-3.5-transcribe"),
+        ("Antigravity", "dev", 10.0, "engineering", "gemini-3.5-transcribe"),
+        ("VS Code", "dev", 35.0, "engineering", "gemini-3.5-transcribe"),
+        ("Outlook", "email", 12.0, "general", "gemini-3.5-transcribe"),
+        ("Google Meet", "general", 65.0, "general", "gemini-3.5-transcribe"),
+        ("Terminal", "dev", 40.0, "engineering", "gemini-3.5-transcribe"),
     ]
 
     for app_nm, cat, dur, prof, exp_model in test_routes:
@@ -62,7 +62,7 @@ def run_all_tests():
         print(f"  App: {app_nm:<12} ({dur:>4.1f}s) -> Routed to: {routing.model_name:<22} | Reason: {routing.reason}")
         assert routing.model_name == exp_model, f"Routing mismatch for {app_nm}: expected {exp_model}, got {routing.model_name}"
 
-    print("  ✓ Verification: Dynamic model router accurately routes all app contexts to gemini-2.5-flash.")
+    print("  ✓ Verification: Dynamic model router accurately routes all app contexts to gemini-3.5-transcribe.")
 
     # TEST 2: All 5 Prompt Styles
     print("\n" + "-" * 80)
