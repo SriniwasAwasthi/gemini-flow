@@ -258,29 +258,17 @@ class VocabularyEngine:
 
     def get_prompt_injection(self, category_priorities: Optional[List[str]] = None) -> str:
         """
-        Compiles active vocabulary terms and alias rules into a structured
-        instruction for Gemini speech-to-text priming.
+        Compiles active vocabulary terms into a clean instruction for Gemini speech-to-text priming.
         """
         active = [e for e in self.entries if e.enabled]
         if not active:
             return ""
 
-        # Group by category
         canonical_terms = [e.canonical_term for e in active]
-        alias_rules = []
-        for e in active:
-            if e.aliases:
-                aliases_str = ", ".join([f"'{a}'" for a in e.aliases])
-                alias_rules.append(f"Aliases [{aliases_str}] -> Canonical '{e.canonical_term}'")
-
-        injection = (
-            "\n\nPersonal AI Vocabulary & Spelling Directives (Strict Enforcement):\n"
-            f"- Prioritized terms & names: {', '.join(canonical_terms)}.\n"
+        return (
+            "\n\nPersonal AI Vocabulary & Spelling Directives:\n"
+            f"- Prioritize correct spelling for: {', '.join(canonical_terms)}."
         )
-        if alias_rules:
-            injection += "- Canonical Alias Normalization Rules:\n  * " + "\n  * ".join(alias_rules) + "\n"
-
-        return injection
 
     format_prompt_injection = get_prompt_injection
     save = save_vocabulary

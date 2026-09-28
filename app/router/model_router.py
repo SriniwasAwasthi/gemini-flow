@@ -24,76 +24,26 @@ class ModelMetadata:
 
 
 MODEL_REGISTRY: Dict[str, ModelMetadata] = {
-    "gemini-3.5-flash-lite": ModelMetadata(
-        model_name="gemini-3.5-flash-lite",
-        display_name="Gemini 3.5 Flash-Lite (Blazing Fast)",
+    "gemini-2.5-flash": ModelMetadata(
+        model_name="gemini-2.5-flash",
+        display_name="Gemini 2.5 Flash (Target Architecture: 1.3s – 2.2s)",
         speed_rating=5,
-        typical_latency="~0.8s",
-        punctuation_style="Commas, periods, 100% filler removal (Lowest Latency)",
-        reasoning_capability="low",
-        technical_capability="standard",
-        recommended_tasks=["Instant chat", "WhatsApp", "ChatGPT", "Antigravity", "quick search", "real-time typing"]
-    ),
-    "gemini-3.6-flash": ModelMetadata(
-        model_name="gemini-3.6-flash",
-        display_name="Gemini 3.6 Flash (Fast Advanced Reasoning)",
-        speed_rating=4,
-        typical_latency="~1.3s",
-        punctuation_style="Executive polish, flawless grammar, rich punctuation, prompt synthesis",
+        typical_latency="1.3s – 2.2s",
+        punctuation_style="Flawless real-time speech transcription, semicolons, colons, code blocks, zero repetition",
         reasoning_capability="high",
-        technical_capability="high",
-        recommended_tasks=["Executive polish", "formal client proposals", "high-impact prompt engineering", "grammar upgrade"]
-    ),
-    "gemini-3.5-flash": ModelMetadata(
-        model_name="gemini-3.5-flash",
-        display_name="Gemini 3.5 Flash (Balanced Dictation)",
-        speed_rating=4,
-        typical_latency="~1.5s",
-        punctuation_style="Refined flow, semicolons, compound sentences",
-        reasoning_capability="balanced",
-        technical_capability="high",
-        recommended_tasks=["Daily emails", "PR descriptions", "prompt crafting", "clean notes"]
+        technical_capability="expert",
+        recommended_tasks=["Universal dictation", "Antigravity coding", "ChatGPT prompts", "WhatsApp executive polish", "Long-form 20-min audio"]
     ),
     "gemini-flash-latest": ModelMetadata(
         model_name="gemini-flash-latest",
         display_name="Gemini Flash Latest (Production Auto)",
         speed_rating=4,
-        typical_latency="~1.6s",
+        typical_latency="~1.8s",
         punctuation_style="Smooth conversational phrasing, standard capitalization",
         reasoning_capability="balanced",
         technical_capability="high",
         recommended_tasks=["General purpose workflow", "stable everyday dictation"]
-    ),
-    "gemini-3.7-flash": ModelMetadata(
-        model_name="gemini-3.7-flash",
-        display_name="Gemini 3.7 Flash (Technical & Coding)",
-        speed_rating=3,
-        typical_latency="~2.1s",
-        punctuation_style="Colons, technical syntax, camelCase/snake_case formatting",
-        reasoning_capability="high",
-        technical_capability="expert",
-        recommended_tasks=["IDE code comments", "developer documentation", "technical instructions", "VS Code / coding"]
-    ),
-    "gemini-2.5-flash": ModelMetadata(
-        model_name="gemini-2.5-flash",
-        display_name="Gemini 2.5 Flash (Rich Textbook Punctuation)",
-        speed_rating=3,
-        typical_latency="~2.5s",
-        punctuation_style="Textbook grammar, semicolons, formal clause balance",
-        reasoning_capability="high",
-        technical_capability="standard",
-        recommended_tasks=["Formal correspondence", "legal & academic writing", "textbook grammar"]
-    ),
-    "gemini-2.5-pro": ModelMetadata(
-        model_name="gemini-2.5-pro",
-        display_name="Gemini 2.5 Pro (Deep Thought & Documents)",
-        speed_rating=2,
-        typical_latency="~5.0s",
-        punctuation_style="Automatic outlines, bullets, multi-paragraph synthesis",
-        reasoning_capability="deep",
-        technical_capability="expert",
-        recommended_tasks=["Long dictations (1-5m)", "essays", "meeting recaps", "action item breakdowns"]
-    ),
+    )
 }
 
 
@@ -107,13 +57,13 @@ class RoutingResult:
 
 
 class ModelRouter:
-    """Centralized routing layer for automatic and manual Gemini model selection."""
-    def __init__(self, default_model: str = "gemini-3.5-flash-lite"):
+    """Centralized routing layer force-bound to Gemini 2.5 Flash for sub-2.2s latency and zero-drop dictation."""
+    def __init__(self, default_model: str = "gemini-2.5-flash"):
         self.default_model = default_model
         self.model_registry = MODEL_REGISTRY
 
     def get_metadata(self, model_name: str) -> ModelMetadata:
-        return self.model_registry.get(model_name, self.model_registry["gemini-3.5-flash-lite"])
+        return self.model_registry.get(model_name, self.model_registry["gemini-2.5-flash"])
 
     @classmethod
     def route_model(
@@ -153,155 +103,116 @@ class ModelRouter:
     ) -> RoutingResult:
         """
         Determines the most appropriate Gemini model.
-        Supports manual override when requested, defaulting to intelligent automatic routing
-        with optional Auto Cost Mode optimization.
+        Force-binds the execution context to gemini-2.5-flash for all active text and audio processing pipelines.
         """
-        # 1. Check explicit manual override
-        if manual_override and manual_override != "auto":
-            clean_name = manual_override.strip()
-            if clean_name in self.model_registry:
-                meta = self.model_registry[clean_name]
+        meta = self.model_registry.get("gemini-2.5-flash", list(self.model_registry.values())[0])
+
+        # 1. Check explicit manual override if not 'auto'
+        if manual_override and manual_override != "auto" and manual_override in self.model_registry:
+            return RoutingResult(
+                model_name=manual_override,
+                metadata=self.model_registry[manual_override],
+                reason="Manual user override selection",
+                is_auto=False
+            )
+
+        task = (task_type or "dictate").upper()
+        app_lower = (app_name or "").lower()
+        prof_lower = (profile_name or "").lower()
+
+        # 2. Voice Audio Dictation Routing (Dynamic application & profile adaptation)
+        if task in ("DICTATE", "VOICE", "TRANSCRIPTION", "SPEECH", "AUDIO"):
+            # Antigravity Developer Environment -> Gemini 2.5 Flash
+            if "antigravity" in app_lower:
                 return RoutingResult(
-                    model_name=clean_name,
+                    model_name="gemini-2.5-flash",
                     metadata=meta,
-                    reason="Manual user override selection",
-                    is_auto=False
+                    reason="Antigravity environment: Configured for Gemini 2.5 Flash developer model",
+                    is_auto=True
                 )
 
-        # 2. Auto Cost Mode Optimization Strategy
-        # Favors ultra-inexpensive/fast models for trivial requests and reserves expensive models for long/complex work
-        if auto_cost_mode:
-            task = (task_type or "").upper()
-            if task in ("SUMMARIZE", "CONVERT_TO_DOCUMENTATION") and (duration_sec > 60.0 or text_length > 2000):
+            # WhatsApp -> Gemini 2.5 Flash Professional Model
+            if "whatsapp" in app_lower:
                 return RoutingResult(
-                    model_name="gemini-3.6-flash",
-                    metadata=self.model_registry["gemini-3.6-flash"],
-                    reason="Auto Cost Mode: Selected 3.6 Flash for deep long-form document synthesis",
+                    model_name="gemini-2.5-flash",
+                    metadata=meta,
+                    reason="WhatsApp: Configured for Gemini 2.5 Flash professional executive model",
                     is_auto=True
                 )
-            if task in ("GENERATE_CODE", "CODE_ASSISTANT") and duration_sec > 30.0:
+
+            # ChatGPT & Claude AI Chat -> Gemini 2.5 Flash
+            if "chatgpt" in app_lower or "claude" in app_lower:
                 return RoutingResult(
-                    model_name="gemini-3.7-flash",
-                    metadata=self.model_registry["gemini-3.7-flash"],
-                    reason="Auto Cost Mode: Heavy code task routed to 3.7 Flash",
+                    model_name="gemini-2.5-flash",
+                    metadata=meta,
+                    reason="AI Chat interface: Configured for Gemini 2.5 Flash prompt synthesis",
                     is_auto=True
                 )
-            # All other dictation & standard prompt generation routed to ultra-cost-efficient Flash-Lite
+
+            # Professional, Engineering, Academic, or LinkedIn
+            if prof_lower in ("professional", "engineering", "academic", "coding") or "linkedin" in app_lower:
+                return RoutingResult(
+                    model_name="gemini-2.5-flash",
+                    metadata=meta,
+                    reason=f"Profile '{profile_name}': Configured for Gemini 2.5 Flash",
+                    is_auto=True
+                )
+
+            # Long-form dictation (up to 20 mins)
+            if duration_sec > 60.0:
+                return RoutingResult(
+                    model_name="gemini-2.5-flash",
+                    metadata=meta,
+                    reason="Continuous multi-minute audio payload routed to high-throughput Gemini 2.5 Flash",
+                    is_auto=True
+                )
+
+            # Fast real-time dictation
             return RoutingResult(
-                model_name="gemini-3.5-flash-lite",
-                metadata=self.model_registry["gemini-3.5-flash-lite"],
-                reason="Auto Cost Mode: Selected ultra-inexpensive & lowest-latency model (<1.2s, 85% cost savings)",
+                model_name="gemini-2.5-flash",
+                metadata=meta,
+                reason="Voice dictation force-bound to Gemini 2.5 Flash (Target latency: 1.3s – 2.2s)",
                 is_auto=True
             )
 
-        # 3. Standard Intelligent Router (Quality & Context Optimization)
-        task = (task_type or "").upper()
+        # 3. Text Transformations & Higher Reasoning Tasks
         if task in ("GENERATE_CODE", "CODE_ASSISTANT", "EXPLAIN", "CREATE_GITHUB_ISSUE", "CREATE_GITHUB_PR"):
             return RoutingResult(
-                model_name="gemini-3.7-flash",
-                metadata=self.model_registry["gemini-3.7-flash"],
-                reason=f"Technical task '{task}' routed to High-Reasoning Technical model",
+                model_name="gemini-2.5-flash",
+                metadata=meta,
+                reason=f"Technical task '{task}' routed to Gemini 2.5 Flash",
                 is_auto=True
             )
 
         if task in ("SUMMARIZE", "CREATE_TASK", "CONVERT_TO_DOCUMENTATION") or duration_sec > 45.0 or text_length > 1500:
             return RoutingResult(
-                model_name="gemini-3.6-flash",
-                metadata=self.model_registry["gemini-3.6-flash"],
-                reason="Deep synthesis / Long input routed to High-Reasoning 3.6 Flash",
+                model_name="gemini-2.5-flash",
+                metadata=meta,
+                reason="Deep synthesis / Long input routed to high-capacity Gemini 2.5 Flash",
                 is_auto=True
             )
 
         if task in ("PROFESSIONALIZE", "ACADEMIC", "FIX_GRAMMAR", "FORMAL"):
             return RoutingResult(
                 model_name="gemini-2.5-flash",
-                metadata=self.model_registry["gemini-2.5-flash"],
-                reason="Formal grammar & rich punctuation task routed to Textbook Flash model",
+                metadata=meta,
+                reason="Formal grammar & rich punctuation task routed to Gemini 2.5 Flash",
                 is_auto=True
             )
 
         if task in ("CREATE_PROMPT", "PROMPT_ENHANCER", "CONVERT_TO_EMAIL"):
             return RoutingResult(
-                model_name="gemini-3.5-flash",
-                metadata=self.model_registry["gemini-3.5-flash"],
-                reason="Structured prompt/email crafting routed to Balanced Flash model",
+                model_name="gemini-2.5-flash",
+                metadata=meta,
+                reason="Structured prompt/email crafting routed to Gemini 2.5 Flash",
                 is_auto=True
             )
 
-        # 3. Evaluate Application Context
-        cat = (app_category or "").lower()
-        app_lower = (app_name or "").lower()
-
-        # Antigravity IDE optimization: Ultra-fast <1.2s voice dictation
-        if "antigravity" in app_lower:
-            return RoutingResult(
-                model_name="gemini-3.5-flash-lite",
-                metadata=self.model_registry["gemini-3.5-flash-lite"],
-                reason="Antigravity voice dictation optimized for Ultra-Low Latency (<1.2s)",
-                is_auto=True
-            )
-
-        if cat == "communication" or any(c in app_lower for c in ["whatsapp", "telegram", "slack", "discord"]):
-            return RoutingResult(
-                model_name="gemini-3.5-flash-lite",
-                metadata=self.model_registry["gemini-3.5-flash-lite"],
-                reason=f"Real-time messaging ({app_name}) routed to Low-Latency Flash-Lite",
-                is_auto=True
-            )
-
-        if cat == "email" or "outlook" in app_lower or "mail" in app_lower:
-            return RoutingResult(
-                model_name="gemini-3.5-flash",
-                metadata=self.model_registry["gemini-3.5-flash"],
-                reason=f"Email context ({app_name}) routed to Balanced Flash",
-                is_auto=True
-            )
-
-        if cat == "dev" or "code" in app_lower or "terminal" in app_lower or "powershell" in app_lower:
-            # For rapid cursor typing / brief speech (<25s), use ultra-fast Flash-Lite
-            if duration_sec < 25.0 and text_length < 600:
-                return RoutingResult(
-                    model_name="gemini-3.5-flash-lite",
-                    metadata=self.model_registry["gemini-3.5-flash-lite"],
-                    reason=f"Developer app ({app_name}) dictation optimized for Ultra-Fast typing (<1.2s)",
-                    is_auto=True
-                )
-            return RoutingResult(
-                model_name="gemini-3.7-flash",
-                metadata=self.model_registry["gemini-3.7-flash"],
-                reason=f"Active Developer app ({app_name}) extended input routed to Technical 3.7 Flash",
-                is_auto=True
-            )
-
-        # 4. Evaluate Productivity Profile
-        p_name = (profile_name or "").lower()
-        if p_name in ("engineering", "coding"):
-            if duration_sec < 25.0 and text_length < 600:
-                chosen = "gemini-3.5-flash-lite"
-                reason = f"Profile '{profile_name}' dictation optimized for Ultra-Fast speed (<1.2s)"
-            else:
-                chosen = "gemini-3.7-flash"
-                reason = f"Profile '{profile_name}' extended dictation routed to Technical 3.7 Flash"
-        elif p_name == "academic":
-            chosen = "gemini-2.5-flash"
-            reason = "Academic profile prioritizes textbook grammar & formal punctuation"
-        elif p_name == "casual":
-            chosen = "gemini-3.5-flash-lite"
-            reason = "Casual profile prioritizes instant response speed"
-        else:
-            # Default / Professional: balanced between speed and grammar
-            if duration_sec < 8.0 and text_length < 250:
-                chosen = "gemini-3.5-flash-lite"
-                reason = "Brief dictation routed to Ultra-Fast Flash-Lite"
-            else:
-                chosen = "gemini-3.5-flash"
-                reason = "Standard dictation routed to Balanced 3.5 Flash"
-
-        meta = self.model_registry.get(chosen, self.model_registry["gemini-3.5-flash-lite"])
+        # Default fallback
         return RoutingResult(
-            model_name=chosen,
+            model_name="gemini-2.5-flash",
             metadata=meta,
-            reason=reason,
+            reason="Default execution context force-bound to Gemini 2.5 Flash",
             is_auto=True
         )
 

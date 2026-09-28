@@ -136,8 +136,8 @@ def calculate_entry_cost(
     output_chars: int = 0
 ) -> float:
     """Calculates estimated API cost in USD for a single Gemini invocation."""
-    clean_model = model_name.strip().lower() if model_name else "gemini-3.5-flash-lite"
-    pricing = MODEL_PRICING.get(clean_model, MODEL_PRICING["gemini-3.5-flash-lite"])
+    clean_model = model_name.strip().lower() if model_name else "gemini-2.5-flash"
+    pricing = MODEL_PRICING.get(clean_model, MODEL_PRICING["gemini-2.5-flash"])
 
     # Estimate tokens (~4 characters per token average)
     input_tokens = max(1, input_chars // 4)
@@ -255,7 +255,7 @@ class CostAwarenessTracker:
                 dur = float(e.get("duration", 0.0) or 0.0)
                 total_speaking_sec += dur
 
-                model = e.get("model", "gemini-3.5-flash-lite")
+                model = e.get("model", "gemini-2.5-flash")
                 model_usage[model] = model_usage.get(model, 0) + 1
 
                 cost = calculate_entry_cost(

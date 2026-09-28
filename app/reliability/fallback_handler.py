@@ -45,28 +45,18 @@ class ExecutionResult:
 
 
 MODEL_FALLBACK_CHAINS = {
-    "gemini-2.5-pro": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"],
-    "gemini-3.7-flash": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.6-flash"],
-    "gemini-2.5-flash": ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"],
-    "gemini-3.6-flash": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"],
-    "gemini-3.5-flash": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"],
-    "gemini-3.5-flash-lite": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"],
-    "gemini-flash-latest": ["gemini-2.5-flash", "gemini-flash-lite-latest"],
-    "gemini-flash-lite-latest": ["gemini-2.5-flash", "gemini-flash-latest"]
+    "gemini-2.5-flash": ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"],
+    "gemini-flash-latest": ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"],
+    "gemini-flash-lite-latest": ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash"]
 }
 
 
 class FallbackHandler:
-    """Manages resilient execution of Gemini API requests and graceful UI degradations."""
+    """Manages resilient execution of Gemini API requests with automatic model fallback."""
 
     @staticmethod
     def get_fallback_chain(primary_model: str) -> List[str]:
-        chain = [primary_model]
-        fallbacks = MODEL_FALLBACK_CHAINS.get(primary_model, ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-2.5-flash"])
-        for m in fallbacks:
-            if m not in chain:
-                chain.append(m)
-        return chain
+        return MODEL_FALLBACK_CHAINS.get(primary_model, [primary_model, "gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"])
 
     @staticmethod
     def classify_error(status_code: int, error_text: str) -> Tuple[APIErrorType, str]:
@@ -156,9 +146,9 @@ class FallbackHandler:
 
                         err_type, friendly_msg = cls.classify_error(status_code, text_or_err)
 
-                        # If rate limit 429, server unavailable 503, or model not found/unsupported 404/400: failover to next model immediately!
-                        if err_type != APIErrorType.INVALID_KEY and (err_type in (APIErrorType.RATE_LIMIT_429, APIErrorType.SERVER_UNAVAILABLE_503) or status_code in (404, 400) or "not found" in text_or_err.lower()) and idx + 1 < len(models_to_try):
-                            logger.warning(f"Model {model} failed ({status_code or err_type.value}). Instant failover to {models_to_try[idx + 1]}.")
+                        # Instant failover to next model on 429, 503, 500, Timeout, 404, empty transcript, or unsupported model
+                        if err_type != APIErrorType.INVALID_KEY and (err_type in (APIErrorType.RATE_LIMIT_429, APIErrorType.SERVER_UNAVAILABLE_503, APIErrorType.TIMEOUT, APIErrorType.INTERNAL_SERVER_ERROR_500) or status_code in (404, 400, 500, 503, 429) or "not found" in text_or_err.lower() or "timeout" in text_or_err.lower() or "empty" in text_or_err.lower()) and idx + 1 < len(models_to_try):
+                            logger.warning(f"Model {model} returned {status_code or err_type.value}. Instant fast failover to {models_to_try[idx + 1]}.")
                             fallback_reason = FallbackReason(
                                 original_model=primary_model,
                                 fallback_model=models_to_try[idx + 1],

@@ -1002,9 +1002,27 @@ class SettingsDialog(QDialog):
             h = ws.get("height", 720)
             x = ws.get("x")
             y = ws.get("y")
+
+            primary_screen = QApplication.primaryScreen()
+            if primary_screen:
+                screen_geom = primary_screen.availableGeometry()
+                w = min(max(w, 720), screen_geom.width() - 40)
+                h = min(max(h, 620), screen_geom.height() - 60)
+
             self.resize(w, h)
-            if x is not None and y is not None:
-                self.move(x, y)
+
+            needs_centering = True
+            if x is not None and y is not None and x > 10 and y > 30 and primary_screen:
+                screen_geom = primary_screen.availableGeometry()
+                if (screen_geom.left() <= x <= screen_geom.right() - 200) and (screen_geom.top() <= y <= screen_geom.bottom() - 200):
+                    self.move(x, y)
+                    needs_centering = False
+
+            if needs_centering and primary_screen:
+                screen_geom = primary_screen.availableGeometry()
+                cx = screen_geom.left() + (screen_geom.width() - w) // 2
+                cy = screen_geom.top() + (screen_geom.height() - h) // 2
+                self.move(max(20, cx), max(20, cy))
         except Exception as e:
             logger.warning(f"Could not restore window geometry: {e}")
 
@@ -2073,6 +2091,17 @@ class SettingsDialog(QDialog):
             self.profile_model_badge.setText(f"💎 {p.preferred_model}")
             self.profile_prompt_edit.setPlainText(p.system_prompt_addition)
             self.profile_vocab_tags.setText(", ".join(p.vocabulary_categories) if p.vocabulary_categories else "General")
+
+    def sync_active_profile(self, profile_id: str):
+        """Thread-safe UI method to sync the active productivity profile from the active window context."""
+        if not hasattr(self, "profile_combo") or not self.profile_combo:
+            return
+        idx = self.profile_combo.findData(profile_id)
+        if idx >= 0 and self.profile_combo.currentIndex() != idx:
+            self.profile_combo.blockSignals(True)
+            self.profile_combo.setCurrentIndex(idx)
+            self.profile_combo.blockSignals(False)
+            self._on_profile_combo_changed()
 
     def _create_vocabulary_tab(self) -> QWidget:
         tab = QWidget()
@@ -3502,7 +3531,7 @@ class SettingsDialog(QDialog):
         if model_mode == "auto":
             self.model_combo.setCurrentIndex(0)
         else:
-            model_name = self.config.get("model_name", "gemini-3.5-flash-lite")
+            model_name = self.config.get("model_name", "gemini-2.5-flash")
             found = False
             for i in range(1, self.model_combo.count()):
                 if self.model_combo.itemText(i).startswith(model_name):
@@ -3639,17 +3668,18 @@ class SettingsDialog(QDialog):
             }
             matched_preset = id_to_preset.get(p_id, "clean_dictation")
             
-            # Activate immediately on selection
-            self.config.set_active_saved_prompt(p_id)
-            self.config.set("mode_preset", matched_preset)
-            self.config.save_config()
-
-            self.active_prompt_badge.setText(f"Active: {matched.get('title')}")
-            self.active_prompt_badge.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 3px 8px; border: none;")
-            self.btn_apply_prompt.setEnabled(False)
-            self.btn_apply_prompt.setText("✓ Currently Active")
+            is_active = matched.get("is_active", False)
+            if is_active:
+                self.active_prompt_badge.setText(f"Active: {matched.get('title')}")
+                self.active_prompt_badge.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 3px 8px; border: none;")
+                self.btn_apply_prompt.setEnabled(False)
+                self.btn_apply_prompt.setText("✓ Currently Active")
+            else:
+                self.active_prompt_badge.setText("Status: Inactive")
+                self.active_prompt_badge.setStyleSheet("color: #94A3B8; font-weight: bold; font-size: 11px; background: #334155; border-radius: 4px; padding: 3px 8px; border: none;")
+                self.btn_apply_prompt.setEnabled(True)
+                self.btn_apply_prompt.setText("⚡ Set as Active Prompt")
             self.btn_delete_prompt.setEnabled(len(prompts) > 1)
-            self.settings_applied.emit()
 
     def _on_new_saved_prompt(self):
         self._editing_prompt_id = None
@@ -3767,6 +3797,8 @@ class SettingsDialog(QDialog):
                         self._refresh_dictionary()
                         self._refresh_snippets()
                         self._refresh_vocab_table()
+                        cur_prof = self.config.get("active_profile", "coding")
+                        self.sync_active_profile(cur_prof)
         except Exception as e:
             logger.debug(f"Live poll note: {e}")
 
@@ -4241,7 +4273,7 @@ class SettingsDialog(QDialog):
         item.setForeground(1, QColor("#94A3B8"))
 
         # Column 2: Model
-        model_name = entry.get("model", "gemini-3.5-flash-lite")
+        model_name = entry.get("model", "gemini-2.5-flash")
         short_model = model_name.replace("gemini-", "")
         item.setText(2, f"🤖 {short_model}")
         item.setForeground(2, QColor("#64748B"))
@@ -4299,7 +4331,7 @@ class SettingsDialog(QDialog):
         title = entry.get("title", "")
         duration = entry.get("duration", 0)
         app_name = entry.get("app_name", "General")
-        model = entry.get("model", "gemini-3.5-flash-lite")
+        model = entry.get("model", "gemini-2.5-flash")
         mode = entry.get("mode", "")
         is_pinned = entry.get("is_pinned", False)
         is_fav = entry.get("is_favorite", False)
@@ -4815,7 +4847,7 @@ class SettingsDialog(QDialog):
         # Model / Router
         if model_code == "auto":
             self.config.set("model_mode", "auto")
-            self.config.set("model_name", "gemini-3.5-flash-lite")
+            self.config.set("model_name", "gemini-2.5-flash")
         else:
             self.config.set("model_mode", model_code)
             self.config.set("model_name", model_code)

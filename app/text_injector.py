@@ -81,10 +81,22 @@ class TextInjector:
         return "General"
 
     def focus_target_window(self):
-        """Restores focus to the window that was active when speech started."""
+        """Restores focus to the window that was active when speech started with AttachThreadInput guarantee."""
         if self.last_target_hwnd:
             try:
-                user32.SetForegroundWindow(self.last_target_hwnd)
+                kernel32 = ctypes.windll.kernel32
+                fore_hwnd = user32.GetForegroundWindow()
+                if fore_hwnd != self.last_target_hwnd:
+                    cur_thread = kernel32.GetCurrentThreadId()
+                    target_thread = user32.GetWindowThreadProcessId(self.last_target_hwnd, None)
+                    if target_thread != 0 and target_thread != cur_thread:
+                        user32.AttachThreadInput(cur_thread, target_thread, True)
+                        user32.BringWindowToTop(self.last_target_hwnd)
+                        user32.SetForegroundWindow(self.last_target_hwnd)
+                        user32.AttachThreadInput(cur_thread, target_thread, False)
+                    else:
+                        user32.BringWindowToTop(self.last_target_hwnd)
+                        user32.SetForegroundWindow(self.last_target_hwnd)
                 time.sleep(0.05)
             except Exception as e:
                 logger.warning(f"Could not restore foreground window: {e}")
@@ -129,8 +141,8 @@ class TextInjector:
         """
         Injects the text into the active cursor position by copying to clipboard
         and simulating Ctrl + V.
-        If leave_in_clipboard is provided, sets the clipboard to leave_in_clipboard immediately after
-        the Ctrl+V paste action completes (e.g. leaving normal spoken text as safeguard/backup).
+        If leave_in_clipboard is provided, sets the clipboard to leave_in_clipboard after
+        the Ctrl+V paste action completes (leaving normal spoken text as safeguard/backup).
         """
         if not text:
             return False
@@ -153,7 +165,7 @@ class TextInjector:
             # 2. Set clipboard to the primary text to paste (with retry)
             if not self._safe_set_clipboard(text):
                 logger.warning("Could not set primary clipboard text.")
-            time.sleep(0.04)
+            time.sleep(0.05)
 
             # 3. Simulate Ctrl + V using Win32 keybd_event
             user32.keybd_event(VK_CONTROL, 0, 0, 0)
@@ -167,7 +179,7 @@ class TextInjector:
             # 4. Handle post-paste clipboard state
             if leave_in_clipboard is not None:
                 # Allow target window time to process the Ctrl+V paste message
-                time.sleep(0.08)
+                time.sleep(0.20)
                 self._safe_set_clipboard(leave_in_clipboard)
                 logger.info("Clipboard updated with safeguard text (normal speech backup).")
             elif restore_clipboard and old_clipboard is not None:

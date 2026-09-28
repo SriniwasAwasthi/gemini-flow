@@ -17,6 +17,7 @@ class AppContext:
     preferred_model: str    # Model routing recommendation
     tone_directive: str     # Context prompt instruction
     formatting_directive: str
+    profile_id: str = "coding"  # "engineering", "coding", "professional", "academic", "casual"
     vocabulary_priorities: List[str] = field(default_factory=list)
     icon: str = "🖥️"
     is_prompt_interface: bool = False
@@ -27,121 +28,133 @@ class AppContext:
 
 
 APP_REGISTRY: Dict[str, Dict[str, Any]] = {
-    # 1. Developer Environments / IDEs & AI Prompt Interfaces
+    # 1. Developer Environments / IDEs & AI Assistants
     "antigravity": {
         "canonical_name": "Antigravity",
         "category": "dev",
-        "preferred_model": "gemini-3.5-flash-lite",
-        "tone_directive": "Technical, precise, and direct developer style.",
-        "formatting_directive": "Accurate verbatim speech transcription with proper punctuation, sentence casing, and clean programming terms.",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
+        "tone_directive": "Technical, precise, and natural developer style.",
+        "formatting_directive": "Accurate technical speech transcription with proper punctuation, sentence casing, camelCase/snake_case, and clean programming syntax.",
         "vocabulary_priorities": ["Programming", "Technical"],
         "icon": "🚀",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "chatgpt": {
         "canonical_name": "ChatGPT",
         "category": "ai_chat",
-        "preferred_model": "gemini-3.5-flash",
-        "tone_directive": "Clear, precise conversational and instruction style.",
-        "formatting_directive": "Accurate verbatim speech transcription with clean sentence structure and proper punctuation.",
-        "vocabulary_priorities": ["Technical", "Prompting"],
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
+        "tone_directive": "Clear, natural, and precise conversational and technical instruction style.",
+        "formatting_directive": "Accurate verbatim speech transcription with clean sentence structure, proper punctuation, and programming syntax where appropriate.",
+        "vocabulary_priorities": ["Technical", "Programming"],
         "icon": "🤖",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "claude": {
         "canonical_name": "Claude AI",
         "category": "ai_chat",
-        "preferred_model": "gemini-3.5-flash",
-        "tone_directive": "Structured, articulate instruction style.",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
+        "tone_directive": "Clear, natural, and structured conversational instruction style.",
         "formatting_directive": "Accurate verbatim speech transcription with clean sentence structure and proper punctuation.",
-        "vocabulary_priorities": ["Technical", "Prompting"],
+        "vocabulary_priorities": ["Technical", "Programming"],
         "icon": "🧠",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "perplexity": {
         "canonical_name": "Perplexity",
         "category": "ai_chat",
-        "preferred_model": "gemini-3.5-flash-lite",
+        "profile_id": "casual",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Sharp, concise search and query style.",
         "formatting_directive": "Accurate speech transcription with proper punctuation.",
         "vocabulary_priorities": ["General"],
         "icon": "🔍",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "vs code": {
         "canonical_name": "VS Code",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Technical, precise, and developer-oriented.",
         "formatting_directive": "Accurate verbatim speech transcription with proper punctuation, clean programming terms, and syntax.",
         "vocabulary_priorities": ["Programming", "Technical"],
         "icon": "💻",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "code": {
         "canonical_name": "VS Code",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Technical, precise, and developer-oriented.",
         "formatting_directive": "Accurate verbatim speech transcription with proper punctuation, clean programming terms, and syntax.",
         "vocabulary_priorities": ["Programming", "Technical"],
         "icon": "💻",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "cursor": {
         "canonical_name": "Cursor",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Technical, precise coding instruction style.",
         "formatting_directive": "Accurate verbatim speech transcription with proper punctuation and clean code terminology.",
         "vocabulary_priorities": ["Programming", "Technical"],
         "icon": "⚡",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "windsurf": {
         "canonical_name": "Windsurf",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Technical, precise coding instruction style.",
         "formatting_directive": "Accurate verbatim speech transcription with proper punctuation and clean code terminology.",
         "vocabulary_priorities": ["Programming", "Technical"],
         "icon": "🏄",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "cline": {
         "canonical_name": "Cline AI",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
-        "tone_directive": "Technical, autonomous AI coding instruction style.",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
+        "tone_directive": "Technical, precise coding instruction style.",
         "formatting_directive": "Accurate verbatim speech transcription with proper punctuation and clean code terminology.",
         "vocabulary_priorities": ["Programming", "Technical"],
         "icon": "🤖",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "continue": {
         "canonical_name": "Continue AI",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Clear, precise developer instructions.",
         "formatting_directive": "Accurate verbatim speech transcription with proper punctuation.",
         "vocabulary_priorities": ["Programming", "Technical"],
         "icon": "⏩",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "zed": {
         "canonical_name": "Zed Editor",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Technical, precise developer style.",
         "formatting_directive": "Accurate verbatim speech transcription with proper punctuation.",
         "vocabulary_priorities": ["Programming", "Technical"],
         "icon": "⚡",
-        "is_prompt_interface": True
+        "is_prompt_interface": False
     },
     "visual studio": {
         "canonical_name": "Visual Studio",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Technical, precise C#/C++ and .NET software engineering style.",
         "formatting_directive": "Clean developer casing and indentation. Wrap syntax in code blocks.",
         "vocabulary_priorities": ["Programming", "Technical"],
@@ -150,7 +163,8 @@ APP_REGISTRY: Dict[str, Dict[str, Any]] = {
     "pycharm": {
         "canonical_name": "PyCharm",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Pythonic, concise, developer style. Respect PEP8 naming conventions.",
         "formatting_directive": "Format Python functions and variables in snake_case. Clean docstring formatting.",
         "vocabulary_priorities": ["Programming", "Technical"],
@@ -159,47 +173,82 @@ APP_REGISTRY: Dict[str, Dict[str, Any]] = {
     "terminal": {
         "canonical_name": "Terminal",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Direct CLI command and shell script style. No conversational fluff.",
         "formatting_directive": "Format flags (e.g. --flag), paths, and Unix/PowerShell commands cleanly on one line.",
         "vocabulary_priorities": ["Technical", "Programming"],
         "icon": "⚡"
     },
 
-    # 2. Email Clients
+    # 2. Email Clients & Professional Correspondence
     "gmail": {
         "canonical_name": "Gmail",
         "category": "email",
-        "preferred_model": "gemini-3.5-flash",
+        "profile_id": "professional",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Professional, courteous, and clear email correspondence.",
         "formatting_directive": "Organize into natural email paragraphs with polite opening salutation and professional sign-off if dictated.",
         "vocabulary_priorities": ["Personal", "Custom"],
         "icon": "✉️"
     },
-    "microsoft outlook": {
+    "outlook": {
         "canonical_name": "Microsoft Outlook",
         "category": "email",
-        "preferred_model": "gemini-3.5-flash",
+        "profile_id": "professional",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Corporate executive email style. Crisp, polished, and courteous.",
         "formatting_directive": "Clean business paragraphs, bullet points for action items, polite closing.",
         "vocabulary_priorities": ["Personal", "Project"],
         "icon": "✉️"
+    },
+    "microsoft outlook": {
+        "canonical_name": "Microsoft Outlook",
+        "category": "email",
+        "profile_id": "professional",
+        "preferred_model": "gemini-2.5-flash",
+        "tone_directive": "Corporate executive email style. Crisp, polished, and courteous.",
+        "formatting_directive": "Clean business paragraphs, bullet points for action items, polite closing.",
+        "vocabulary_priorities": ["Personal", "Project"],
+        "icon": "✉️"
+    },
+    "linkedin": {
+        "canonical_name": "LinkedIn",
+        "category": "writing",
+        "profile_id": "professional",
+        "preferred_model": "gemini-2.5-flash",
+        "tone_directive": "Articulate, engaging professional executive thought leadership.",
+        "formatting_directive": "Clean readable paragraph breaks, bullet points, engaging hook, and polite closing.",
+        "vocabulary_priorities": ["Business", "Technical"],
+        "icon": "💼"
     },
 
     # 3. Real-Time Chat & Collaboration
     "whatsapp": {
         "canonical_name": "WhatsApp",
         "category": "communication",
-        "preferred_model": "gemini-3.5-flash-lite",
+        "profile_id": "professional",
+        "preferred_model": "gemini-2.5-flash",
+        "tone_directive": "Professional, articulate, polite, and executive-grade communication.",
+        "formatting_directive": "Polished corporate English, flawless grammar, exact punctuation, and clean sentence structure without hesitation or slang.",
+        "vocabulary_priorities": ["Business", "Personal"],
+        "icon": "💬"
+    },
+    "telegram": {
+        "canonical_name": "Telegram",
+        "category": "communication",
+        "profile_id": "casual",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Natural, direct, conversational chat messaging.",
-        "formatting_directive": "Concise sentences without overly stiff corporate boilerplate.",
+        "formatting_directive": "Concise sentences with clean punctuation and zero hesitation.",
         "vocabulary_priorities": ["Personal"],
         "icon": "💬"
     },
     "slack": {
         "canonical_name": "Slack",
         "category": "communication",
-        "preferred_model": "gemini-3.5-flash-lite",
+        "profile_id": "professional",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Collaborative, crisp workplace chat. Friendly yet productive.",
         "formatting_directive": "Use bullet points or bold keys if listing items. Keep messages compact.",
         "vocabulary_priorities": ["Project", "Technical"],
@@ -208,7 +257,8 @@ APP_REGISTRY: Dict[str, Dict[str, Any]] = {
     "discord": {
         "canonical_name": "Discord",
         "category": "communication",
-        "preferred_model": "gemini-3.5-flash-lite",
+        "profile_id": "casual",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Casual, friendly, community conversation.",
         "formatting_directive": "Natural phrasing and direct style.",
         "vocabulary_priorities": ["Custom"],
@@ -219,7 +269,8 @@ APP_REGISTRY: Dict[str, Dict[str, Any]] = {
     "github": {
         "canonical_name": "GitHub",
         "category": "dev",
-        "preferred_model": "gemini-3.7-flash",
+        "profile_id": "coding",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Clear open-source software engineering style. Structured and constructive.",
         "formatting_directive": "Markdown-compatible formatting with headers (###), checklists (- [ ]), and code backticks for commit IDs and file paths.",
         "vocabulary_priorities": ["Technical", "Programming", "Project"],
@@ -230,7 +281,8 @@ APP_REGISTRY: Dict[str, Dict[str, Any]] = {
     "microsoft word": {
         "canonical_name": "Microsoft Word",
         "category": "writing",
-        "preferred_model": "gemini-2.5-pro",
+        "profile_id": "academic",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Formal, articulate, and grammatically impeccable prose.",
         "formatting_directive": "Full paragraphs, rich punctuation balance, and structured sections.",
         "vocabulary_priorities": ["Academic", "Personal"],
@@ -239,7 +291,8 @@ APP_REGISTRY: Dict[str, Dict[str, Any]] = {
     "notion": {
         "canonical_name": "Notion",
         "category": "writing",
-        "preferred_model": "gemini-3.5-flash",
+        "profile_id": "professional",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Structured knowledge base and product management style.",
         "formatting_directive": "Markdown headers, checklists, and bulleted takeaways.",
         "vocabulary_priorities": ["Project", "Technical"],
@@ -248,7 +301,8 @@ APP_REGISTRY: Dict[str, Dict[str, Any]] = {
     "notepad": {
         "canonical_name": "Notepad",
         "category": "writing",
-        "preferred_model": "gemini-3.5-flash-lite",
+        "profile_id": "casual",
+        "preferred_model": "gemini-2.5-flash",
         "tone_directive": "Clean, unpretentious plain text notes.",
         "formatting_directive": "Direct transcription with essential punctuation.",
         "vocabulary_priorities": ["Custom"],
@@ -276,12 +330,13 @@ class AppIntelligenceManager:
                 preferred_model=cfg["preferred_model"],
                 tone_directive=cfg["tone_directive"],
                 formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg["vocabulary_priorities"],
                 icon=cfg["icon"],
-                is_prompt_interface=True
+                is_prompt_interface=False
             )
 
-        # 2. VS Code & Modern Code Editors (Direct AI Prompt Conversion)
+        # 2. VS Code & Modern Code Editors
         if (
             "vs code" in app_clean
             or "vs code" in title_clean
@@ -297,12 +352,13 @@ class AppIntelligenceManager:
             return AppContext(
                 app_name="VS Code",
                 category="dev",
-                preferred_model="gemini-3.7-flash",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
                 tone_directive=cfg["tone_directive"],
                 formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
                 icon="💻",
-                is_prompt_interface=True
+                is_prompt_interface=False
             )
 
         # 3. Cursor, Windsurf & AI Agent Coding Environments
@@ -311,12 +367,13 @@ class AppIntelligenceManager:
             return AppContext(
                 app_name="Cursor",
                 category="dev",
-                preferred_model="gemini-3.7-flash",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
                 tone_directive=cfg["tone_directive"],
                 formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
                 icon="⚡",
-                is_prompt_interface=True
+                is_prompt_interface=False
             )
 
         if "windsurf" in app_clean or "windsurf" in title_clean:
@@ -324,12 +381,13 @@ class AppIntelligenceManager:
             return AppContext(
                 app_name="Windsurf",
                 category="dev",
-                preferred_model="gemini-3.7-flash",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
                 tone_directive=cfg["tone_directive"],
                 formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
                 icon="🏄",
-                is_prompt_interface=True
+                is_prompt_interface=False
             )
 
         if "cline" in app_clean or "cline" in title_clean:
@@ -337,12 +395,13 @@ class AppIntelligenceManager:
             return AppContext(
                 app_name="Cline AI",
                 category="dev",
-                preferred_model="gemini-3.7-flash",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
                 tone_directive=cfg["tone_directive"],
                 formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
                 icon="🤖",
-                is_prompt_interface=True
+                is_prompt_interface=False
             )
 
         if "continue" in app_clean or "continue" in title_clean:
@@ -350,12 +409,13 @@ class AppIntelligenceManager:
             return AppContext(
                 app_name="Continue AI",
                 category="dev",
-                preferred_model="gemini-3.7-flash",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
                 tone_directive=cfg["tone_directive"],
                 formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
                 icon="⏩",
-                is_prompt_interface=True
+                is_prompt_interface=False
             )
 
         if "zed" in app_clean or "zed" in title_clean:
@@ -363,12 +423,13 @@ class AppIntelligenceManager:
             return AppContext(
                 app_name="Zed",
                 category="dev",
-                preferred_model="gemini-3.7-flash",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
                 tone_directive=cfg["tone_directive"],
                 formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
                 icon="⚡",
-                is_prompt_interface=True
+                is_prompt_interface=False
             )
 
         # 4. AI Chat & Prompt-Generation Interfaces
@@ -378,15 +439,31 @@ class AppIntelligenceManager:
                 return AppContext(
                     app_name=cfg.get("canonical_name", ai_key.capitalize()),
                     category="ai_chat",
-                    preferred_model=cfg.get("preferred_model", "gemini-3.5-flash"),
-                    tone_directive="Clear, high-impact prompt engineering style.",
-                    formatting_directive="Structure spoken thoughts directly into high-impact AI prompts.",
-                    vocabulary_priorities=cfg.get("vocabulary_priorities", ["Technical", "Prompting"]),
+                    preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
+                    tone_directive="Clear, natural, and precise conversational and technical instruction style.",
+                    formatting_directive="Accurate verbatim speech transcription with clean sentence structure, proper punctuation, and programming syntax where appropriate.",
+                    profile_id=cfg.get("profile_id", "coding"),
+                    vocabulary_priorities=cfg.get("vocabulary_priorities", ["Technical", "Programming"]),
                     icon=cfg.get("icon", "🤖"),
-                    is_prompt_interface=True
+                    is_prompt_interface=False
                 )
 
-        # 3. Check GitHub in browser
+        # 5. Check LinkedIn
+        if "linkedin" in title_clean or "linkedin" in app_clean:
+            cfg = self.registry["linkedin"]
+            return AppContext(
+                app_name="LinkedIn",
+                category=cfg["category"],
+                preferred_model=cfg["preferred_model"],
+                tone_directive=cfg["tone_directive"],
+                formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "professional"),
+                vocabulary_priorities=cfg["vocabulary_priorities"],
+                icon=cfg["icon"],
+                is_prompt_interface=False
+            )
+
+        # 6. Check GitHub in browser
         if "github" in title_clean or "github" in app_clean:
             cfg = self.registry["github"]
             return AppContext(
@@ -395,12 +472,13 @@ class AppIntelligenceManager:
                 preferred_model=cfg["preferred_model"],
                 tone_directive=cfg["tone_directive"],
                 formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg["vocabulary_priorities"],
                 icon=cfg["icon"],
                 is_prompt_interface=False
             )
 
-        # 4. Check Gmail in browser
+        # 7. Check Gmail in browser
         if "gmail" in title_clean or "mail" in title_clean:
             cfg = self.registry["gmail"]
             return AppContext(
@@ -409,12 +487,13 @@ class AppIntelligenceManager:
                 preferred_model=cfg["preferred_model"],
                 tone_directive=cfg["tone_directive"],
                 formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "professional"),
                 vocabulary_priorities=cfg["vocabulary_priorities"],
                 icon=cfg["icon"],
                 is_prompt_interface=False
             )
 
-        # 5. Check registry match
+        # 8. Check registry match
         for key, cfg in self.registry.items():
             if key in app_clean or app_clean in key:
                 return AppContext(
@@ -423,6 +502,7 @@ class AppIntelligenceManager:
                     preferred_model=cfg["preferred_model"],
                     tone_directive=cfg["tone_directive"],
                     formatting_directive=cfg["formatting_directive"],
+                    profile_id=cfg.get("profile_id", "coding"),
                     vocabulary_priorities=cfg["vocabulary_priorities"],
                     icon=cfg["icon"],
                     is_prompt_interface=cfg.get("is_prompt_interface", False)
@@ -432,9 +512,10 @@ class AppIntelligenceManager:
         return AppContext(
             app_name=raw_app_name or "General",
             category="general",
-            preferred_model="gemini-3.5-flash",
+            preferred_model="gemini-2.5-flash",
             tone_directive="Clear, natural, and helpful.",
             formatting_directive="Standard punctuation and sentence structure.",
+            profile_id="coding",
             vocabulary_priorities=["Personal", "Custom"],
             icon="🖥️"
         )
@@ -448,14 +529,14 @@ class AppIntelligenceManager:
         )
 
     @classmethod
-    def get_active_app_context(cls) -> AppContext:
+    def get_active_app_context(cls, target_hwnd: Optional[int] = None) -> AppContext:
         """Helper to get context for the currently active foreground window in Windows."""
         raw_app_name = "General"
         window_title = ""
         try:
             import ctypes
             user32 = ctypes.windll.user32
-            hwnd = user32.GetForegroundWindow()
+            hwnd = target_hwnd or user32.GetForegroundWindow()
             if hwnd:
                 # Window title
                 length = user32.GetWindowTextLengthW(hwnd)
@@ -485,3 +566,4 @@ class AppIntelligenceManager:
 
 
 AppIntelligenceEngine = AppIntelligenceManager
+

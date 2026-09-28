@@ -77,6 +77,9 @@ def apply_dsp_filters(
     return processed
 
 
+import threading
+
+
 class AudioRecorder:
     def __init__(
         self,
@@ -95,6 +98,7 @@ class AudioRecorder:
         self.is_recording = False
         self.stream: Optional[Any] = None
         self.audio_chunks: List[np.ndarray] = []
+        self._buffer_lock = threading.Lock()
         self.start_time = 0.0
         self.device_index: Optional[int] = None
         self._current_amplitude: float = 0.0
@@ -145,39 +149,41 @@ class AudioRecorder:
             logger.debug(f"Audio driver warmup note: {e}")
 
     def _audio_callback(self, indata: np.ndarray, frames: int, time_info: Any, status: Any):
-        """Internal callback for sounddevice InputStream."""
+        """Internal thread-safe callback for sounddevice InputStream."""
         if status:
             logger.warning(f"Audio stream status: {status}")
-        if self.is_recording:
-            # indata shape is (frames, channels)
-            self.audio_chunks.append(indata.copy())
-            # Calculate RMS amplitude for UI visualization (0.0 to 1.0)
-            rms = np.sqrt(np.mean(np.square(indata)))
-            # Scale slightly so normal speech animates nicely
-            scaled = min(1.0, float(rms * 12.0))
-            self._current_amplitude = scaled
-            if self.on_amplitude:
-                try:
-                    self.on_amplitude(scaled)
-                except Exception:
-                    pass
+        with self._buffer_lock:
+            if self.is_recording:
+                # indata shape is (frames, channels)
+                self.audio_chunks.append(indata.copy())
+
+        # Calculate RMS amplitude for UI visualization (0.0 to 1.0)
+        rms = np.sqrt(np.mean(np.square(indata)))
+        scaled = min(1.0, float(rms * 12.0))
+        self._current_amplitude = scaled
+        if self.on_amplitude:
+            try:
+                self.on_amplitude(scaled)
+            except Exception:
+                pass
 
     @property
     def current_amplitude(self) -> float:
         return self._current_amplitude
 
     def start_recording(self) -> bool:
-        """Starts recording audio from the selected microphone."""
-        if self.is_recording:
-            return False
-        if sd is None:
-            logger.error("sounddevice is not available.")
-            return False
+        """Starts recording audio from the selected microphone with zero-drop buffer initialization."""
+        with self._buffer_lock:
+            if self.is_recording:
+                return False
+            if sd is None:
+                logger.error("sounddevice is not available.")
+                return False
 
-        self.audio_chunks = []
-        self.is_recording = True
-        self.start_time = time.time()
-        self._current_amplitude = 0.0
+            self.audio_chunks = []
+            self.is_recording = True
+            self.start_time = time.time()
+            self._current_amplitude = 0.0
 
         # Attempt with configured device index, or fallback to system default
         target_device = self.device_index
@@ -213,17 +219,19 @@ class AudioRecorder:
             else:
                 logger.error(f"Failed to start audio recording on default device: {e}")
 
-            self.is_recording = False
+            with self._buffer_lock:
+                self.is_recording = False
             return False
 
     def stop_recording(self) -> tuple[bytes, float]:
         """
-        Stops recording and returns (wav_bytes, duration_seconds).
+        Stops recording safely and returns (wav_bytes, duration_seconds) without buffer corruption.
         """
-        if not self.is_recording:
-            return b"", 0.0
+        with self._buffer_lock:
+            if not self.is_recording:
+                return b"", 0.0
+            self.is_recording = False
 
-        self.is_recording = False
         duration = max(0.1, time.time() - self.start_time)
 
         try:
@@ -236,13 +244,16 @@ class AudioRecorder:
         except Exception as e:
             logger.error(f"Error stopping audio stream: {e}")
 
-        if not self.audio_chunks:
-            logger.warning("No audio recorded.")
-            return b"", 0.0
+        with self._buffer_lock:
+            if not self.audio_chunks:
+                logger.warning("No audio recorded.")
+                return b"", 0.0
+            raw_chunks = list(self.audio_chunks)
+            self.audio_chunks = []
 
         try:
             # Combine all chunks into one continuous array
-            audio_data = np.concatenate(self.audio_chunks, axis=0)
+            audio_data = np.concatenate(raw_chunks, axis=0)
 
             # Apply Real-Time DSP Filters (Ceiling Fan / AC High-Pass + Dynamic Noise Gate)
             fan_filter_on = self.config.get_dsp_fan_filter_enabled() if hasattr(self.config, "get_dsp_fan_filter_enabled") else self.dsp_fan_filter_enabled

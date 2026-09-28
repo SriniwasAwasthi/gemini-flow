@@ -35,7 +35,7 @@ def run_all_tests():
     print(f"\n[KEY CHECK] Active API Key prefix: {api_key[:12]}... (length: {len(api_key)})")
     assert len(api_key) > 20, "API key is missing or invalid."
 
-    gemini = GeminiEngine(api_key=api_key, model_name="gemini-3.5-flash")
+    gemini = GeminiEngine(api_key=api_key, model_name="gemini-2.5-flash")
 
     # TEST 1: Model Router Dynamic App Context & Duration Routing
     print("\n" + "-" * 80)
@@ -43,12 +43,12 @@ def run_all_tests():
     print("-" * 80)
 
     test_routes = [
-        ("WhatsApp", "communication", 5.0, "engineering", "gemini-3.5-flash-lite"),
-        ("Antigravity", "dev", 10.0, "engineering", "gemini-3.5-flash-lite"),
-        ("VS Code", "dev", 35.0, "engineering", "gemini-3.7-flash"),
-        ("Outlook", "email", 12.0, "general", "gemini-3.5-flash"),
-        ("Google Meet", "general", 65.0, "general", "gemini-3.6-flash"),
-        ("Terminal", "dev", 40.0, "engineering", "gemini-3.7-flash"),
+        ("WhatsApp", "communication", 5.0, "engineering", "gemini-2.5-flash"),
+        ("Antigravity", "dev", 10.0, "engineering", "gemini-2.5-flash"),
+        ("VS Code", "dev", 35.0, "engineering", "gemini-2.5-flash"),
+        ("Outlook", "email", 12.0, "general", "gemini-2.5-flash"),
+        ("Google Meet", "general", 65.0, "general", "gemini-2.5-flash"),
+        ("Terminal", "dev", 40.0, "engineering", "gemini-2.5-flash"),
     ]
 
     for app_nm, cat, dur, prof, exp_model in test_routes:
@@ -62,11 +62,11 @@ def run_all_tests():
         print(f"  App: {app_nm:<12} ({dur:>4.1f}s) -> Routed to: {routing.model_name:<22} | Reason: {routing.reason}")
         assert routing.model_name == exp_model, f"Routing mismatch for {app_nm}: expected {exp_model}, got {routing.model_name}"
 
-    print("  ✓ Verification: Dynamic model router accurately routes all app contexts and audio lengths.")
+    print("  ✓ Verification: Dynamic model router accurately routes all app contexts to gemini-2.5-flash.")
 
     # TEST 2: All 5 Prompt Styles
     print("\n" + "-" * 80)
-    print("TEST 2: All 5 Prompt Styles - Verification of Bullet Points, Line Breaks & Structure")
+    print("TEST 2: All Prompt Styles - Verification of Bullet Points, Line Breaks & Structure")
     print("-" * 80)
 
     speech_sample = (
@@ -118,9 +118,7 @@ def run_all_tests():
     print("-" * 80)
 
     active_models = [
-        "gemini-3.5-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-3.6-flash"
+        "gemini-2.5-flash"
     ]
 
     for m in active_models:

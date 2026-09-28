@@ -188,21 +188,19 @@ class SecurityManager:
                     decrypted = self._decrypt_dpapi(data[6:])
                     if decrypted:
                         cleaned = self._clean_key(decrypted)
-                        if any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd"]):
-                            return ""
-                        return cleaned
+                        if cleaned and not any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd", "KKjYK0n"]):
+                            return cleaned
                 elif data.startswith(b"B64:"):
                     dec = base64.b64decode(data[4:]).decode("utf-8", errors="ignore")
                     cleaned = self._clean_key(dec)
-                    if any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd"]):
-                        return ""
-                    return cleaned
+                    if cleaned and not any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd", "KKjYK0n"]):
+                        return cleaned
             except Exception as e:
                 logger.error(f"Error reading secure credentials: {e}")
 
         # 3. Fallback
         cleaned_fb = self._clean_key(fallback_key)
-        if any(bad in cleaned_fb for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd"]):
+        if any(bad in cleaned_fb for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd", "KKjYK0n"]):
             return ""
         return cleaned_fb
 

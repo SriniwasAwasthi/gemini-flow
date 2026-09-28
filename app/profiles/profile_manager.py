@@ -37,7 +37,7 @@ class Profile:
             id=data.get("id", ""),
             name=data.get("name", ""),
             description=data.get("description", ""),
-            preferred_model=data.get("preferred_model", "gemini-3.5-flash"),
+            preferred_model=data.get("preferred_model", "gemini-2.5-flash"),
             system_prompt_addition=data.get("system_prompt_addition", ""),
             vocabulary_categories=data.get("vocabulary_categories", []),
             temperature=float(data.get("temperature", 0.2)),
@@ -51,11 +51,12 @@ BUILTIN_PROFILES: Dict[str, Profile] = {
         id="engineering",
         name="Engineering & Architecture",
         description="Optimized for system design, cloud infrastructure, schemas, and trade-off analysis.",
-        preferred_model="gemini-2.5-pro",
+        preferred_model="gemini-2.5-flash",
         system_prompt_addition=(
             "You are an expert Principal Systems Architect. Use rigorous technical terminology, "
-            "clear architectural trade-offs, and structured formats. Emphasize scalability, reliability, "
-            "and security best practices."
+            "clear architectural trade-offs, and structured formats. Programmatically format variable declarations "
+            "in camelCase or snake_case, statement semicolons (;), colons (:), and wrap multi-line specifications in Markdown code blocks (```). "
+            "Emphasize scalability, reliability, and security best practices, and faithfully preserve 100% of spoken architectural details without omission."
         ),
         vocabulary_categories=["Architecture", "Cloud", "Programming", "Database"],
         temperature=0.2,
@@ -66,11 +67,13 @@ BUILTIN_PROFILES: Dict[str, Profile] = {
         id="coding",
         name="Coding & Development",
         description="Fine-tuned for code generation, PR descriptions, commit messages, and debugging.",
-        preferred_model="gemini-3.7-flash",
+        preferred_model="gemini-2.5-flash",
         system_prompt_addition=(
             "You are a Senior Staff Software Engineer. Write idiomatic, clean, and bug-free code. "
-            "Format identifiers correctly (camelCase, snake_case, PascalCase). Keep explanatory prose "
-            "concise and focused on engineering rationale."
+            "Programmatically handle semicolons (;), colons (:), variable and function declarations in camelCase or snake_case "
+            "(e.g. 'userId', 'auth_token', 'calculate_sum'), and enclose code snippets in Markdown code blocks (```). "
+            "Faithfully preserve 100% of all technical terminology, syllabus concepts, architectures, and testing methodologies "
+            "spoken by the user without omitting or condensing anything."
         ),
         vocabulary_categories=["Programming", "Git", "Frameworks", "DevOps"],
         temperature=0.1,
@@ -84,7 +87,7 @@ BUILTIN_PROFILES: Dict[str, Profile] = {
         preferred_model="gemini-2.5-flash",
         system_prompt_addition=(
             "Adopt an articulate, executive, and diplomatic tone. Structure communications with clear "
-            "action items, concise executive summaries, and eliminate all colloquialisms."
+            "bullet points, proper punctuation (semicolons, colons, em-dashes), concise executive summaries, and eliminate all colloquialisms."
         ),
         vocabulary_categories=["Business", "Executive", "Management"],
         temperature=0.3,
@@ -95,7 +98,7 @@ BUILTIN_PROFILES: Dict[str, Profile] = {
         id="academic",
         name="Academic & Research",
         description="Structured for formal research papers, mathematical reasoning, and scientific prose.",
-        preferred_model="gemini-2.5-pro",
+        preferred_model="gemini-2.5-flash",
         system_prompt_addition=(
             "Write in formal academic style with precise definitions, methodological rigor, "
             "and scholarly vocabulary. Clearly distinguish hypotheses, evidence, and conclusions."
@@ -109,13 +112,13 @@ BUILTIN_PROFILES: Dict[str, Profile] = {
         id="casual",
         name="Casual & Everyday Dictation",
         description="Fast, natural dictation for quick messages, Slack/WhatsApp, and stream-of-consciousness notes.",
-        preferred_model="gemini-3.5-flash-lite",
+        preferred_model="gemini-2.5-flash",
         system_prompt_addition=(
-            "Transcribe and polish conversationally. Keep the tone natural, warm, and authentic "
+            "Transcribe and polish conversationally with clean punctuation and grammar. Keep the tone natural, warm, and authentic "
             "without over-formalizing everyday speech."
         ),
         vocabulary_categories=["General", "Conversational"],
-        temperature=0.4,
+        temperature=0.3,
         is_builtin=True,
         icon="☕"
     )

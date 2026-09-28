@@ -94,24 +94,33 @@ class HotkeyManager:
 
         for part in parts:
             if part in ("<ctrl>", "ctrl", "control"):
-                is_pynput_down = (keyboard.Key.ctrl_l in self._current_keys or keyboard.Key.ctrl_r in self._current_keys or keyboard.Key.ctrl in self._current_keys)
                 is_win32_down = _is_any_vk_down([0x11, 0xA2, 0xA3])
-                if not (is_pynput_down or is_win32_down):
+                if not is_win32_down:
+                    self._current_keys.discard(keyboard.Key.ctrl_l)
+                    self._current_keys.discard(keyboard.Key.ctrl_r)
+                    self._current_keys.discard(keyboard.Key.ctrl)
                     return False
             elif part in ("<alt>", "alt"):
-                is_pynput_down = (keyboard.Key.alt_l in self._current_keys or keyboard.Key.alt_r in self._current_keys or keyboard.Key.alt in self._current_keys or keyboard.Key.alt_gr in self._current_keys)
                 is_win32_down = _is_any_vk_down([0x12, 0xA4, 0xA5])
-                if not (is_pynput_down or is_win32_down):
+                if not is_win32_down:
+                    self._current_keys.discard(keyboard.Key.alt_l)
+                    self._current_keys.discard(keyboard.Key.alt_r)
+                    self._current_keys.discard(keyboard.Key.alt)
+                    self._current_keys.discard(keyboard.Key.alt_gr)
                     return False
             elif part in ("<shift>", "shift"):
-                is_pynput_down = (keyboard.Key.shift_l in self._current_keys or keyboard.Key.shift_r in self._current_keys or keyboard.Key.shift in self._current_keys)
                 is_win32_down = _is_any_vk_down([0x10, 0xA0, 0xA1])
-                if not (is_pynput_down or is_win32_down):
+                if not is_win32_down:
+                    self._current_keys.discard(keyboard.Key.shift_l)
+                    self._current_keys.discard(keyboard.Key.shift_r)
+                    self._current_keys.discard(keyboard.Key.shift)
                     return False
             elif part in ("<cmd>", "<win>", "win", "cmd", "windows"):
-                is_pynput_down = (keyboard.Key.cmd in self._current_keys or keyboard.Key.cmd_l in self._current_keys or keyboard.Key.cmd_r in self._current_keys)
                 is_win32_down = _is_any_vk_down([0x5B, 0x5C])
-                if not (is_pynput_down or is_win32_down):
+                if not is_win32_down:
+                    self._current_keys.discard(keyboard.Key.cmd)
+                    self._current_keys.discard(keyboard.Key.cmd_l)
+                    self._current_keys.discard(keyboard.Key.cmd_r)
                     return False
             elif part in ("<space>", "space"):
                 is_pynput_down = keyboard.Key.space in self._current_keys
@@ -177,9 +186,13 @@ class HotkeyManager:
 
             # 4. Main Dictation hotkey check (with debounce and autorepeat immunity)
             if self._check_match(self.hotkey_str):
+                now = _time.time()
+                # If hotkey state has been active for > 0.7s, auto-clear so subsequent toggle is never blocked
+                if self._main_hotkey_active and (now - self._last_toggle_time > 0.7):
+                    self._main_hotkey_active = False
+
                 if not self._main_hotkey_active:
                     self._main_hotkey_active = True
-                    now = _time.time()
                     if now - self._last_toggle_time < 0.35:
                         # Ignore bounce within 350ms
                         return
@@ -220,22 +233,32 @@ class HotkeyManager:
             if self._transform_hotkey_active and not self._check_match(self.transform_hotkey_str):
                 self._transform_hotkey_active = False
 
-            # Auto-reset any phantom modifiers
-            try:
-                import ctypes
-                user32 = ctypes.windll.user32
-                any_modifier_down = any(
-                    bool(user32.GetAsyncKeyState(vk) & 0x8000)
-                    for vk in (0x11, 0x10, 0x12, 0x5B, 0x5C)
-                )
-                if not any_modifier_down and not self.is_recording:
-                    self._current_keys.clear()
-            except Exception:
-                pass
+            # Auto-reset any phantom modifiers only when a modifier key itself was released
+            if key in (
+                keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r,
+                keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r, keyboard.Key.alt_gr,
+                keyboard.Key.shift, keyboard.Key.shift_l, keyboard.Key.shift_r,
+                keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r
+            ):
+                try:
+                    import ctypes
+                    user32 = ctypes.windll.user32
+                    any_modifier_down = any(
+                        bool(user32.GetAsyncKeyState(vk) & 0x8000)
+                        for vk in (0x11, 0x10, 0x12, 0x5B, 0x5C)
+                    )
+                    if not any_modifier_down and not self.is_recording:
+                        self._current_keys.clear()
+                except Exception:
+                    pass
 
     def reset_keys(self):
-        """Clears stuck phantom keys in _current_keys using Win32 physical key checks."""
+        """Clears stuck phantom keys in _current_keys using Win32 physical key checks without disrupting active recording."""
         with self._lock:
+            if not self.is_recording and not self.is_processing:
+                self._main_hotkey_active = False
+                self._prompt_hotkey_active = False
+                self._transform_hotkey_active = False
             try:
                 import ctypes
                 user32 = ctypes.windll.user32
@@ -244,7 +267,7 @@ class HotkeyManager:
                     bool(user32.GetAsyncKeyState(vk) & 0x8000)
                     for vk in (0x11, 0x10, 0x12, 0x5B, 0x5C)
                 )
-                if not any_modifier_down and self._current_keys:
+                if not any_modifier_down and not self.is_recording and not self.is_processing:
                     self._current_keys.clear()
             except Exception:
                 if not self.is_recording and not self.is_processing:
@@ -255,7 +278,8 @@ class HotkeyManager:
         Health-check watchdog called periodically.
         Restarts keyboard listener if Windows unhooked or dropped it during sleep/standby.
         """
-        self.reset_keys()
+        if not self.is_recording and not self.is_processing:
+            self.reset_keys()
         if not self.is_active:
             return True
 

@@ -21,16 +21,37 @@ class AudioWaveWidget(QWidget):
         self.bar_heights = [5.0] * self.num_bars
         self.target_amplitude = 0.0
         self.phase = 0.0
+        self.is_animating = False
 
-        # 60 FPS fluid animation timer
+        # 60 FPS fluid animation timer (strictly on-demand, stopped when idle)
         self.anim_timer = QTimer(self)
         self.anim_timer.timeout.connect(self._animate_bars)
-        self.anim_timer.start(16)
+
+    def start_animation(self):
+        self.is_animating = True
+        if not self.anim_timer.isActive():
+            self.anim_timer.start(16)
+
+    def stop_animation(self):
+        self.is_animating = False
+        if self.anim_timer.isActive():
+            self.anim_timer.stop()
+        self.bar_heights = [5.0] * self.num_bars
+        self.target_amplitude = 0.0
+        self.update()
 
     def set_amplitude(self, amp: float):
+        if not self.is_animating:
+            return
         self.target_amplitude = max(0.08, min(1.0, amp))
+        if not self.anim_timer.isActive():
+            self.anim_timer.start(16)
 
     def _animate_bars(self):
+        if not self.is_animating:
+            if self.anim_timer.isActive():
+                self.anim_timer.stop()
+            return
         self.phase += 0.16
         base_h = 5.0
         max_h = 22.0
@@ -221,11 +242,13 @@ class FloatingHUD(QWidget):
             self.status_label.hide()
             self.status_icon.hide()
             self.wave_widget.show()
+            self.wave_widget.start_animation()
             self._apply_glass_style(border_color="rgba(129, 140, 248, 0.65)")
             self._resize_and_anchor(115, 40)
             self.show()
 
         elif state == self.STATE_PROCESSING:
+            self.wave_widget.stop_animation()
             self.wave_widget.hide()
             self.status_icon.setText("⚡")
             self.status_icon.setStyleSheet("font-size: 15px; color: #C084FC; border: none; background: transparent;")
@@ -254,13 +277,15 @@ class FloatingHUD(QWidget):
             self.status_icon.setText("🚫")
             self.status_icon.setStyleSheet("font-size: 14px; color: #F87171; border: none; background: transparent;")
             self.status_icon.show()
-            self.status_label.setText("Cancelled")
+            disp_msg = message or "Cancelled"
+            self.status_label.setText(disp_msg)
             self.status_label.setStyleSheet("color: #FECACA; border: none; background: transparent;")
             self.status_label.show()
             self._apply_glass_style(border_color="rgba(239, 68, 68, 0.70)")
-            self._resize_and_anchor(130, 40)
+            w = max(130, len(disp_msg) * 8 + 45)
+            self._resize_and_anchor(w, 40)
             self.show()
-            self.hide_timer.start(1100)
+            self.hide_timer.start(1400)
 
         elif state == self.STATE_OFFLINE:
             self.wave_widget.hide()
@@ -347,6 +372,7 @@ class FloatingHUD(QWidget):
         self.update()
 
     def hide_smooth(self):
+        self.wave_widget.stop_animation()
         self.hide()
 
     # -------------------------------------------------------------------------

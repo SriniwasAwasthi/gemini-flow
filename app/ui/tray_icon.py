@@ -167,5 +167,5 @@ class SystemTrayManager(QSystemTrayIcon):
             self.main_app.hud.show_state(FloatingHUD.STATE_READY, msg)
 
     def _on_tray_activated(self, reason):
-        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+        if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
             self.main_app.open_settings()

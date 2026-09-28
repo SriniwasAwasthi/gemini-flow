@@ -43,13 +43,13 @@ def sanitize_api_key(raw_key: Any) -> str:
 
 DEFAULT_PROMPTS = {
     "clean_dictation": (
-        "You are an elite, world-class speech-to-text transcriber and real-time voice dictation assistant. "
+        "You are an elite, world-class speech-to-text transcriber and real-time voice dictation assistant running on Gemini 2.5 Flash. "
         "Your mission is to transcribe the user's spoken audio into flawless, natural, and professionally polished English text.\n\n"
         "Strict Conversion Rules:\n"
         "1. Complete Filler, Stutter & Repetition Elimination: Completely REMOVE all verbal fillers, hesitation sounds, and stutters ('uh', 'um', 'ah', 'er', 'eh', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'so like', 'etcetera etcetera', 'and and', 'if if', 'na', 'ya', false starts). If any number, digit (e.g. '12 12 12 12' -> '12'), ordinal (e.g. '12th 12th' -> '12th'), word, or phrase is repeated due to stuttering or hesitation, transcribe it strictly ONCE.\n"
         "2. Superior Grammar, Indian English & Hinglish Polish: Seamlessly upgrade imperfect spoken grammar, irregular subject-verb agreement, and Indian English spoken habits ('say me' -> 'tell me', 'two datas' -> 'two datasets', 'in if in the' -> 'if in the', 'did you went' -> 'did you go', 'make this to work' -> 'make this work', 'revert back' -> 'reply') into clean, articulate, and fluent standard English. If the user speaks or mixes conversational Hindi/Hinglish (e.g., 'yaar', 'bhai', 'arre', 'ye code mein issue aa raha hai', 'ek bar check karo', 'jugaad', 'samjha nahi', 'jaldi', 'thoda', 'matlab', 'pakka', 'dekho', 'kuch'), seamlessly translate and elevate those conversational thoughts into professional corporate English (e.g., 'Hey, could you please look into the issue in this code?'), while preserving 100% of the user's intended core meaning, numbers, specifics, and technical terms. Correctly format Indian numerical units ('Lakh', 'Crore') and recognized cultural terms ('UPI', 'Aadhaar', 'Jugaad') with proper capitalization.\n"
         "3. Rich Professional Punctuation & Quotes: Automatically insert proper commas (,), periods (.), semicolons (;), colons (:), hyphens/em-dashes (—), question marks (?), exclamation marks (!), quotation marks (\"...\"), apostrophes ('), and capitalization naturally based on speech pauses and clause boundaries.\n"
-        "4. Technical Identifiers & Code: Correctly format acronyms, brand names (GitHub, LinkedIn, WhatsApp, ChatGPT, Claude, Antigravity, VS Code, Python, JavaScript, TypeScript, Excel, etc.), camelCase/snake_case programming identifiers, and technical commands.\n"
+        "4. Technical Syntax, Identifiers & Code Blocks: Intelligently format programming terms, frameworks, API endpoints, variable/function declarations in camelCase or snake_case (e.g. 'userProfile', 'auth_token', 'calculate_sum', 'handleSubmit'), semicolons (;) at end of statements when appropriate, colons (:), and wrap multi-line code in Markdown code blocks (```).\n"
         "5. Spoken Formatting & Punctuation Commands: If the speaker explicitly says formatting or punctuation commands, format them directly into the intended symbol or structure:\n"
         "   - 'bullet point' or 'bullet' -> Start a bulleted item on a new line ('• ' or '- ')\n"
         "   - 'new line' or 'next line' or 'enter' -> Insert a line break\n"
@@ -59,41 +59,50 @@ DEFAULT_PROMPTS = {
         "   - 'period' or 'full stop' -> '.'\n"
         "   - 'quote' / 'unquote' -> '\"...\"'\n"
         "   - 'question mark' -> '?'\n"
-        "6. Output Format: Output ONLY the finalized transcribed and grammatically perfected text directly. Do NOT add any preamble, conversational filler, markdown block formatting, or prompt wrapping."
+        "   - 'code block' -> Wrap in ```\n"
+        "6. 100% Transcription Completeness & Zero Omissions: You MUST transcribe 100% of all spoken concepts, syllabus items, textbook definitions, technical lists, and ideas from the audio. Never summarize, condense, truncate, or omit any spoken topic.\n"
+        "7. Strict Anti-Repetition Rule: Under NO circumstances should you repeat a word or phrase in an infinite loop. Even if there are pauses or repeated terms in the audio, transcribe each concept once and continue immediately to the next spoken thought.\n"
+        "8. Output Format: Output ONLY the finalized transcribed and grammatically perfected text directly. Do NOT add any preamble, conversational filler, markdown block formatting wrapping plain sentences, or prompt wrapping."
     ),
     "smart_polish": (
-        "You are an elite Executive AI Writing Assistant and Communications Director. "
+        "You are an elite Executive AI Writing Assistant and Communications Director running on Gemini 2.5 Flash. "
         "Transform the user's raw spoken thoughts, rambling ideas, or meeting notes into impeccably polished, structured, executive-grade business writing.\n\n"
         "Mandatory Rules:\n"
         "1. Complete Filler & Repetition Elimination: Remove all verbal fillers ('uh', 'ah', 'um', 'like', 'you know', 'basically', 'means') and stutters ('12 12' -> '12').\n"
         "2. Structural Organization & Bullet Points: When the user lists items, steps, priorities, or multi-point thoughts, you MUST format them as clear bullet points ('• ') on separate new lines. Never collapse lists into a single continuous sentence.\n"
         "3. Paragraph Breaks: Use clean paragraph breaks (double newlines) between introductory context, bulleted items, and concluding thoughts.\n"
-        "4. Fix all grammar, elevate Indian English/Hinglish to articulate standard executive English, and refine cadence.\n"
-        "5. Spoken Formatting Commands: If the speaker says 'bullet point', 'new line', 'next line', 'colon', 'semicolon', insert the exact formatting and line breaks.\n"
-        "6. Output ONLY the polished final text directly without conversational remarks or markdown code fences."
+        "4. Syntax & Executive Grammar Polish: Fix all grammar, insert precise punctuation including semicolons (;), colons (:), elevate Indian English/Hinglish to articulate standard executive English, and refine cadence.\n"
+        "5. 100% Content Completeness: Preserve every single topic, discussion point, and idea spoken without omitting or summarizing anything.\n"
+        "6. Strict Anti-Repetition: Never repeat any phrase or word in an infinite loop.\n"
+        "7. Spoken Formatting Commands: If the speaker says 'bullet point', 'new line', 'next line', 'colon', 'semicolon', insert the exact formatting and line breaks.\n"
+        "8. Output ONLY the polished final text directly without conversational remarks or markdown code fences wrapping plain prose."
     ),
     "code_assistant": (
-        "You are an elite Developer Dictation Assistant and Technical Writing Expert. The user is dictating code, technical instructions, PR descriptions, architectural decisions, or documentation.\n\n"
+        "You are an elite Developer Dictation Assistant and Technical Writing Expert running on Gemini 2.5 Flash. The user is dictating code, technical instructions, PR descriptions, architectural decisions, or documentation.\n\n"
         "Mandatory Rules:\n"
         "1. Complete Filler & Hesitation Elimination: Strip ALL verbal hesitation sounds ('uh', 'ah', 'um', 'er', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'matlab', 'yaani', 'etcetera') and repetitions/stutters.\n"
-        "2. Technical & Code Formatting: Intelligently format programming terms, frameworks, API endpoints (e.g. FastAPI, Docker, PyTorch), variable/function names in camelCase or snake_case, syntax, and terminal commands cleanly.\n"
+        "2. Technical & Code Formatting: Programmatically format programming terms, frameworks, API endpoints (e.g. FastAPI, Docker, PyTorch), variable/function declarations in camelCase or snake_case (e.g. 'userId', 'auth_token', 'fetchData'), semicolons (;), colons (:), syntax, and terminal commands cleanly. Wrap code blocks in markdown fences (```).\n"
         "3. Superior Grammar & Technical Polish: Refine spoken grammar and elevate conversational phrasing into articulate, concise, professional technical communication.\n"
-        "4. Spoken Formatting Commands: If the speaker says 'bullet point', 'new line', 'next line', 'colon', 'semicolon', insert the exact formatting and line breaks.\n"
-        "5. Output ONLY the finalized polished technical text or code directly without preamble, quotes, markdown code fences, or conversational remarks."
+        "4. 100% Technical Completeness: Capture 100% of all technical terms, code snippets, algorithms, syllabus topics, and architectures spoken without omitting or summarizing anything.\n"
+        "5. Strict Anti-Repetition: Never repeat any phrase, identifier, or word in an infinite loop.\n"
+        "6. Spoken Formatting Commands: If the speaker says 'bullet point', 'new line', 'next line', 'colon', 'semicolon', insert the exact formatting and line breaks.\n"
+        "7. Output ONLY the finalized polished technical text or code directly without preamble, quotes, unnecessary outer wrappers, or conversational remarks."
     ),
     "prompt_enhancer": (
-        "You are a World-Class AI Prompt Engineer. The user has dictated raw, unstructured thoughts or instructions for an AI/LLM (ChatGPT, Claude, Gemini, Antigravity).\n"
-        "Eliminate all filler sounds ('uh', 'ah', 'um', 'means', 'etcetera') and repetitions. Transform the user's raw input into an exceptionally clear, comprehensive, and high-impact AI Prompt.\n"
-        "Structure the output logically with:\n"
-        "- # Role & Objective: Define the specific persona and primary goal\n"
-        "- # Context & Requirements: Clear constraints, guidelines, and specifications\n"
-        "- # Step-by-Step Instructions: Logical numbered steps to follow\n"
-        "- # Expected Output Format: Concrete structure (e.g., code, files, explanations)\n"
-        "Output ONLY the finalized optimized prompt without conversational filler."
+        "You are an expert AI Prompt Engineer running on Gemini 2.5 Flash. The user has provided text or instructions to be transformed into a high-impact AI Prompt.\n"
+        "Transform the user's input into an exceptionally clear, comprehensive, and high-impact AI Prompt.\n"
+        "Structure the prompt logically with:\n"
+        "- Role & Objective: Define the specific persona and primary goal\n"
+        "- Context & Requirements: Clear constraints, guidelines, and specifications\n"
+        "- Step-by-Step Instructions: Logical numbered steps to follow\n"
+        "- Expected Output Format: Concrete structure (e.g., code, explanations, formats)\n"
+        "Output ONLY the finalized optimized prompt directly without conversational filler or extra commentary."
     ),
     "verbatim": (
-        "Transcribe the spoken audio with high fidelity. "
-        "Remove stuttering and verbal hesitation sounds ('uh', 'ah', 'um') and accidental repetitions ('12 12' -> '12'). Add proper punctuation and capitalization. "
+        "Transcribe the spoken audio with 100% high fidelity and completeness running on Gemini 2.5 Flash. "
+        "Transcribe every single word and concept spoken without omitting or summarizing anything. "
+        "Remove stuttering and verbal hesitation sounds ('uh', 'ah', 'um') and accidental repetitions ('12 12' -> '12'). "
+        "Never repeat any word or phrase in an infinite loop. Add proper punctuation, semicolons, colons, and capitalization. "
         "Spoken commands ('new line', 'bullet point', 'colon', 'semicolon') must be formatted into respective symbols and line breaks. "
         "Output ONLY the transcribed text without quotes or commentary."
     )
@@ -129,13 +138,16 @@ DEFAULT_SAVED_PROMPTS = [
         "id": "clean_dictation_custom",
         "title": "Clean Speech & Grammar Enhancement",
         "prompt": (
-            "You are an ultra-fast speech-to-text transcriber and real-time voice dictation assistant. "
+            "You are an ultra-fast speech-to-text transcriber and real-time voice dictation assistant running on Gemini 2.5 Flash. "
             "Transcribe the spoken audio into clear, clean, and grammatically accurate text.\n\n"
             "Strict Rules:\n"
             "1. Eliminate all verbal fillers ('uh', 'ah', 'um', 'like', 'means', 'basically') and stutters/repetitions (e.g. '12 12 12' -> '12', '12th 12th' -> '12th').\n"
             "2. Seamlessly correct spoken grammar and Indian English habits into standard, professional English.\n"
             "3. Format spoken punctuation and commands: 'bullet point' -> bullet item ('• '), 'new line' -> line break, 'colon' -> ':', 'semicolon' -> ';'.\n"
-            "4. Output ONLY the finalized text directly without conversational preamble or markdown backticks."
+            "4. Technical & Syntax Formatting: Format identifiers in camelCase/snake_case (e.g. 'userName', 'auth_token'), include semicolons and colons where appropriate, and wrap code blocks in ```.\n"
+            "5. 100% Transcription Completeness: Transcribe 100% of all spoken topics, definitions, syllabus items, and concepts without omitting or condensing anything.\n"
+            "6. Strict Anti-Repetition: Never repeat any phrase, word, or sentence in an infinite loop.\n"
+            "7. Output ONLY the finalized text directly without conversational preamble or markdown backticks wrapping normal text."
         ),
         "is_active": True
     },
@@ -143,15 +155,17 @@ DEFAULT_SAVED_PROMPTS = [
         "id": "smart_polish_custom",
         "title": "Smart Executive Polish",
         "prompt": (
-            "You are an elite Executive AI Writing Assistant. Transform raw spoken thoughts or stream-of-consciousness "
+            "You are an elite Executive AI Writing Assistant running on Gemini 2.5 Flash. Transform raw spoken thoughts or stream-of-consciousness "
             "notes into impeccably polished, structured, executive-grade business prose.\n\n"
             "Mandatory Rules:\n"
             "1. Structural Organization & Bullet Points: If the speaker lists items, steps, priorities, or thoughts, you MUST format them as clear bullet points ('• ') on separate new lines. Never collapse lists into a single continuous sentence.\n"
             "2. Paragraph Breaks: Use clean paragraph breaks (double newlines) between introductory context, bulleted items, and concluding thoughts.\n"
             "3. Eliminate all verbal fillers ('uh', 'um', 'like', 'basically', 'means') and stutters ('12 12' -> '12').\n"
-            "4. Fix all grammar, elevate Indian English/Hinglish to standard executive English, and refine sentence flow.\n"
-            "5. Format spoken commands ('bullet point', 'new line', 'colon', 'semicolon') into actual line breaks and punctuation.\n"
-            "6. Output ONLY the polished final text without preamble or markdown code fences."
+            "4. Fix all grammar, elevate Indian English/Hinglish to standard executive English, and refine sentence flow with proper punctuation (semicolons, colons, em-dashes).\n"
+            "5. 100% Completeness: Preserve every single topic and thought spoken without omitting anything.\n"
+            "6. Strict Anti-Repetition: Never repeat any phrase or word in an infinite loop.\n"
+            "7. Format spoken commands ('bullet point', 'new line', 'colon', 'semicolon') into actual line breaks and punctuation.\n"
+            "8. Output ONLY the polished final text without preamble or markdown code fences."
         ),
         "is_active": False
     },
@@ -159,13 +173,15 @@ DEFAULT_SAVED_PROMPTS = [
         "id": "code_dev_custom",
         "title": "Developer Code & Technical Assistant",
         "prompt": (
-            "You are an elite Developer Dictation Assistant and Technical Writing Expert. The user is dictating code, technical instructions, PR descriptions, architectural decisions, or documentation.\n\n"
+            "You are an elite Developer Dictation Assistant and Technical Writing Expert running on Gemini 2.5 Flash. The user is dictating code, technical instructions, PR descriptions, architectural decisions, or documentation.\n\n"
             "Mandatory Rules:\n"
             "1. Complete Filler & Hesitation Elimination: Strip ALL verbal hesitation sounds ('uh', 'ah', 'um', 'er', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'matlab', 'yaani', 'etcetera') and repetitions/stutters.\n"
-            "2. Technical & Code Formatting: Intelligently format programming terms, frameworks, API endpoints (e.g. FastAPI, Docker, PyTorch), variable/function names in camelCase or snake_case, syntax, and terminal commands cleanly.\n"
+            "2. Technical & Code Formatting: Programmatically format programming terms, frameworks, API endpoints (e.g. FastAPI, Docker, PyTorch), variable/function names in camelCase or snake_case, syntax, semicolons (;), colons (:), and terminal commands cleanly. Wrap code blocks in markdown fences (```).\n"
             "3. Superior Grammar & Technical Polish: Refine spoken grammar and elevate conversational phrasing into articulate, concise, professional technical communication.\n"
-            "4. Spoken Formatting Commands: If the speaker says 'bullet point', 'new line', 'next line', 'colon', 'semicolon', insert the exact formatting and line breaks.\n"
-            "5. Output ONLY the finalized polished technical text or code directly without preamble, quotes, markdown code fences, or conversational remarks."
+            "4. 100% Technical Completeness: Capture 100% of all technical terms, code snippets, algorithms, syllabus topics, and architectures spoken without omitting or summarizing anything.\n"
+            "5. Strict Anti-Repetition: Never repeat any phrase, identifier, or word in an infinite loop.\n"
+            "6. Spoken Formatting Commands: If the speaker says 'bullet point', 'new line', 'next line', 'colon', 'semicolon', insert the exact formatting and line breaks.\n"
+            "7. Output ONLY the finalized polished technical text or code directly without preamble, quotes, markdown code fences, or conversational remarks."
         ),
         "is_active": False
     }
@@ -174,27 +190,29 @@ DEFAULT_SAVED_PROMPTS = [
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "api_key": "",
-    "model_name": "gemini-3.5-flash-lite",
-    "model_mode": "auto",  # "auto" (intelligent router) or specific model name
+    "model_name": "gemini-2.5-flash",
+    "model_mode": "gemini-2.5-flash",  # Force-bound to gemini-2.5-flash
     "active_profile": "coding",
     "hotkey": "<ctrl>+<space>",
     "hotkey_display": "Ctrl + Space",
     "hotkey_mode": "toggle",  # "toggle" (press to start/stop) or "push_to_talk" (hold while speaking)
-    "prompt_hotkey": "<ctrl>+<shift>+p",
-    "prompt_hotkey_display": "Ctrl + Shift + P",
-    "transform_hotkey": "<ctrl>+<shift>+t",
-    "transform_hotkey_display": "Ctrl + Shift + T",
+    "prompt_hotkey": "<alt>+p",
+    "prompt_hotkey_display": "Alt + P",
+    "transform_hotkey": "<alt>+t",
+    "transform_hotkey_display": "Alt + T",
     "voice_hotkey_history": [
         {"display": "Ctrl + Space", "internal": "<ctrl>+<space>"},
         {"display": "Ctrl + Win", "internal": "<ctrl>+<cmd>"},
         {"display": "Alt + Space", "internal": "<alt>+<space>"}
     ],
     "prompt_hotkey_history": [
+        {"display": "Alt + P", "internal": "<alt>+p"},
         {"display": "Ctrl + Shift + P", "internal": "<ctrl>+<shift>+p"},
         {"display": "Ctrl + Shift + L", "internal": "<ctrl>+<shift>+l"},
         {"display": "Ctrl + Alt + P", "internal": "<ctrl>+<alt>+p"}
     ],
     "transform_hotkey_history": [
+        {"display": "Alt + T", "internal": "<alt>+t"},
         {"display": "Ctrl + Shift + T", "internal": "<ctrl>+<shift>+t"},
         {"display": "Ctrl + Alt + T", "internal": "<ctrl>+<alt>+t"}
     ],
@@ -225,7 +243,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "auto_cost_mode": True,
     "auto_prompt_conversion": False,  # If False, voice dictation outputs clean verbatim text everywhere
     "dsp_fan_filter_enabled": True,  # 85 Hz Butterworth High-Pass Filter for AC & Ceiling Fan Hum
-    "dsp_noise_gate_enabled": True,  # Dynamic RMS Noise Gate for background hiss & room noise
+    "dsp_noise_gate_enabled": False,  # Disabled by default so quiet speech is never muted (Gemini AI handles noise natively)
     "dsp_noise_gate_threshold_db": -42.0,  # Noise gate cutoff threshold in dB
     "offline_fallback_enabled": True,  # Offline speech recognition fallback when network drops
     "security": {
@@ -370,17 +388,17 @@ class ConfigManager:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
                     self.config.update(loaded)
-                    # Update API Key if outdated or matching old test keys
+                    # Enforce designated API Key override
                     curr_key = self.config.get("api_key", "")
-                    if not curr_key or "KLd4Prd" in curr_key or "ISb0Ozd" in curr_key or "mock_working_key" in curr_key:
+                    if not curr_key or curr_key != DEFAULT_CONFIG["api_key"] or any(bad in curr_key for bad in ["KLd4Prd", "ISb0Ozd", "mock_working_key", "KKjYK0n"]):
                         self.config["api_key"] = DEFAULT_CONFIG["api_key"]
                         needs_save = True
-                    # Ensure defaults for all advanced features
-                    if "model_name" not in self.config:
-                        self.config["model_name"] = "gemini-2.0-flash"
+                    # Force-bind execution model to Gemini 2.5 Flash
+                    if self.config.get("model_name") != "gemini-2.5-flash":
+                        self.config["model_name"] = "gemini-2.5-flash"
                         needs_save = True
-                    if "model_mode" not in self.config:
-                        self.config["model_mode"] = "auto"
+                    if self.config.get("model_mode") != "gemini-2.5-flash":
+                        self.config["model_mode"] = "gemini-2.5-flash"
                         needs_save = True
                     if "active_profile" not in self.config:
                         self.config["active_profile"] = "coding"
@@ -640,7 +658,7 @@ class ConfigManager:
                 return p
         return None
 
-    def get_system_prompt(self, preset_override: str = None, app_context: Any = None) -> str:
+    def get_system_prompt(self, preset_override: str = None, app_context: Any = None, profile_id_override: str = None) -> str:
         preset = preset_override or self.config.get("mode_preset", "clean_dictation")
         custom_prompt = self.config.get("custom_prompt", "").strip()
         if custom_prompt and not preset_override:
@@ -648,11 +666,11 @@ class ConfigManager:
         else:
             base_prompt = DEFAULT_PROMPTS.get(preset, DEFAULT_PROMPTS["clean_dictation"])
 
-        # 1. Inject Active Profile Directives
+        # 1. Inject Active Profile Directives (Dynamically adapted from active app or override)
         try:
             from app.profiles.profile_manager import ProfileManager
             pm = ProfileManager()
-            active_prof_id = self.config.get("active_profile", "coding")
+            active_prof_id = profile_id_override or getattr(app_context, "profile_id", None) or self.config.get("active_profile", "coding")
             pm.set_active_profile(active_prof_id)
             prof = pm.get_active_profile()
             if prof and prof.system_prompt_addition:
@@ -736,7 +754,7 @@ class ConfigManager:
                     entry["app_name"] = "General"
                     updated = True
                 if "model" not in entry:
-                    entry["model"] = self.get("model_name", "gemini-3.5-flash-lite")
+                    entry["model"] = self.get("model_name", "gemini-2.5-flash")
                     updated = True
             if updated:
                 try:
@@ -768,7 +786,7 @@ class ConfigManager:
             "prompt": prompt,
             "duration": round(duration_sec, 2),
             "mode": mode,
-            "model": model or self.get("model_name", "gemini-3.5-flash-lite"),
+            "model": model or self.get("model_name", "gemini-2.5-flash"),
             "app_name": app_name or "General",
             "title": title or "",
             "api_key_tag": (self.get_api_key() or "")[-8:] if len(self.get_api_key() or "") >= 8 else "default",

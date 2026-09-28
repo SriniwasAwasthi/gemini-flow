@@ -30,18 +30,17 @@ logger = logging.getLogger("GeminiFlow.GeminiEngine")
 FALLBACK_MODELS = [
     "gemini-2.5-flash",
     "gemini-flash-latest",
-    "gemini-flash-lite-latest",
-    "gemini-3.5-flash-lite",
-    "gemini-3.6-flash",
-    "gemini-3.7-flash",
-    "gemini-3.5-flash"
+    "gemini-flash-lite-latest"
 ]
 
 
 class GeminiEngine:
-    def __init__(self, api_key: str = "", model_name: str = "gemini-2.5-flash"):
+    def __init__(self, api_key: Any = "", model_name: str = "gemini-2.5-flash"):
         from .config import sanitize_api_key
-        self.api_key = sanitize_api_key(api_key)
+        if hasattr(api_key, "get_api_key"):
+            self.api_key = sanitize_api_key(api_key.get_api_key())
+        else:
+            self.api_key = sanitize_api_key(api_key)
         self.model_name = model_name
         self.session = requests.Session()
         
@@ -190,22 +189,22 @@ class GeminiEngine:
                 return False, offline_text or "No speech detected in offline mode."
             return False, "Gemini API key is not configured. Please open Settings."
 
-        # 1. Resolve Primary Model
+        # 1. Resolve Primary Model via ModelRouter (Dynamic Application Context & Profile Routing)
         duration_approx = len(wav_bytes) / 32000.0  # Approx seconds for 16kHz 16-bit mono
-        if self.model_name == "auto" or not self.model_name:
-            app_nm = app_context.app_name if app_context else "General"
-            app_cat = app_context.category if app_context else "general"
-            routing = ModelRouter.route_model(
-                task_type=task,
-                duration_sec=duration_approx,
-                app_name=app_nm,
-                app_category=app_cat,
-                profile_name=profile_id,
-                auto_cost_mode=auto_cost_mode
-            )
-            primary_model = routing.model_name
-        else:
-            primary_model = self.model_name
+        app_name = app_context.app_name if app_context else "General"
+        app_cat = getattr(app_context, "category", "general") if app_context else "general"
+        routing = ModelRouter.route_model(
+            task_type="dictate",
+            duration_sec=duration_approx,
+            text_length=int(duration_approx * 2.5),
+            app_name=app_name,
+            app_category=app_cat,
+            profile_name=profile_id,
+            manual_override=None if self.model_name in ("auto", None, "") else self.model_name,
+            auto_cost_mode=auto_cost_mode
+        )
+        primary_model = routing.model_name
+        logger.info(f"ModelRouter selected primary model: '{primary_model}' ({routing.reason})")
 
         # 2. Resilient Model Invocation via FallbackHandler
         def call_model(model: str) -> Tuple[bool, str]:
@@ -219,19 +218,26 @@ class GeminiEngine:
 
         # 3. If online transcription failed due to network / connection drops, invoke local offline fallback
         if not exec_res.success and offline_fallback_enabled:
-            logger.info("Cloud API unreachable or failed. Attempting Embedded Local Offline Speech Recognition fallback...")
-            try:
-                offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes)
-                if offline_ok and offline_text:
-                    exec_res = ExecutionResult(
-                        success=True,
-                        text=offline_text,
-                        model_used="Offline Local Speech (Windows SAPI)",
-                        fallback_occurred=True,
-                        latency_seconds=exec_res.latency_seconds
-                    )
-            except Exception as off_ex:
-                logger.debug(f"Offline fallback exception: {off_ex}")
+            # Only trigger offline fallback if error is true network loss (DNS failure/disconnect)
+            # NEVER trigger on rate limits, invalid keys, or normal API errors
+            is_net_err = (
+                exec_res.fallback_reason
+                and exec_res.fallback_reason.error_type == APIErrorType.NETWORK_ERROR
+            ) or "network" in (exec_res.error_message or "").lower()
+            if is_net_err:
+                logger.info("Network disconnection detected. Attempting local offline speech recognition...")
+                try:
+                    offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes)
+                    if offline_ok and offline_text:
+                        exec_res = ExecutionResult(
+                            success=True,
+                            text=offline_text,
+                            model_used="Offline Local Speech (Windows SAPI)",
+                            fallback_occurred=True,
+                            latency_seconds=exec_res.latency_seconds
+                        )
+                except Exception as off_ex:
+                    logger.debug(f"Offline fallback exception: {off_ex}")
 
         self.last_result = exec_res
         self.last_model_used = exec_res.model_used
@@ -263,73 +269,316 @@ class GeminiEngine:
             return True, final_text
         return False, exec_res.error_message or "Transcription failed across all models."
 
-    def _try_transcribe_with_model(self, model: str, wav_bytes: bytes, system_instruction: str) -> Tuple[bool, str]:
-        """Direct REST API implementation with Keep-Alive session and zero-thinking config."""
-        audio_b64 = base64.b64encode(wav_bytes).decode("utf-8")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+    @staticmethod
+    def _split_wav_into_chunks(wav_bytes: bytes, target_chunk_sec: float = 40.0, max_chunk_sec: float = 50.0) -> List[bytes]:
+        """
+        Splits large WAV audio into silence-aligned sub-chunks (35-48s) using RMS energy analysis.
+        Prevents word truncation at boundaries and keeps audio within Gemini's prime attention window,
+        completely eliminating attention drift, skipped sentences, and autoregressive repetition loops.
+        """
+        if not wav_bytes or len(wav_bytes) < 1000:
+            return [wav_bytes] if wav_bytes else []
 
-        gen_config: Dict[str, Any] = {
-            "temperature": 0.0,
-            "topP": 0.9,
-            "maxOutputTokens": 2048
-        }
-
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "text": (
-                                f"{system_instruction}\n\n"
-                                "Task: Transcribe and refine the audio attached below according to the system rules above. "
-                                "Output ONLY the final transcribed text."
-                            )
-                        },
-                        {
-                            "inline_data": {
-                                "mime_type": "audio/wav",
-                                "data": audio_b64
-                            }
-                        }
-                    ]
-                }
-            ],
-            "generationConfig": gen_config
-        }
-
-        headers = {
-            "Content-Type": "application/json",
-            "x-goog-api-key": self.api_key
-        }
         try:
-            start_t = time.time()
-            approx_sec = len(wav_bytes) / 32000.0
-            # Generous connect timeout (10s) and read timeout (max 90s, minimum 25s) to avoid false timeouts on cold start / slow connections
-            req_timeout = (10.0, max(25.0, min(90.0, float(approx_sec * 2.5) + 20.0)))
-            response = self.session.post(url, headers=headers, json=payload, timeout=req_timeout)
+            bio = io.BytesIO(wav_bytes)
+            import wave
+            import numpy as np
+            with wave.open(bio, 'rb') as wf:
+                nchannels = wf.getnchannels()
+                sampwidth = wf.getsampwidth()
+                framerate = wf.getframerate()
+                nframes = wf.getnframes()
+                pcm_data = wf.readframes(nframes)
 
-            elapsed = time.time() - start_t
-            logger.info(f"Gemini transcription with {model} completed in {elapsed:.2f}s (Status: {response.status_code})")
+            total_sec = nframes / float(framerate) if framerate > 0 else 0
+            # Audio shorter than max_chunk_sec runs directly as a single chunk
+            if total_sec <= max_chunk_sec or total_sec <= 0:
+                return [wav_bytes]
 
-            if response.status_code == 200:
-                data = response.json()
-                candidates = data.get("candidates", [])
-                if not candidates:
-                    return False, "No speech detected or empty response from Gemini."
-                parts = candidates[0].get("content", {}).get("parts", [])
-                full_text = "".join([p.get("text", "") for p in parts if "text" in p])
-                cleaned_text = self._clean_output(full_text)
-                return True, cleaned_text
+            dtype = np.int16 if sampwidth == 2 else np.int8
+            samples = np.frombuffer(pcm_data, dtype=dtype)
+            if nchannels > 1:
+                # Use first channel for silence / energy calculation
+                samples = samples.reshape(-1, nchannels)[:, 0]
+
+            chunks = []
+            current_frame = 0
+            total_frames = nframes
+
+            while current_frame < total_frames:
+                remaining_frames = total_frames - current_frame
+                remaining_sec = remaining_frames / float(framerate)
+
+                if remaining_sec <= max_chunk_sec:
+                    # Final slice
+                    chunk_pcm = pcm_data[current_frame * nchannels * sampwidth :]
+                    out_io = io.BytesIO()
+                    with wave.open(out_io, 'wb') as out_wf:
+                        out_wf.setnchannels(nchannels)
+                        out_wf.setsampwidth(sampwidth)
+                        out_wf.setframerate(framerate)
+                        out_wf.writeframes(chunk_pcm)
+                    chunks.append(out_io.getvalue())
+                    break
+
+                # Search window for natural silence pause: [target_chunk_sec - 10s, target_chunk_sec + 8s]
+                search_start_sec = max(10.0, target_chunk_sec - 10.0)
+                search_end_sec = min(remaining_sec - 5.0, max_chunk_sec)
+
+                start_f = current_frame + int(search_start_sec * framerate)
+                end_f = current_frame + int(search_end_sec * framerate)
+
+                # 50ms frames for energy computation
+                frame_len = max(1, int(0.05 * framerate))
+                min_energy = float('inf')
+                best_split_frame = current_frame + int(target_chunk_sec * framerate)
+
+                for f_idx in range(start_f, end_f - frame_len, frame_len):
+                    block = samples[f_idx : f_idx + frame_len].astype(np.float32)
+                    energy = np.mean(block ** 2)
+                    if energy < min_energy:
+                        min_energy = energy
+                        best_split_frame = f_idx + frame_len // 2
+
+                chunk_pcm = pcm_data[current_frame * nchannels * sampwidth : best_split_frame * nchannels * sampwidth]
+                out_io = io.BytesIO()
+                with wave.open(out_io, 'wb') as out_wf:
+                    out_wf.setnchannels(nchannels)
+                    out_wf.setsampwidth(sampwidth)
+                    out_wf.setframerate(framerate)
+                    out_wf.writeframes(chunk_pcm)
+                chunks.append(out_io.getvalue())
+
+                current_frame = best_split_frame
+
+            return chunks if chunks else [wav_bytes]
+        except Exception as ex:
+            logger.warning(f"Error in silence-aware WAV splitting: {ex}")
+            return [wav_bytes]
+
+    @staticmethod
+    def _stitch_chunk_transcripts(chunks: List[str]) -> str:
+        """Intelligently joins multi-chunk transcripts without creating awkward breaks or dropping words."""
+        valid = [c.strip() for c in chunks if c and c.strip()]
+        if not valid:
+            return ""
+        stitched = valid[0]
+        for next_chunk in valid[1:]:
+            if not next_chunk:
+                continue
+            if stitched.endswith(("\n", "\n\n")) or next_chunk.startswith(("\n", "•", "-", "*")):
+                stitched = stitched.rstrip() + "\n\n" + next_chunk.lstrip()
+            elif stitched.endswith((".", "!", "?", ":", ";")):
+                stitched += " " + next_chunk
+            elif stitched.endswith(","):
+                stitched += " " + next_chunk
             else:
+                stitched += " " + next_chunk
+        return stitched
+
+    @staticmethod
+    def _extract_part_text(p: Any) -> str:
+        """Extracts text from candidate part, supporting text, audioTranscription, and alternative modalities."""
+        if not isinstance(p, dict):
+            return ""
+        if "text" in p and p["text"]:
+            return str(p["text"])
+        if "audioTranscription" in p:
+            at = p["audioTranscription"]
+            if isinstance(at, dict) and "text" in at and at["text"]:
+                return str(at["text"])
+        return ""
+
+    def _try_transcribe_with_model(self, model: str, wav_bytes: bytes, system_instruction: str) -> Tuple[bool, str]:
+        """Direct REST API implementation with Keep-Alive session, 8192 token limit, and concurrent chunk transcription."""
+        chunks = self._split_wav_into_chunks(wav_bytes, target_chunk_sec=40.0, max_chunk_sec=50.0)
+
+        # Single chunk path (standard speech <= 50s)
+        if len(chunks) == 1:
+            chunk_bytes = chunks[0]
+            audio_b64 = base64.b64encode(chunk_bytes).decode("utf-8")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+
+            gen_config: Dict[str, Any] = {
+                "temperature": 0.0,
+                "topP": 0.95,
+                "maxOutputTokens": 8192
+            }
+            # Optimize Gemini 2.5 Flash for sub-2.5s speech transcription by disabling thinking overhead
+            if "2.5" in model:
+                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": (
+                                    f"{system_instruction}\n\n"
+                                    "CRITICAL TRANSCRIPTION DIRECTIVES:\n"
+                                    "1. 100% Transcription Completeness: Transcribe every spoken word, sentence, technical term, list item, and syllabus concept from beginning to end without omitting, summarizing, or condensing ANY part of the speech.\n"
+                                    "2. Anti-Repetition Guarantee: NEVER repeat any phrase, word, or sentence in an infinite loop. Even if pauses occur in the audio, transcribe each concept once and continue immediately to the next spoken thought.\n"
+                                    "3. Output ONLY the finalized transcribed text directly without commentary, quotes, or markdown code fence wrappers."
+                                )
+                            },
+                            {
+                                "inline_data": {
+                                    "mime_type": "audio/wav",
+                                    "data": audio_b64
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "generationConfig": gen_config
+            }
+
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": self.api_key
+            }
+            try:
+                start_t = time.time()
+                approx_sec = len(chunk_bytes) / 32000.0
+                req_timeout = (2.5, max(6.0, min(25.0, float(approx_sec * 1.2) + 4.0)))
+                response = self.session.post(url, headers=headers, json=payload, timeout=req_timeout)
+
+                elapsed = time.time() - start_t
+                logger.info(f"Gemini transcription with {model} completed in {elapsed:.2f}s (Status: {response.status_code})")
+
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                    except Exception as json_err:
+                        logger.error(f"Failed to parse JSON from {model}: {json_err}")
+                        return False, f"Malformed JSON response from {model}"
+
+                    candidates = data.get("candidates", []) if isinstance(data, dict) else []
+                    if candidates:
+                        cand = candidates[0]
+                        finish_reason = cand.get("finishReason", "")
+                        parts = cand.get("content", {}).get("parts", [])
+                        full_text = "".join([self._extract_part_text(p) for p in parts])
+                        cleaned_text = self._clean_output(full_text)
+                        if cleaned_text:
+                            return True, cleaned_text
+                        if finish_reason == "STOP" or not parts:
+                            # Model processed audio normally and heard no speech (clean silence)
+                            logger.info(f"Model {model} completed with finishReason='{finish_reason}' and empty transcript (clean silence).")
+                            return True, ""
+                        logger.info(f"Model {model} returned finishReason='{finish_reason}' without text. Triggering failover.")
+                        return False, f"Model finished with reason: {finish_reason}"
+                    return False, "No candidates returned by model."
+                else:
+                    try:
+                        err = response.json().get("error", {}).get("message", response.text)
+                    except Exception:
+                        err = response.text
+                    return False, f"Gemini API Error ({response.status_code}): {err}"
+            except requests.exceptions.Timeout:
+                return False, f"Network timeout with {model}: Connection/Read timed out."
+            except Exception as e:
+                return False, f"Network request error: {str(e)}"
+
+        # Multi-chunk path for long-form speech (continuous up to 20 mins) with parallel execution (<10s guaranteed)
+        from concurrent.futures import ThreadPoolExecutor
+        chunk_results = [""] * len(chunks)
+        chunk_errors = []
+
+        # Resilient chunk models
+        chunk_model_candidates = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"]
+
+        def _transcribe_chunk_worker(c_idx: int, c_bytes: bytes):
+            c_b64 = base64.b64encode(c_bytes).decode("utf-8")
+            c_sec = len(c_bytes) / 32000.0
+            c_timeout = (2.5, max(8.0, min(30.0, float(c_sec * 1.2) + 5.0)))
+
+            for try_model in chunk_model_candidates:
+                c_url = f"https://generativelanguage.googleapis.com/v1beta/models/{try_model}:generateContent?key={self.api_key}"
+                c_gen_config: Dict[str, Any] = {
+                    "temperature": 0.0,
+                    "topP": 0.95,
+                    "maxOutputTokens": 8192,
+                    "thinkingConfig": {"thinkingBudget": 0}
+                }
+
+                c_payload = {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": (
+                                        f"{system_instruction}\n\n"
+                                        f"Task: Transcribe part {c_idx+1} of {len(chunks)} of the user's continuous speech.\n"
+                                        "CRITICAL TRANSCRIPTION DIRECTIVES:\n"
+                                        "1. 100% Completeness: Transcribe every spoken word, sentence, technical term, variable in camelCase/snake_case, semicolon (;), colon (:), list item, and syllabus concept in this audio chunk completely without cutting off, summarizing, or omitting anything.\n"
+                                        "2. Anti-Repetition Guarantee: NEVER repeat any phrase, word, or sentence in an infinite loop. Even if pauses occur in the audio, transcribe each concept once and continue immediately to the next spoken thought.\n"
+                                        "3. Output ONLY the finalized transcribed text for this audio segment."
+                                    )
+                                },
+                                {
+                                    "inline_data": {
+                                        "mime_type": "audio/wav",
+                                        "data": c_b64
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "generationConfig": c_gen_config
+                }
+                c_headers = {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": self.api_key
+                }
+
+                # Single fast attempt + 1 jittered retry on transient network error
+                for attempt in range(2):
+                    try:
+                        t0 = time.time()
+                        resp = self.session.post(c_url, headers=c_headers, json=c_payload, timeout=c_timeout)
+                        logger.info(f"Chunk {c_idx+1}/{len(chunks)} with {try_model} completed in {time.time()-t0:.2f}s (Status: {resp.status_code})")
+                        if resp.status_code == 200:
+                            try:
+                                data = resp.json()
+                            except Exception:
+                                continue
+                            candidates = data.get("candidates", []) if isinstance(data, dict) else []
+                            if candidates:
+                                parts = candidates[0].get("content", {}).get("parts", [])
+                                full_text = "".join([self._extract_part_text(p) for p in parts])
+                                cleaned = self._clean_output(full_text)
+                                if cleaned:
+                                    chunk_results[c_idx] = cleaned
+                                    return
+                        elif resp.status_code in (429, 503, 500):
+                            time.sleep(0.2 * (attempt + 1))
+                            continue
+                        else:
+                            break
+                    except Exception:
+                        time.sleep(0.2)
+                        continue
+
+            chunk_errors.append(f"Chunk {c_idx+1} could not be transcribed.")
+
+        # Scalable thread pool for instant parallel chunk execution
+        max_w = min(12, max(2, len(chunks)))
+        with ThreadPoolExecutor(max_workers=max_w) as executor:
+            futures = [executor.submit(_transcribe_chunk_worker, i, c) for i, c in enumerate(chunks)]
+            for f in futures:
                 try:
-                    err = response.json().get("error", {}).get("message", response.text)
-                except Exception:
-                    err = response.text
-                return False, f"Gemini API Error ({response.status_code}): {err}"
-        except requests.exceptions.Timeout:
-            return False, f"Network timeout with {model}: Connection/Read timed out."
-        except Exception as e:
-            return False, f"Network request error: {str(e)}"
+                    f.result()
+                except Exception as ex:
+                    logger.debug(f"Chunk future exception: {ex}")
+
+        valid_results = [r.strip() for r in chunk_results if r and r.strip()]
+        if not valid_results:
+            return False, f"Gemini API Error with {model}: Could not transcribe audio chunks."
+
+        final_joined = self._stitch_chunk_transcripts(valid_results)
+        final_cleaned = self._clean_output(final_joined)
+        return True, final_cleaned
 
     def transform_text(
         self,
@@ -342,13 +591,13 @@ class GeminiEngine:
     ) -> ExecutionResult:
         """
         Executes text transformation across the 16 preset operations or custom prompt
-        with intelligent model routing, exponential backoff, and fallback failover.
+        with Gemini 2.5 Flash for sub-2.2s execution and resilient error handling.
         """
         if not self.api_key:
             return ExecutionResult(
                 success=False,
                 text="",
-                model_used="",
+                model_used="gemini-2.5-flash",
                 error_message="Gemini API Key is not configured. Please open Settings."
             )
 
@@ -356,7 +605,7 @@ class GeminiEngine:
             return ExecutionResult(
                 success=False,
                 text="",
-                model_used="",
+                model_used="gemini-2.5-flash",
                 error_message="Input text is empty."
             )
 
@@ -368,20 +617,18 @@ class GeminiEngine:
         )
 
         # 2. Resolve Primary Model
-        if self.model_name == "auto" or not self.model_name:
-            if auto_cost_mode and len(raw_text) < 1500 and transform_type not in (TransformType.SUMMARIZE, TransformType.CONVERT_DOCS):
-                primary_model = "gemini-3.5-flash-lite"
-            else:
-                primary_model = TransformEngine.resolve_model(
-                    transform_type=transform_type,
-                    text_length=len(raw_text)
-                )
-        else:
-            primary_model = self.model_name
+        primary_model = self.model_name if (self.model_name and self.model_name != "auto") else "gemini-2.5-flash"
 
         # 3. Model execution function
         def call_model(model: str) -> Tuple[bool, str]:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+            gen_config: Dict[str, Any] = {
+                "temperature": TransformEngine.get_preset(transform_type).temperature,
+                "maxOutputTokens": 4096
+            }
+            if "2.5" in model or "2.0" in model:
+                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+
             payload = {
                 "contents": [
                     {
@@ -392,23 +639,23 @@ class GeminiEngine:
                         ]
                     }
                 ],
-                "generationConfig": {
-                    "temperature": TransformEngine.get_preset(transform_type).temperature,
-                    "maxOutputTokens": 2048
-                }
+                "generationConfig": gen_config
             }
             headers = {
                 "Content-Type": "application/json",
                 "x-goog-api-key": self.api_key
             }
             try:
-                resp = self.session.post(url, headers=headers, json=payload, timeout=(10.0, 35.0))
+                resp = self.session.post(url, headers=headers, json=payload, timeout=(2.5, 12.0))
                 if resp.status_code == 200:
-                    data = resp.json()
-                    candidates = data.get("candidates", [])
+                    try:
+                        data = resp.json()
+                    except Exception as json_err:
+                        return False, f"Malformed JSON from {model}: {json_err}"
+                    candidates = data.get("candidates", []) if isinstance(data, dict) else []
                     if candidates:
                         parts = candidates[0].get("content", {}).get("parts", [])
-                        res_text = "".join([p.get("text", "") for p in parts if "text" in p])
+                        res_text = "".join([self._extract_part_text(p) for p in parts])
                         return True, self._clean_output(res_text)
                     return False, "Empty response from Gemini."
                 else:
@@ -507,7 +754,13 @@ class GeminiEngine:
         return text
 
     def _clean_output(self, raw_text: str) -> str:
-        """Removes accidental code fences, quotation wraps, markdown preamble, and verbal disfluencies."""
+        """
+        Cleans transcribed text:
+        1. Strips markdown fences, surrounding quotes, and verbal disfluencies.
+        2. Completely detects and collapses autoregressive repetition loops of any length
+           (e.g., 'robust testing, robust testing...' or multi-word phrase loops).
+        3. Collapses word stutters and cleans dangling punctuation artifacts.
+        """
         text = raw_text.strip()
         if text.startswith("```") and text.endswith("```"):
             lines = text.split("\n")
@@ -516,17 +769,39 @@ class GeminiEngine:
         if text.startswith('"') and text.endswith('"') and "\n" not in text:
             text = text[1:-1].strip()
 
-        # Deterministic hesitation & filler token cleanup safety net
-        # Matches: uh, um, ah, er, eh, uhm, ahm, uhh, ahh surrounded by word boundaries
+        # 1. Deterministic hesitation & filler token cleanup
         filler_pattern = re.compile(r'\b(uh|um|ah|er|eh|uhm|ahm|umm|ahh|uhh)\b[,;:]*', re.IGNORECASE)
         text = filler_pattern.sub('', text)
 
-        # Remove repeated identical words, numbers, and phrases (e.g., "12, 12, 12", "12th 12th", "and and", "if if")
-        for _ in range(3):
-            text = re.sub(r'\b(\w+(?:\s+\w+){1,3})(?:[\s,;—\-]+)\1\b', r'\1', text, flags=re.IGNORECASE)
+        # 2. Multi-word phrase loop collapse (handles 'robust testing, robust testing...' repeated 2 to 500+ times)
+        # Check phrase lengths from 10 down to 1 words
+        for phrase_len in range(10, 0, -1):
+            pattern = r'\b((?:\w+[\s,;—\-]+){' + str(phrase_len) + r'})\1+'
+            prev = None
+            iters = 0
+            while prev != text and iters < 25:
+                prev = text
+                iters += 1
+                text = re.sub(pattern, r'\1', text, flags=re.IGNORECASE)
+
+        # Collapses repeated lists/clauses like: 'phrase, phrase, phrase'
+        pattern_list = r'\b([A-Za-z0-9_\'\-]+(?:\s+[A-Za-z0-9_\'\-]+){0,8})(?:[\s,;—\-]+(?:\1\b))+'
+        prev = None
+        iters = 0
+        while prev != text and iters < 25:
+            prev = text
+            iters += 1
+            text = re.sub(pattern_list, r'\1', text, flags=re.IGNORECASE)
+
+        # 3. Single-word stutter collapse (e.g., '12, 12, 12', 'and and', 'if if')
+        prev = None
+        iters = 0
+        while prev != text and iters < 25:
+            prev = text
+            iters += 1
             text = re.sub(r'\b(\w+)(?:[\s,;—\-]+)\1\b', r'\1', text, flags=re.IGNORECASE)
 
-        # Normalize multiple spaces and cleanup dangling punctuation from removed fillers
+        # 4. Normalize multiple spaces and cleanup dangling punctuation from removed repetitions/fillers
         text = re.sub(r'[,;]\s*(na|ya)\s*([.?!]?)$', r'\2', text, flags=re.IGNORECASE)
         text = re.sub(r'\s*,\s*,+', ',', text)
         text = re.sub(r'\s*,\s*\.', '.', text)

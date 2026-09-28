@@ -72,26 +72,55 @@ def remove_pid_file():
         pass
 
 
-def kill_zombie_process_if_any():
-    """Kills any stuck or unresponsive background instance identified in PID file."""
-    if not PID_FILE.exists():
-        return
-    try:
-        with open(PID_FILE, "r", encoding="utf-8") as f:
-            old_pid = int(f.read().strip())
-        if old_pid != os.getpid():
-            import subprocess
-            logger.warning(f"Cleaning up unresponsive zombie Gemini Flow process (PID {old_pid})...")
-            subprocess.run(["taskkill", "/F", "/PID", str(old_pid)], capture_output=True)
-            time.sleep(0.3)
-    except Exception as e:
-        logger.debug(f"Zombie process cleanup note: {e}")
-    finally:
+def terminate_other_gemini_flow_instances(exclude_pid: int = None):
+    """
+    Terminates any other running or zombie instance of Gemini Flow / Wisper process (python, pythonw, or exe)
+    using Windows taskkill and process enumeration. Ensures no zombie process ever blocks startup or requires PC reboot.
+    """
+    if exclude_pid is None:
+        exclude_pid = os.getpid()
+
+    # 1. Kill via PID file if present
+    if PID_FILE.exists():
+        try:
+            with open(PID_FILE, "r", encoding="utf-8") as f:
+                old_pid = int(f.read().strip())
+            if old_pid != exclude_pid:
+                import subprocess
+                subprocess.run(["taskkill", "/F", "/PID", str(old_pid)], capture_output=True)
+        except Exception:
+            pass
         remove_pid_file()
+
+    # 2. Kill only python/pythonw/Gemini Flow processes matching our project (avoid touching powershell/cmd parent shells)
+    try:
+        import subprocess
+        ps_cmd = f"$target = {exclude_pid}; Get-CimInstance Win32_Process | Where-Object {{ ($_.Name -eq 'python.exe' -or $_.Name -eq 'pythonw.exe' -or $_.Name -like '*Gemini Flow*') -and ($_.CommandLine -like '*main_standalone.py*' -or $_.CommandLine -like '*main.py*' -or $_.CommandLine -like '*Wisper*') -and $_.ProcessId -ne $target }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
+        subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd], capture_output=True, timeout=5)
+    except Exception as ex:
+        logger.debug(f"Process termination note: {ex}")
+
+    # 3. Clean up stale IPC pipe
+    try:
+        QLocalServer.removeServer(IPC_PIPE_NAME)
+    except Exception:
+        pass
+
+
+def kill_zombie_process_if_any():
+    """Kills any stuck or unresponsive background instance."""
+    terminate_other_gemini_flow_instances()
 
 
 def notify_running_instance(command: str = "SHOW") -> bool:
     """Notifies the already running instance to perform an action (e.g. SHOW, RESTART)."""
+    try:
+        import ctypes
+        ASFW_ANY = -1
+        ctypes.windll.user32.AllowSetForegroundWindow(ASFW_ANY)
+    except Exception:
+        pass
+
     socket = QLocalSocket()
     socket.connectToServer(IPC_PIPE_NAME)
     if socket.waitForConnected(1200):
@@ -101,19 +130,6 @@ def notify_running_instance(command: str = "SHOW") -> bool:
         if socket.waitForReadyRead(1000):
             socket.readAll()
         socket.disconnectFromServer()
-
-        if command == "SHOW":
-            # In addition, find the window directly and switch to it
-            try:
-                import ctypes
-                user32 = ctypes.windll.user32
-                hwnd = user32.FindWindowW(None, "Gemini Flow — Voice AI Settings & Dashboard")
-                if hwnd:
-                    user32.ShowWindow(hwnd, 9)  # SW_RESTORE = 9
-                    user32.SwitchToThisWindow(hwnd, True)
-                    user32.SetForegroundWindow(hwnd)
-            except Exception:
-                pass
         return True
     return False
 
@@ -121,22 +137,51 @@ def notify_running_instance(command: str = "SHOW") -> bool:
 def force_window_to_foreground(window):
     """
     Guarantees a PyQt window is un-minimized, restored, and forced to the foreground
-    over active apps (Edge, Chrome, Antigravity, etc.) using native Win32 APIs without recreating window flags.
+    over active apps (Edge, Chrome, Antigravity, etc.) using native Win32 APIs with 64-bit pointer safety.
     """
     if not window:
         return
+
+    # 1. Qt level restore & show
+    from PyQt6.QtCore import Qt, QTimer
+    window.setWindowState(window.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
     window.showNormal()
     window.show()
+
+    # 2. Win32 Level Foreground Force
     try:
         import ctypes
+        from ctypes import c_void_p, c_int, c_uint, c_ulong, byref
         user32 = ctypes.windll.user32
-        hwnd = int(window.winId())
+        kernel32 = ctypes.windll.kernel32
+
+        hwnd = c_void_p(int(window.winId()))
+
+        # Ensure taskbar visibility via WS_EX_APPWINDOW so user can always see and click it
+        GWL_EXSTYLE = -20
+        WS_EX_APPWINDOW = 0x00040000
+        WS_EX_TOOLWINDOW = 0x00000080
+        get_long = getattr(user32, 'GetWindowLongPtrW', getattr(user32, 'GetWindowLongW', None))
+        set_long = getattr(user32, 'SetWindowLongPtrW', getattr(user32, 'SetWindowLongW', None))
+        cur_style = get_long(hwnd, GWL_EXSTYLE)
+        set_long(hwnd, GWL_EXSTYLE, (cur_style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW)
+
+        # Un-minimize
         SW_RESTORE = 9
         user32.ShowWindow(hwnd, SW_RESTORE)
 
-        fore_hwnd = user32.GetForegroundWindow()
-        cur_thread = user32.GetCurrentThreadId()
-        fore_thread = user32.GetWindowThreadProcessId(fore_hwnd, None)
+        # Simulate Alt key to unlock Windows foreground lock
+        VK_MENU = 0x12
+        KEYEVENTF_KEYUP = 0x0002
+        user32.keybd_event(VK_MENU, 0, 0, 0)
+        user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
+
+        # AttachThreadInput trick to steal foreground lock from active app
+        fore_hwnd = c_void_p(user32.GetForegroundWindow())
+        cur_thread = kernel32.GetCurrentThreadId()
+        fore_pid = c_ulong()
+        fore_thread = user32.GetWindowThreadProcessId(fore_hwnd, byref(fore_pid))
+
         if fore_thread != cur_thread and fore_thread != 0:
             user32.AttachThreadInput(fore_thread, cur_thread, True)
             user32.SetForegroundWindow(hwnd)
@@ -145,8 +190,27 @@ def force_window_to_foreground(window):
         else:
             user32.SetForegroundWindow(hwnd)
             user32.BringWindowToTop(hwnd)
-    except Exception:
-        pass
+
+        # Set HWND_TOPMOST with 64-bit pointer safety so it pops directly on top of Antigravity / active app
+        HWND_TOPMOST = c_void_p(-1)
+        HWND_NOTOPMOST = c_void_p(-2)
+        SWP_NOMOVE = 0x0002
+        SWP_NOSIZE = 0x0001
+        SWP_SHOWWINDOW = 0x0040
+        flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW
+        user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags)
+
+        # After 1200ms, demote HWND_TOPMOST back to normal so it doesn't stay permanently locked on top
+        def _demote_topmost():
+            try:
+                user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+            except Exception:
+                pass
+        QTimer.singleShot(1200, _demote_topmost)
+
+    except Exception as e:
+        logger.warning(f"force_window_to_foreground note: {e}")
+
     window.raise_()
     window.activateWindow()
 
@@ -175,6 +239,11 @@ log_file = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow" / "gemini
 log_file.parent.mkdir(parents=True, exist_ok=True)
 handlers = [logging.handlers.RotatingFileHandler(str(log_file), maxBytes=5 * 1024 * 1024, backupCount=2, encoding="utf-8")]
 if sys.stdout is not None:
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     handlers.append(logging.StreamHandler(sys.stdout))
 
 logging.basicConfig(
@@ -270,7 +339,10 @@ class GeminiFlowApp:
         self.server = QLocalServer(self.app)
         QLocalServer.removeServer(IPC_PIPE_NAME)
         self.server.newConnection.connect(self._on_ipc_connection)
-        self.server.listen(IPC_PIPE_NAME)
+        if not self.server.listen(IPC_PIPE_NAME):
+            logger.warning(f"QLocalServer listen retry needed on '{IPC_PIPE_NAME}': {self.server.errorString()}")
+            QLocalServer.removeServer(IPC_PIPE_NAME)
+            self.server.listen(IPC_PIPE_NAME)
 
         # Standby / Sleep / Inactivity Watchdog Timer (fires every 5 seconds)
         from PyQt6.QtCore import QTimer
@@ -386,6 +458,7 @@ class GeminiFlowApp:
 
     def _on_speech_cancelled(self):
         """UI Thread handler for speech cancellation."""
+        self.hotkey_mgr.reset_keys()
         if self.config.get("play_sounds", True):
             try:
                 winsound.Beep(350, 70)
@@ -412,10 +485,10 @@ class GeminiFlowApp:
             except Exception:
                 raw_text = ""
 
-        # 3. Fallback: If nothing selected or copied, start voice dictation
+        # 3. Fallback: If nothing selected or copied, show error and do NOT start voice dictation
         if not raw_text or len(raw_text.strip()) < 2:
-            logger.info("No text selected or in clipboard for prompt transform, starting prompt voice dictation...")
-            self.on_start_speech()
+            logger.info("No text selected or in clipboard for prompt transform.")
+            self.hud.show_state(FloatingHUD.STATE_ERROR, "Select Text First!")
             return
 
         self.is_busy_processing = True
@@ -436,7 +509,7 @@ class GeminiFlowApp:
         if success and prompt_or_error:
             # Save both AI prompt and raw text to history
             app_name = self.text_injector.get_target_app_name()
-            model = self.gemini.last_model_used or self.config.get("model_name", "gemini-3.5-flash-lite")
+            model = self.gemini.last_model_used or self.config.get("model_name", "gemini-2.5-flash")
             self.config.add_history_entry(
                 text=prompt_or_error,
                 duration_sec=1.0,
@@ -516,7 +589,7 @@ class GeminiFlowApp:
         if success and text_or_error:
             # Save to history
             app_name = self.text_injector.get_target_app_name()
-            model = self.gemini.last_model_used or self.config.get("model_name", "gemini-3.5-flash-lite")
+            model = self.gemini.last_model_used or self.config.get("model_name", "gemini-2.5-flash")
             self.config.add_history_entry(text_or_error, 1.0, f"Transform: {transform_name}", app_name=app_name, model=model)
             if self.settings_dialog and self.settings_dialog.isVisible():
                 self.settings_dialog.notify_history_changed()
@@ -553,17 +626,25 @@ class GeminiFlowApp:
 
             self.gemini.set_api_key(api_key)
 
-            # 1. Resolve Application Context
-            app_context = AppIntelligenceManager.get_active_app_context()
+            # 1. Resolve Application Context & Dynamic Profile
+            target_hwnd = getattr(self.text_injector, "last_target_hwnd", None)
+            app_context = AppIntelligenceManager.get_active_app_context(target_hwnd)
             app_name = app_context.app_name if app_context else self.text_injector.get_target_app_name()
+            category = getattr(app_context, "category", "general") if app_context else "general"
 
-            # 2. Resolve Active Productivity Profile & Cost Mode
-            active_profile = self.config.get("active_profile", "coding")
-            auto_cost_mode = self.config.get("auto_cost_mode", True)
-
-            # 3. Construct Active Speech Transcription System Prompt (from active prompt library or preset)
+            # 2. Voice Dictation Mode: Strictly adhere to user's configured mode_preset (default: clean_dictation)
+            # Never force-override voice dictation to prompt_enhancer or code_assistant based on foreground apps.
+            active_profile = app_context.profile_id if (app_context and app_context.profile_id) else self.config.get("active_profile", "coding")
             active_mode = self.config.get("mode_preset", "clean_dictation")
-            prompt = self.config.get_system_prompt(app_context=app_context)
+
+            auto_cost_mode = self.config.get("auto_cost_mode", True)
+            logger.info(f"Dynamic Context: App='{app_name}', Category='{category}', Profile='{active_profile}', Mode='{active_mode}'")
+
+            # In-memory sync of active profile
+            self.config.config["active_profile"] = active_profile
+
+            # 3. Construct Active Speech Transcription System Prompt
+            prompt = self.config.get_system_prompt(preset_override=active_mode, app_context=app_context, profile_id_override=active_profile)
 
             # 4. Transcribe with Gemini (Resilient execution + ModelRouter + Cost Optimization + Offline Fallback)
             success, raw_result = self.gemini.transcribe_audio(
@@ -578,85 +659,26 @@ class GeminiFlowApp:
             if self._is_cancelled:
                 return
 
-            if not success or not raw_result:
+            if not success:
                 self.signals.finished.emit(False, raw_result or "Transcription failed.", duration, active_mode, app_name, self.gemini.last_model_used, "")
                 return
 
-            # Apply Custom Dictionary & Snippet Expansions to normal speech
-            raw_spoken_text = GeminiEngine.apply_dictionary(raw_result, self.config.get_dictionary())
-            raw_spoken_text = GeminiEngine.apply_snippets(raw_spoken_text, self.config.get_snippets())
+            # Clean silence detection (no words spoken)
+            if not raw_result or not raw_result.strip():
+                self.signals.finished.emit(True, "", duration, active_mode, app_name, self.gemini.last_model_used, "")
+                return
 
-            mode = active_mode
-            final_text = raw_spoken_text
+            # 5. Apply Custom Dictionary, Snippets & Vocabulary to transcribe speech accurately
+            final_text = GeminiEngine.apply_dictionary(raw_result, self.config.get_dictionary())
+            final_text = GeminiEngine.apply_snippets(final_text, self.config.get_snippets())
+            raw_spoken_text = final_text
 
-            # 5. Check if active window is a Prompt-Generation Interface (Antigravity, VS Code, Windsurf, Cursor, etc.)
-            auto_prompt_enabled = self.config.get_auto_prompt_conversion() if hasattr(self.config, "get_auto_prompt_conversion") else self.config.get("auto_prompt_conversion", False)
-            is_prompt_ui = getattr(app_context, "is_prompt_interface", False) and auto_prompt_enabled
-            if is_prompt_ui:
-                logger.info(f"Active window '{app_name}' is a Prompt-Generation Interface: Converting speech to structured prompt.")
-                prompt_instruction = (
-                    "You are an expert AI Prompt Engineer. The user dictated raw speech intended as an instruction/prompt for an AI system:\n"
-                    f"<spoken_instruction>{raw_spoken_text}</spoken_instruction>\n\n"
-                    "Transform this raw speech into an exceptionally clear, comprehensive, and high-impact AI prompt. "
-                    "Structure the prompt logically with:\n"
-                    "- Role & Objective: Define the specific persona and primary goal\n"
-                    "- Context & Requirements: Clear constraints, guidelines, and specifications\n"
-                    "- Step-by-Step Instructions: Logical numbered steps to follow\n"
-                    "- Expected Output Format: Concrete structure\n"
-                    "Output ONLY the finalized optimized prompt without any preamble, markdown code fence wrapping the whole response, or commentary."
-                )
-                try:
-                    trans_res = self.gemini.transform_text(
-                        raw_text=raw_spoken_text,
-                        transform_type=TransformType.CONVERT_PROMPT,
-                        app_context=app_context,
-                        custom_instruction=prompt_instruction,
-                        profile_id=active_profile,
-                        auto_cost_mode=auto_cost_mode
-                    )
-                    if trans_res.success and trans_res.text:
-                        final_text = trans_res.text.strip()
-                        mode = "prompt_generation"
-                    else:
-                        final_text = raw_spoken_text
-                except Exception as p_err:
-                    logger.warning(f"Prompt generation fallback to raw speech: {p_err}")
-                    final_text = raw_spoken_text
-            else:
-                # 6. General Code Editors / IDEs / Text Fields: Intent check or Raw Clean Transcription
-                active_clip = ""
-                try:
-                    active_clip = pyperclip.paste()
-                except Exception:
-                    active_clip = ""
-
-                intent_result = IntentClassifier.classify(raw_result, clipboard_fallback=active_clip)
-                if intent_result.intent != IntentCategory.DICTATE and intent_result.payload:
-                    logger.info(f"Voice Command Detected: {intent_result.intent.value} with payload length {len(intent_result.payload)}")
-                    matched_transform = INTENT_TO_TRANSFORM_MAP.get(intent_result.intent, TransformType.IMPROVE)
-
-                    trans_res = self.gemini.transform_text(
-                        raw_text=intent_result.payload,
-                        transform_type=matched_transform,
-                        app_context=app_context,
-                        custom_instruction=intent_result.system_instruction,
-                        profile_id=active_profile,
-                        auto_cost_mode=auto_cost_mode
-                    )
-                    if trans_res.success and trans_res.text:
-                        final_text = trans_res.text
-                        mode = intent_result.intent.value
-                else:
-                    # Apply Custom Dictionary & Snippet Expansions for normal code/text dictation
-                    final_text = GeminiEngine.apply_dictionary(final_text, self.config.get_dictionary())
-                    final_text = GeminiEngine.apply_snippets(final_text, self.config.get_snippets())
-
-            model_used = self.gemini.last_model_used or self.config.get("model_name", "gemini-3.5-flash-lite")
-            self.signals.finished.emit(True, final_text, duration, mode, app_name, model_used, raw_spoken_text)
+            model_used = self.gemini.last_model_used or "gemini-2.5-flash"
+            self.signals.finished.emit(True, final_text, duration, active_mode, app_name, model_used, raw_spoken_text)
 
         except Exception as e:
             logger.error(f"Error in speech processing worker: {e}", exc_info=True)
-            self.signals.finished.emit(False, f"Error: {str(e)}", duration, "clean_dictation", "General", "", "")
+            self.signals.finished.emit(False, f"Error: {str(e)}", duration, "clean_dictation", "General", "gemini-2.5-flash", "")
 
     def _on_transcription_finished(
         self,
@@ -665,20 +687,41 @@ class GeminiFlowApp:
         duration: float,
         mode: str = "clean_dictation",
         app_name: str = "General",
-        model_used: str = "gemini-3.5-flash-lite",
+        model_used: str = "gemini-2.5-flash",
         raw_spoken_text: str = ""
     ):
         """Back on main Qt UI thread."""
         self.is_busy_processing = False
         self.hotkey_mgr.set_processing_state(False)
+        self.hotkey_mgr.reset_keys()
 
         if self._is_cancelled:
+            return
+
+        disp_name = self.config.get("hotkey_display", "Ctrl + Space")
+
+        # Handle clean silence (no words spoken)
+        if success and not text_or_error:
+            logger.info("No speech detected in audio.")
+            self.hud.show_state(FloatingHUD.STATE_READY, "No Audio Detected 🎙️")
+            self.tray.update_status(f"🟢 Ready ({disp_name})", state="ready")
             return
 
         if success and text_or_error:
             logger.info(f"Final Processed Text [{mode}]: {text_or_error[:100]}...")
 
-            # 1. Persistent History Logging:
+            # 1. Zero-Loss Emergency File Backup:
+            # Write immediately to last_transcription.txt so user speech can NEVER be lost
+            try:
+                rescue_path = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow" / "last_transcription.txt"
+                with open(rescue_path, "w", encoding="utf-8") as rf:
+                    rf.write(f"=== Last Dictation ({time.strftime('%Y-%m-%d %H:%M:%S')}) ===\n")
+                    rf.write(f"Target App: {app_name} | Mode: {mode} | Model: {model_used} | Duration: {duration:.1f}s\n\n")
+                    rf.write(text_or_error)
+            except Exception as res_err:
+                logger.debug(f"Rescue file backup note: {res_err}")
+
+            # 2. Persistent History Logging:
             # Maintain persistent log storing both the generated prompt and the raw transcription
             self.config.add_history_entry(
                 text=text_or_error,
@@ -691,11 +734,10 @@ class GeminiFlowApp:
             )
             if self.settings_dialog and self.settings_dialog.isVisible():
                 self.settings_dialog.notify_history_changed()
+                active_prof = self.config.get("active_profile", "coding")
+                self.settings_dialog.sync_active_profile(active_prof)
 
-            # 2. AI Prompt Pasting & Safeguard Normal Speech Clipboard Management:
-            # When prompt generation is active (e.g. in Antigravity, VS Code, Windsurf, Cursor),
-            # paste the structured AI Prompt into the active chat/editor, then immediately set
-            # the clipboard to the exact normal spoken text (as dictated) as a safeguard backup.
+            # 3. AI Prompt Pasting & Safeguard Normal Speech Clipboard Management:
             is_prompt_mode = (mode == "prompt_generation" and raw_spoken_text and raw_spoken_text.strip() != text_or_error.strip())
             is_offline_mode = "offline" in (model_used or "").lower()
 
@@ -735,7 +777,6 @@ class GeminiFlowApp:
                     pyperclip.copy(text_or_error)
                     self.hud.show_state(FloatingHUD.STATE_COPIED, "Copied to Clipboard!")
 
-            disp_name = self.config.get("hotkey_display", "Ctrl + Win")
             self.tray.update_status(f"🟢 Ready ({disp_name})", state="ready")
 
         else:
@@ -760,11 +801,11 @@ class GeminiFlowApp:
                 self.hotkey_mgr.check_health()
             self._last_watchdog_time = now
 
-            # 2. Maximum recording duration safety net (auto-stop after 300s / 5 mins)
+            # 2. Maximum recording duration safety net (auto-stop after 1800s / 30 mins)
             if hasattr(self, 'recorder') and self.recorder and self.recorder.is_recording:
                 elapsed = time.time() - self.recorder.start_time
-                if elapsed > 300.0:
-                    logger.warning(f"Recording reached 5-minute safety limit ({elapsed:.1f}s). Auto-stopping to prevent memory leak.")
+                if elapsed > 1800.0:
+                    logger.warning(f"Recording reached 30-minute safety limit ({elapsed:.1f}s). Auto-stopping.")
                     self.on_stop_speech()
         except Exception as e:
             logger.debug(f"Watchdog tick note: {e}")
@@ -794,6 +835,8 @@ class GeminiFlowApp:
                         except Exception:
                             pass
                         self.open_settings()
+                        if hasattr(self, 'hud') and self.hud:
+                            self.hud.show_state(FloatingHUD.STATE_READY, "Gemini Flow — Voice AI Ready 🎙️")
                 client.disconnectFromServer()
         except Exception as e:
             logger.error(f"Error handling IPC connection: {e}")
@@ -880,7 +923,7 @@ class GeminiFlowApp:
         self.app.quit()
 
     def restart_app(self):
-        """Cleanly releases all resources and launches a fresh Gemini Flow instance."""
+        """Cleanly releases all resources and launches a fresh Gemini Flow instance without requiring PC reboot."""
         logger.info("Restarting Gemini Flow cleanly...")
         try:
             self.hotkey_mgr.stop()
@@ -901,15 +944,19 @@ class GeminiFlowApp:
 
         import subprocess
         python_exe = sys.executable
+        pythonw_cand = Path(python_exe).parent / "pythonw.exe"
+        if pythonw_cand.exists():
+            python_exe = str(pythonw_cand)
+
         launcher = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main_standalone.py")
         DETACHED_PROCESS = 0x00000008
         CREATE_NO_WINDOW = 0x08000000
         flags = DETACHED_PROCESS | CREATE_NO_WINDOW
         try:
-            subprocess.Popen([python_exe, launcher], creationflags=flags, close_fds=True)
+            subprocess.Popen([python_exe, launcher, "--force-restart"], creationflags=flags, close_fds=True)
         except Exception as e:
             logger.error(f"Failed to spawn detached process: {e}")
-            subprocess.Popen([python_exe, launcher])
+            subprocess.Popen([python_exe, launcher, "--force-restart"])
 
         self.app.quit()
 
@@ -941,17 +988,30 @@ class GeminiFlowApp:
             self.open_settings()
 
         try:
-            return self.app.exec()
+            ret = self.app.exec()
+            logger.info(f"QApplication.exec() exited with code: {ret}")
+            return ret
+        except Exception as e:
+            logger.critical(f"Exception during app.exec(): {e}", exc_info=True)
+            raise
         finally:
+            logger.info("run() finally block executing: cleaning up PID file and mutex.")
             remove_pid_file()
             release_app_mutex()
 
 
 def start_app(show_window: bool = True):
     from PyQt6.QtWidgets import QApplication
-    # Check CLI flags
     args = sys.argv[1:]
-    if "--set-api-key" in args:
+    is_force_restart = any(f in args for f in ("--force-restart", "--restart", "-r", "-f"))
+
+    if is_force_restart:
+        logger.info("Restart requested via CLI. Forcefully terminating old instances and starting fresh...")
+        terminate_other_gemini_flow_instances()
+        release_app_mutex()
+        time.sleep(0.4)
+
+    elif "--set-api-key" in args:
         idx = args.index("--set-api-key")
         if idx + 1 < len(args):
             new_key = args[idx + 1]
@@ -965,35 +1025,37 @@ def start_app(show_window: bool = True):
                 print("Running Gemini Flow instance notified to reload.")
             sys.exit(0)
 
-    if "--restart" in args or "-r" in args:
-        logger.info("Restart flag passed. Notifying running instance to restart...")
-        if notify_running_instance(command="RESTART"):
-            time.sleep(0.5)
-            sys.exit(0)
-
     if "--startup" in args or "-s" in args or "--hidden" in args:
         show_window = False
 
     init_app = QApplication.instance() or QApplication(sys.argv)
 
-    # 1. Enforce atomic single-instance via Named Mutex + live IPC check + Zombie Recovery
-    is_primary = acquire_app_mutex()
-    if not is_primary:
-        # Check if the primary instance is actually alive and responsive
+    # 1. Enforce atomic single-instance via Named Mutex + live IPC check + Auto Recovery
+    is_primary = False
+    for attempt in range(4):
+        is_primary = acquire_app_mutex()
+        if is_primary:
+            break
+        if is_force_restart:
+            terminate_other_gemini_flow_instances()
+            release_app_mutex()
+            time.sleep(0.3)
+            continue
+
+        # Check if an existing primary instance is actually responsive
         notified = notify_running_instance("SHOW")
         if notified:
             logger.info("Gemini Flow is already running. Existing instance brought to front.")
             sys.exit(0)
         else:
-            logger.warning("Named Mutex was held by an unresponsive or dead instance. Performing zombie recovery...")
-            kill_zombie_process_if_any()
+            logger.warning(f"Named Mutex held by unresponsive instance (attempt {attempt+1}/4). Purging zombie processes...")
+            terminate_other_gemini_flow_instances()
             release_app_mutex()
             try:
                 QLocalServer.removeServer(IPC_PIPE_NAME)
             except Exception:
                 pass
-            time.sleep(0.2)
-            acquire_app_mutex()
+            time.sleep(0.4)
 
     app = GeminiFlowApp()
     sys.exit(app.run(show_window=show_window))

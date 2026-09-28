@@ -54,7 +54,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "You are an elite copy editor. Improve the following text for clarity, cadence, "
             "and elegance. Keep the core meaning unchanged. Output ONLY the improved text."
         ),
-        recommended_model="gemini-3.5-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.3,
         icon="✨"
     ),
@@ -90,7 +90,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Rephrase the following text in a warm, relaxed, and conversational tone suitable for direct "
             "messaging or quick team syncs. Output ONLY the rewritten text."
         ),
-        recommended_model="gemini-3.5-flash-lite",
+        recommended_model="gemini-2.5-flash",
         temperature=0.4,
         icon="☕"
     ),
@@ -102,7 +102,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Condense the following text to its leanest, punchiest form. Remove all superfluous words "
             "and fluff while keeping 100% of essential facts. Output ONLY the concise text."
         ),
-        recommended_model="gemini-3.5-flash-lite",
+        recommended_model="gemini-2.5-flash",
         temperature=0.2,
         icon="✂️"
     ),
@@ -114,7 +114,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Elaborate upon the provided text with rich context, supporting nuance, and comprehensive "
             "detail. Output ONLY the expanded content."
         ),
-        recommended_model="gemini-3.6-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.5,
         icon="📖"
     ),
@@ -126,7 +126,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Summarize the provided content into a tight executive summary with high-signal bullet "
             "points highlighting core conclusions and action items. Output ONLY the summary."
         ),
-        recommended_model="gemini-3.6-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.2,
         icon="📋"
     ),
@@ -138,7 +138,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Explain the following concept, code snippet, or argument in crystal-clear, structured terms. "
             "Use intuitive metaphors where appropriate. Output ONLY the explanation."
         ),
-        recommended_model="gemini-3.7-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.3,
         icon="💡"
     ),
@@ -150,7 +150,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Rewrite the following text adhering to rigorous software engineering and technical "
             "documentation standards. Use accurate terminology and clear specifications. Output ONLY the text."
         ),
-        recommended_model="gemini-3.7-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.2,
         icon="⚙️"
     ),
@@ -159,11 +159,11 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Convert to AI Prompt",
         description="Craft an optimized, high-fidelity system/user prompt from raw notes.",
         system_instruction=(
-            "You are a Principal AI Prompt Engineer. Transform the user's raw notes or request into an "
-            "optimized, high-performance AI prompt structured with Role, Context, Objective, Constraints, "
-            "and Output Format."
+            "You are an expert AI Prompt Engineer. Transform the provided text into an "
+            "optimized, high-impact AI prompt structured with Role & Objective, Context & Requirements, "
+            "Step-by-Step Instructions, and Expected Output Format. Output ONLY the finalized prompt."
         ),
-        recommended_model="gemini-3.5-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.3,
         icon="🧠"
     ),
@@ -175,7 +175,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Convert the user's thoughts into a polished email. Include a compelling 'Subject: ' line, "
             "appropriate salutation, clean body paragraphs, and professional closing."
         ),
-        recommended_model="gemini-3.5-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.3,
         icon="✉️"
     ),
@@ -192,7 +192,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "## Environment & Notes\n"
             "Output ONLY the markdown issue."
         ),
-        recommended_model="gemini-3.7-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.2,
         icon="🐛"
     ),
@@ -210,7 +210,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "- [ ] Documentation updated\n"
             "Output ONLY the markdown PR description."
         ),
-        recommended_model="gemini-3.7-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.2,
         icon="🔀"
     ),
@@ -222,7 +222,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Format the input as production-grade technical documentation or docstrings following "
             "Google/Markdown developer doc standards. Output ONLY the documentation."
         ),
-        recommended_model="gemini-3.7-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.2,
         icon="📚"
     ),
@@ -234,7 +234,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Organize the provided text into clean, structured meeting/project notes in markdown with "
             "key headings, bullet points, and action items with checkboxes. Output ONLY the notes."
         ),
-        recommended_model="gemini-3.6-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.3,
         icon="📝"
     ),
@@ -243,7 +243,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Custom Transformation",
         description="Apply a custom user prompt instruction to the selected text.",
         system_instruction="Follow the user's custom instruction faithfully. Output ONLY the transformed text.",
-        recommended_model="gemini-3.5-flash",
+        recommended_model="gemini-2.5-flash",
         temperature=0.3,
         icon="🎯"
     )
@@ -292,5 +292,5 @@ class TransformEngine:
 
         preset = cls.get_preset(transform_type)
         if text_length > 3000:
-            return "gemini-3.6-flash"
+            return "gemini-2.5-flash"
         return preset.recommended_model
