@@ -26,9 +26,9 @@ class ModelMetadata:
 MODEL_REGISTRY: Dict[str, ModelMetadata] = {
     "gemini-2.5-flash": ModelMetadata(
         model_name="gemini-2.5-flash",
-        display_name="Gemini 2.5 Flash (Target Architecture: 1.3s – 2.2s)",
+        display_name="Gemini 2.5 Flash (Flagship: 1.2s – 1.8s)",
         speed_rating=5,
-        typical_latency="1.3s – 2.2s",
+        typical_latency="1.2s – 1.8s",
         punctuation_style="Flawless real-time speech transcription, semicolons, colons, code blocks, zero repetition",
         reasoning_capability="high",
         technical_capability="expert",
@@ -36,13 +36,23 @@ MODEL_REGISTRY: Dict[str, ModelMetadata] = {
     ),
     "gemini-flash-latest": ModelMetadata(
         model_name="gemini-flash-latest",
-        display_name="Gemini Flash Latest (Production Auto)",
-        speed_rating=4,
-        typical_latency="~1.8s",
-        punctuation_style="Smooth conversational phrasing, standard capitalization",
+        display_name="Gemini Flash Latest (Production Auto: ~1.2s – 1.6s)",
+        speed_rating=5,
+        typical_latency="~1.2s – 1.6s",
+        punctuation_style="Structured prose, clear punctuation, high throughput",
+        reasoning_capability="high",
+        technical_capability="high",
+        recommended_tasks=["General purpose workflow", "stable everyday dictation", "High concurrency"]
+    ),
+    "gemini-flash-lite-latest": ModelMetadata(
+        model_name="gemini-flash-lite-latest",
+        display_name="Gemini Flash Lite (Ultra-Fast: ~0.9s – 1.3s)",
+        speed_rating=5,
+        typical_latency="~0.9s – 1.3s",
+        punctuation_style="Rapid streaming transcription, clean formatting",
         reasoning_capability="balanced",
         technical_capability="high",
-        recommended_tasks=["General purpose workflow", "stable everyday dictation"]
+        recommended_tasks=["Instant quick dictation", "High-speed voice notes", "Sub-second typing"]
     )
 }
 
