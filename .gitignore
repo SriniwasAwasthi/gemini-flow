@@ -23,8 +23,8 @@ launcher_debug.log
 htmlcov/
 *.pdf
 *.vbs
-*.cs
 *.ps1
+!Launcher.cs
 app/resources/*_preview.png
 app/resources/checkbox_test.png
 app_icon.ico
@@ -39,4 +39,8 @@ config.json
 *.mp3
 *.m4a
 *.ogg
+*.mp4
+*.webm
 scratch/
+output_progressive_*.mp4
+videos/raw_*.mp4

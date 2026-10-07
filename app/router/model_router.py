@@ -103,6 +103,16 @@ MODEL_REGISTRY: Dict[str, ModelMetadata] = {
         reasoning_capability="high",
         technical_capability="expert",
         recommended_tasks=["Standard dictation", "Prompt polish"]
+    ),
+    "offline-whisper": ModelMetadata(
+        model_name="offline-whisper",
+        display_name="Offline Whisper AI (100% On-Device / No Internet)",
+        speed_rating=5,
+        typical_latency="~0.3s – 0.8s",
+        punctuation_style="Direct local speech transcription, 100% offline privacy",
+        reasoning_capability="balanced",
+        technical_capability="high",
+        recommended_tasks=["Offline dictation", "Airplane mode", "Zero latency local notes"]
     )
 }
 

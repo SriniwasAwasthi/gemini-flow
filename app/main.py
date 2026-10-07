@@ -53,12 +53,56 @@ def release_app_mutex():
             logger.warning(f"Error releasing single instance mutex: {e}")
 
 
+def get_codebase_last_modified() -> float:
+    """Returns the latest modification timestamp of all source python files in the project."""
+    try:
+        root = Path(__file__).parent.parent
+        latest = 0.0
+        for p in root.glob("*.py"):
+            try:
+                m = p.stat().st_mtime
+                if m > latest:
+                    latest = m
+            except Exception:
+                pass
+        app_dir = root / "app"
+        if app_dir.exists():
+            for p in app_dir.rglob("*.py"):
+                try:
+                    m = p.stat().st_mtime
+                    if m > latest:
+                        latest = m
+                except Exception:
+                    pass
+        return latest
+    except Exception:
+        return 0.0
+
+
+def is_dashboard_window_visible() -> bool:
+    """Checks whether the Gemini Flow settings/dashboard window is currently visible on screen."""
+    try:
+        import ctypes
+        u32 = ctypes.windll.user32
+        for title in ("Gemini Flow — Voice AI Settings & Dashboard", "Gemini Flow - Voice AI Settings & Dashboard"):
+            hwnd = u32.FindWindowW(None, title)
+            if hwnd and u32.IsWindowVisible(hwnd):
+                # Ensure it is restored and brought to top
+                SW_RESTORE = 9
+                u32.ShowWindow(hwnd, SW_RESTORE)
+                u32.SetForegroundWindow(hwnd)
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def write_pid_file():
-    """Writes current process ID to PID file for zombie recovery."""
+    """Writes current process ID and timestamp to PID file for zombie recovery and update tracking."""
     try:
         PID_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(PID_FILE, "w", encoding="utf-8") as f:
-            f.write(str(os.getpid()))
+            f.write(f"{os.getpid()}:{time.time():.2f}")
     except Exception as e:
         logger.debug(f"Could not write PID file: {e}")
 
@@ -84,7 +128,8 @@ def terminate_other_gemini_flow_instances(exclude_pid: int = None):
     if PID_FILE.exists():
         try:
             with open(PID_FILE, "r", encoding="utf-8") as f:
-                old_pid = int(f.read().strip())
+                content = f.read().strip()
+                old_pid = int(content.split(":")[0]) if ":" in content else int(content)
             if old_pid != exclude_pid:
                 import subprocess
                 subprocess.run(["taskkill", "/F", "/PID", str(old_pid)], capture_output=True)
@@ -353,12 +398,19 @@ class GeminiFlowApp:
 
         self.is_busy_processing = False
         self._is_cancelled = False
+        self._rolling_chunks = []
+        self._rolling_lock = threading.Lock()
+        self._rolling_active = False
+        self._startup_code_mtime = get_codebase_last_modified()
 
-        # Asynchronous zero-delay background warmup (Pre-warms Gemini TLS Keep-Alive, PortAudio mic stack, Windows startup)
+        # Asynchronous zero-delay background warmup (Pre-warms Gemini TLS Keep-Alive, PortAudio mic stack, Whisper offline weights, Windows startup)
         def _async_startup_warmup():
             try:
                 self.gemini.warm_connection()
                 self.recorder.warmup_audio()
+                if self.config.get("offline_fallback_enabled", True) or str(self.config.get("model_name", "")).lower() in ("offline-whisper", "offline"):
+                    from app.offline.offline_engine import OfflineSpeechEngine
+                    OfflineSpeechEngine.warmup_whisper()
                 if self.config.get("start_with_windows", True):
                     setup_windows_startup(True)
                 ensure_desktop_shortcuts()
@@ -378,6 +430,9 @@ class GeminiFlowApp:
             return
 
         self._is_cancelled = False
+        with self._rolling_lock:
+            self._rolling_chunks = []
+        self._rolling_active = True
         self.hotkey_mgr.set_recording_state(True)
 
         # 1. Capture active foreground window
@@ -398,15 +453,62 @@ class GeminiFlowApp:
         if success:
             self.hud.show_state(FloatingHUD.STATE_LISTENING, "")
             self.tray.update_status("🎙️ Recording Speech...", state="recording")
+            self._start_rolling_transcription()
         else:
             self.hud.show_state(FloatingHUD.STATE_ERROR, "Microphone Error")
             self.tray.update_status("⚠️ Mic Error", state="ready")
+
+    def _start_rolling_transcription(self):
+        """Asynchronously slices and transcribes 16-24s chunks in real-time during long recordings."""
+        def _rolling_loop():
+            chunk_idx = 0
+            while self.recorder.is_recording and not self._is_cancelled and self._rolling_active:
+                time.sleep(1.0)
+                if not self.recorder.is_recording or self._is_cancelled or not self._rolling_active:
+                    break
+
+                chunk_wav = self.recorder.get_rolling_chunk(min_sec=16.0, max_sec=24.0)
+                if chunk_wav and len(chunk_wav) > 2000:
+                    curr_idx = chunk_idx
+                    chunk_idx += 1
+                    with self._rolling_lock:
+                        self._rolling_chunks.append("")
+
+                    target_hwnd = getattr(self.text_injector, "last_target_hwnd", None)
+                    app_context = AppIntelligenceManager.get_active_app_context(target_hwnd)
+                    active_profile = app_context.profile_id if (app_context and app_context.profile_id) else self.config.get("active_profile", "coding")
+                    active_mode = self.config.get("mode_preset", "clean_dictation")
+                    prompt = self.config.get_system_prompt(preset_override=active_mode, app_context=app_context, profile_id_override=active_profile)
+                    auto_cost_mode = self.config.get("auto_cost_mode", True)
+                    offline_fallback_on = self.config.get_offline_fallback_enabled() if hasattr(self.config, "get_offline_fallback_enabled") else self.config.get("offline_fallback_enabled", True)
+
+                    def _transcribe_slice(c_idx, c_bytes):
+                        try:
+                            ok, txt = self.gemini.transcribe_audio(
+                                wav_bytes=c_bytes,
+                                system_instruction=prompt,
+                                app_context=app_context,
+                                profile_id=active_profile,
+                                auto_cost_mode=auto_cost_mode,
+                                offline_fallback_enabled=offline_fallback_on
+                            )
+                            if ok and txt:
+                                with self._rolling_lock:
+                                    if c_idx < len(self._rolling_chunks):
+                                        self._rolling_chunks[c_idx] = txt.strip()
+                        except Exception as ex:
+                            logger.debug(f"Rolling slice {c_idx} error: {ex}")
+
+                    threading.Thread(target=_transcribe_slice, args=(curr_idx, chunk_wav), daemon=True).start()
+
+        threading.Thread(target=_rolling_loop, daemon=True, name="RollingAudioMonitor").start()
 
     def on_stop_speech(self):
         """Triggered globally when user stops hotkey."""
         if not self.recorder.is_recording:
             return
 
+        self._rolling_active = False
         self.hotkey_mgr.set_recording_state(False)
 
         # 1. Stop audio capture
@@ -447,6 +549,9 @@ class GeminiFlowApp:
         """Triggered globally when Escape is pressed during recording or processing."""
         logger.info("Cancelling speech session...")
         self._is_cancelled = True
+        self._rolling_active = False
+        with self._rolling_lock:
+            self._rolling_chunks = []
         self.is_busy_processing = False
         self.hotkey_mgr.set_recording_state(False)
         self.hotkey_mgr.set_processing_state(False)
@@ -646,15 +751,68 @@ class GeminiFlowApp:
             # 3. Construct Active Speech Transcription System Prompt
             prompt = self.config.get_system_prompt(preset_override=active_mode, app_context=app_context, profile_id_override=active_profile)
 
-            # 4. Transcribe with Gemini (Resilient execution + ModelRouter + Cost Optimization + Offline Fallback)
-            success, raw_result = self.gemini.transcribe_audio(
-                wav_bytes=wav_bytes,
-                system_instruction=prompt,
-                app_context=app_context,
-                profile_id=active_profile,
-                auto_cost_mode=auto_cost_mode,
-                offline_fallback_enabled=offline_fallback_on
-            )
+            # 4. Transcribe with Gemini / Whisper
+            # If rolling streaming chunks were accumulated during speech (> 16s recording)
+            with self._rolling_lock:
+                has_rolling = bool(self._rolling_chunks)
+
+            if has_rolling:
+                logger.info(f"Processing rolling streaming dictation ({len(self._rolling_chunks)} chunks accumulated during speech)...")
+                tail_wav = self.recorder.get_tail_chunk()
+                if tail_wav and len(tail_wav) > 2000:
+                    with self._rolling_lock:
+                        tail_idx = len(self._rolling_chunks)
+                        self._rolling_chunks.append("")
+                    try:
+                        ok_tail, txt_tail = self.gemini.transcribe_audio(
+                            wav_bytes=tail_wav,
+                            system_instruction=prompt,
+                            app_context=app_context,
+                            profile_id=active_profile,
+                            auto_cost_mode=auto_cost_mode,
+                            offline_fallback_enabled=offline_fallback_on
+                        )
+                        if ok_tail and txt_tail:
+                            with self._rolling_lock:
+                                if tail_idx < len(self._rolling_chunks):
+                                    self._rolling_chunks[tail_idx] = txt_tail.strip()
+                    except Exception as tail_ex:
+                        logger.debug(f"Tail chunk note: {tail_ex}")
+
+                # Wait briefly for in-flight rolling chunks to complete (max 3.5s)
+                t_wait_start = time.time()
+                while time.time() - t_wait_start < 3.5:
+                    with self._rolling_lock:
+                        all_done = all(len(c) > 0 for c in self._rolling_chunks)
+                    if all_done:
+                        break
+                    time.sleep(0.08)
+
+                with self._rolling_lock:
+                    valid_chunks = [c.strip() for c in self._rolling_chunks if c and c.strip()]
+
+                if valid_chunks:
+                    raw_result = " ".join(valid_chunks).strip()
+                    success = True
+                else:
+                    success, raw_result = self.gemini.transcribe_audio(
+                        wav_bytes=wav_bytes,
+                        system_instruction=prompt,
+                        app_context=app_context,
+                        profile_id=active_profile,
+                        auto_cost_mode=auto_cost_mode,
+                        offline_fallback_enabled=offline_fallback_on
+                    )
+            else:
+                # Standard path for short speech (< 16s)
+                success, raw_result = self.gemini.transcribe_audio(
+                    wav_bytes=wav_bytes,
+                    system_instruction=prompt,
+                    app_context=app_context,
+                    profile_id=active_profile,
+                    auto_cost_mode=auto_cost_mode,
+                    offline_fallback_enabled=offline_fallback_on
+                )
 
             if self._is_cancelled:
                 return
@@ -807,6 +965,15 @@ class GeminiFlowApp:
                 if elapsed > 1800.0:
                     logger.warning(f"Recording reached 30-minute safety limit ({elapsed:.1f}s). Auto-stopping.")
                     self.on_stop_speech()
+
+            # 3. Detect codebase changes on disk while idle (e.g. after code edits/updates)
+            if hasattr(self, '_startup_code_mtime') and self._startup_code_mtime > 0:
+                latest_code_mtime = get_codebase_last_modified()
+                if latest_code_mtime > self._startup_code_mtime + 2.0:
+                    if not (hasattr(self, 'recorder') and self.recorder and self.recorder.is_recording) and not self.is_busy_processing:
+                        logger.info("Codebase modified on disk while running! Auto-reloading Gemini Flow to apply updates...")
+                        self.restart_app()
+                        return
         except Exception as e:
             logger.debug(f"Watchdog tick note: {e}")
 
@@ -1042,10 +1209,48 @@ def start_app(show_window: bool = True):
             time.sleep(0.3)
             continue
 
+        # Check if codebase was updated on disk since the running instance started
+        code_mtime = get_codebase_last_modified()
+        pid_mtime = 0.0
+        if PID_FILE.exists():
+            try:
+                with open(PID_FILE, "r", encoding="utf-8") as f:
+                    c = f.read().strip()
+                    if ":" in c:
+                        pid_mtime = float(c.split(":")[1])
+                    else:
+                        pid_mtime = PID_FILE.stat().st_mtime
+            except Exception:
+                pid_mtime = PID_FILE.stat().st_mtime
+
+        if code_mtime > pid_mtime + 1.0 and pid_mtime > 0:
+            logger.info("Codebase has been updated on disk since the running instance started! Recycling old instance to load fresh code...")
+            terminate_other_gemini_flow_instances()
+            release_app_mutex()
+            time.sleep(0.3)
+            continue
+
         # Check if an existing primary instance is actually responsive
         notified = notify_running_instance("SHOW")
-        if notified:
-            logger.info("Gemini Flow is already running. Existing instance brought to front.")
+        if notified and show_window:
+            # Verify that the dashboard window actually became visible on screen
+            window_visible = False
+            for _ in range(10):
+                time.sleep(0.1)
+                if is_dashboard_window_visible():
+                    window_visible = True
+                    break
+            if window_visible:
+                logger.info("Gemini Flow is already running and dashboard was brought to front.")
+                sys.exit(0)
+            else:
+                logger.warning("Existing instance failed to display visible dashboard on screen. Recycling old instance to guarantee app opens...")
+                terminate_other_gemini_flow_instances()
+                release_app_mutex()
+                time.sleep(0.3)
+                continue
+        elif notified and not show_window:
+            logger.info("Gemini Flow is already running in background.")
             sys.exit(0)
         else:
             logger.warning(f"Named Mutex held by unresponsive instance (attempt {attempt+1}/4). Purging zombie processes...")

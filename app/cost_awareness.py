@@ -99,7 +99,27 @@ class MilestoneInfo:
 
 
 MILESTONES_TABLE: List[Tuple[int, str, str, str]] = [
+    (10000000, "🌌 Cosmic Polymath", "200 Complete Books / 1,000 Full Magazines", "Legendary feat! You have dictated over 10,000,000 words — an entire library of 200 published books and 1,000 magazine issues!"),
+    (7500000, "🏛️ Grand Archive Chronicler", "150 Complete Books / 750 Magazines", "Unprecedented achievement! You have dictated over 7,500,000 words — equivalent to 150 published volumes!"),
+    (5000000, "🏛️ Library Founder", "100 Complete Books / 500 Magazines", "A monumental library! You have spoken over 5,000,000 words — equivalent to 100 complete full-length books!"),
+    (4000000, "📜 Literary Dynast", "80 Complete Books / 400 Magazines", "You have dictated over 4,000,000 words — equivalent to writing 80 full-length books!"),
+    (3000000, "👑 Triple-Million Wordsmith", "60 Complete Books / 300 Magazines", "You have spoken over 3,000,000 words — a vast collection of 60 published novels!"),
+    (2500000, "📖 Library Curator Legend", "50 Complete Books / 250 Magazines", "You have completed over 2,500,000 words — an entire shelf of 50 complete books!"),
+    (2000000, "💎 Double-Millionaire Author", "40 Complete Books / 200 Magazines", "You have dictated over 2,000,000 words — equivalent to 40 published books!"),
+    (1500000, "🌟 Multi-Million Masterpiece", "30 Complete Books / 150 Magazines", "You have spoken over 1,500,000 words — the scope of 30 full novels!"),
+    (1000000, "🏆 The Million-Word Visionary", "20 Complete Books / 100 Magazines", "Celebration! You have dictated over 1,000,000 words — equivalent to writing 20 complete full-length books and 100 magazines!"),
+    (750000, "⚡ Literary Titan", "15 Complete Books / 75 Magazines", "You have spoken over 750,000 words — equivalent to writing 15 complete books!"),
+    (500000, "🎖️ Master of 10 Books", "10 Complete Books / 50 Magazines", "You have dictated over 500,000 words — equivalent to 10 full-length novels!"),
+    (400000, "🏅 Grand Anthology Creator", "8 Complete Books / 40 Magazines", "You have spoken over 400,000 words — equivalent to 8 complete published books!"),
+    (300000, "⭐ Prolific Series Author", "6 Complete Books / 30 Magazines", "You have dictated over 300,000 words — equivalent to 6 complete books!"),
+    (250000, "✨ Quintet Virtuoso", "5 Complete Books / 25 Magazines", "You have spoken over 250,000 words — equivalent to writing 5 full-length novels!"),
+    (200000, "📘 Tetralogy Master", "4 Complete Books / 20 Magazines", "You have dictated over 200,000 words — equivalent to 4 complete full-length books!"),
+    (150000, "📗 Trilogy Master", "3 Complete Books / 15 Magazines", "You have spoken over 150,000 words — equivalent to a complete trilogy of 3 full-length books!"),
+    (100000, "📚 Dual Novelist", "2 Complete Books / 10 Magazines", "You have dictated over 100,000 words — equivalent to writing 2 complete full-length books!"),
+    (75000, "📕 Master Essayist & Novelist", "1.5 Books / 1 Book + 2.5 Magazines", "You have spoken over 75,000 words — equivalent to 1 full novel and 2.5 complete magazine issues!"),
+    (60000, "📰 Published Author & Editor", "1 Book + 1 Full Magazine Issue", "You have dictated over 60,000 words — equivalent to 1 complete novel plus a full magazine issue!"),
     (50000, "📖 Grand Novelist", "Full-Length Book / Novel", "You have dictated over 50,000 words — equivalent to writing a complete full-length novel!"),
+    (35000, "📑 Literary Contributor", "Major Anthology / 3.5 Magazines", "You have spoken over 35,000 words — the scope of a major published anthology!"),
     (20000, "📚 Prolific Author", "Book Chapter / Novella", "You have spoken over 20,000 words — the length of a major book chapter or novella!"),
     (10000, "📰 Feature Journalist", "Full Magazine / Journal Issue", "You have dictated over 10,000 words — equivalent to writing an entire magazine issue!"),
     (5000, "📝 Academic Scholar", "Academic Essay / Research Paper", "You have completed over 5,000 words — the scope of a full published academic research paper!"),
@@ -151,8 +171,44 @@ def calculate_entry_cost(
 
 
 def get_milestone_info(total_words: int) -> MilestoneInfo:
-    """Calculates user's current publication milestone and progress to next level."""
+    """
+    Calculates user's current publication milestone and progress to next level.
+    Supports infinite dynamic progression from 0 to 10,000,000+ words, celebrating
+    completed books (50,000 words each), grand novels, and magazines (10,000 words each).
+    Never halts progression at 50,000 words.
+    """
     words = max(0, total_words)
+    highest_threshold = MILESTONES_TABLE[0][0]  # 10,000,000 words
+
+    # Dynamic infinite extension beyond 10,000,000 words
+    if words >= highest_threshold:
+        books = words // 50000
+        extra_words = words % 50000
+        magazines = extra_words // 10000
+        curr_words_threshold = (words // 50000) * 50000
+        next_words_threshold = curr_words_threshold + 50000
+        span = next_words_threshold - curr_words_threshold
+        progress = (words - curr_words_threshold) / span
+        progress_pct = max(0.0, min(100.0, progress * 100.0))
+        words_remaining = max(0, next_words_threshold - words)
+
+        mag_part = f" and {magazines} magazine issue{'s' if magazines != 1 else ''}" if magazines > 0 else ""
+        desc = (
+            f"🎉 Grand Celebration! You have dictated {words:,} total words — equivalent to writing "
+            f"{books} complete full-length published books/novels{mag_part}!"
+        )
+        return MilestoneInfo(
+            rank_title=f"🌌 Cosmic Polymath ({books} Complete Books)",
+            icon="🌌",
+            description=desc,
+            current_words=words,
+            current_milestone_words=curr_words_threshold,
+            next_milestone_title=f"🌌 Cosmic Polymath ({books + 1} Complete Books)",
+            next_milestone_words=next_words_threshold,
+            progress_pct=round(progress_pct, 1),
+            words_remaining=words_remaining
+        )
+
     current_tier = MILESTONES_TABLE[-1]
     next_tier = MILESTONES_TABLE[0]
 
@@ -174,10 +230,22 @@ def get_milestone_info(total_words: int) -> MilestoneInfo:
         progress_pct = 100.0
         words_remaining = 0
 
+    # Dynamic celebration enhancement for all tiers at and above 50,000 words
+    desc = current_tier[3]
+    if words >= 50000:
+        books = words // 50000
+        extra_words = words % 50000
+        magazines = extra_words // 10000
+        mag_part = f" and {magazines} magazine issue{'s' if magazines != 1 else ''}" if magazines > 0 else ""
+        desc = (
+            f"🎉 Celebration! You have dictated {words:,} total words — equivalent to writing "
+            f"{books} complete full-length novel{'s' if books != 1 else ''}{mag_part}!"
+        )
+
     return MilestoneInfo(
         rank_title=f"{current_tier[1]} ({current_tier[2]})",
         icon=current_tier[1].split()[0],
-        description=current_tier[3],
+        description=desc,
         current_words=words,
         current_milestone_words=curr_words_threshold,
         next_milestone_title=f"{next_tier[1]} ({next_tier[2]})",

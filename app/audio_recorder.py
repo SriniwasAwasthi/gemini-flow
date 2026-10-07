@@ -102,6 +102,8 @@ class AudioRecorder:
         self.start_time = 0.0
         self.device_index: Optional[int] = None
         self._current_amplitude: float = 0.0
+        self._rolling_sample_cursor: int = 0
+        self._tail_wav_bytes: Optional[bytes] = None
 
     @staticmethod
     def get_input_devices() -> List[Dict[str, Any]]:
@@ -184,6 +186,8 @@ class AudioRecorder:
             self.is_recording = True
             self.start_time = time.time()
             self._current_amplitude = 0.0
+            self._rolling_sample_cursor = 0
+            self._tail_wav_bytes = None
 
         # Attempt with configured device index, or fallback to system default
         target_device = self.device_index
@@ -223,9 +227,91 @@ class AudioRecorder:
                 self.is_recording = False
             return False
 
+    def _samples_to_wav(self, audio_data: np.ndarray) -> bytes:
+        """Converts raw float32 audio samples to 16-bit PCM WAV bytes with DSP filtering applied."""
+        if audio_data is None or len(audio_data) == 0:
+            return b""
+
+        # Apply Real-Time DSP Filters (Ceiling Fan / AC High-Pass + Dynamic Noise Gate)
+        fan_filter_on = self.config.get_dsp_fan_filter_enabled() if hasattr(self.config, "get_dsp_fan_filter_enabled") else self.dsp_fan_filter_enabled
+        noise_gate_on = self.config.get_dsp_noise_gate_enabled() if hasattr(self.config, "get_dsp_noise_gate_enabled") else self.dsp_noise_gate_enabled
+        gate_thresh = self.config.get_dsp_noise_gate_threshold_db() if hasattr(self.config, "get_dsp_noise_gate_threshold_db") else self.dsp_noise_gate_threshold_db
+
+        if fan_filter_on or noise_gate_on:
+            audio_data = apply_dsp_filters(
+                audio_data=audio_data,
+                sample_rate=self.sample_rate,
+                high_pass_enabled=fan_filter_on,
+                high_pass_hz=85.0,
+                noise_gate_enabled=noise_gate_on,
+                noise_gate_threshold_db=gate_thresh
+            )
+
+        # Clip and convert float32 (-1.0 to 1.0) to int16 PCM
+        audio_data = np.clip(audio_data, -1.0, 1.0)
+        pcm16_data = (audio_data * 32767).astype(np.int16)
+
+        wav_io = io.BytesIO()
+        with wave.open(wav_io, "wb") as wf:
+            wf.setnchannels(self.channels)
+            wf.setsampwidth(2)
+            wf.setframerate(self.sample_rate)
+            wf.writeframes(pcm16_data.tobytes())
+
+        return wav_io.getvalue()
+
+    def get_rolling_chunk(self, min_sec: float = 16.0, max_sec: float = 24.0) -> Optional[bytes]:
+        """
+        Extracts a silence-aligned audio slice if accumulated speech exceeds min_sec.
+        Enables real-time background transcription while recording long speech (1-20 minutes)
+        so that 95%+ of long speech is already transcribed when the user stops.
+        """
+        with self._buffer_lock:
+            if not self.is_recording or not self.audio_chunks:
+                return None
+
+            total_samples = sum(len(c) for c in self.audio_chunks)
+            cursor = self._rolling_sample_cursor
+            unemitted = total_samples - cursor
+            min_samples = int(min_sec * self.sample_rate)
+            max_samples = int(max_sec * self.sample_rate)
+
+            if unemitted < min_samples:
+                return None
+
+            # Concatenate chunks into continuous array
+            full_audio = np.concatenate(self.audio_chunks, axis=0)
+            search_region = full_audio[cursor : cursor + min(unemitted, max_samples)]
+
+            # Locate natural pause in speech (minimum RMS energy in 50ms windows)
+            block_size = int(0.05 * self.sample_rate)  # 50ms block
+            min_block_idx = int(min_sec * self.sample_rate) // block_size
+            total_blocks = len(search_region) // block_size
+
+            split_sample = len(search_region)
+            if total_blocks > min_block_idx + 1:
+                blocks = search_region[:total_blocks * block_size].reshape(total_blocks, block_size)
+                rms = np.sqrt(np.mean(blocks ** 2, axis=1) + 1e-9)
+                candidate_idx = min_block_idx + int(np.argmin(rms[min_block_idx:]))
+                split_sample = candidate_idx * block_size + block_size // 2
+
+            chunk_audio = full_audio[cursor : cursor + split_sample]
+            self._rolling_sample_cursor = cursor + split_sample
+
+        return self._samples_to_wav(chunk_audio)
+
+    def get_tail_chunk(self) -> Optional[bytes]:
+        """Returns the final audio slice recorded after the last rolling chunk."""
+        return self._tail_wav_bytes
+
+    def rolling_chunks_were_emitted(self) -> bool:
+        """Returns True if rolling chunks were dispatched during this recording."""
+        return self._rolling_sample_cursor > 0
+
     def stop_recording(self) -> tuple[bytes, float]:
         """
-        Stops recording safely and returns (wav_bytes, duration_seconds) without buffer corruption.
+        Stops recording safely and returns (wav_bytes, duration_seconds).
+        If rolling transcription was active, also stores the remaining tail chunk.
         """
         with self._buffer_lock:
             if not self.is_recording:
@@ -236,7 +322,6 @@ class AudioRecorder:
 
         try:
             if self.stream:
-                # Allow a tiny moment for in-flight audio frames from OS buffer
                 time.sleep(0.04)
                 self.stream.stop()
                 self.stream.close()
@@ -252,38 +337,17 @@ class AudioRecorder:
             self.audio_chunks = []
 
         try:
-            # Combine all chunks into one continuous array
             audio_data = np.concatenate(raw_chunks, axis=0)
 
-            # Apply Real-Time DSP Filters (Ceiling Fan / AC High-Pass + Dynamic Noise Gate)
-            fan_filter_on = self.config.get_dsp_fan_filter_enabled() if hasattr(self.config, "get_dsp_fan_filter_enabled") else self.dsp_fan_filter_enabled
-            noise_gate_on = self.config.get_dsp_noise_gate_enabled() if hasattr(self.config, "get_dsp_noise_gate_enabled") else self.dsp_noise_gate_enabled
-            gate_thresh = self.config.get_dsp_noise_gate_threshold_db() if hasattr(self.config, "get_dsp_noise_gate_threshold_db") else self.dsp_noise_gate_threshold_db
+            # If rolling transcription was active, extract the tail chunk
+            if self._rolling_sample_cursor > 0 and self._rolling_sample_cursor < len(audio_data):
+                tail_audio = audio_data[self._rolling_sample_cursor:]
+                self._tail_wav_bytes = self._samples_to_wav(tail_audio)
+            else:
+                self._tail_wav_bytes = None
 
-            if fan_filter_on or noise_gate_on:
-                audio_data = apply_dsp_filters(
-                    audio_data=audio_data,
-                    sample_rate=self.sample_rate,
-                    high_pass_enabled=fan_filter_on,
-                    high_pass_hz=85.0,
-                    noise_gate_enabled=noise_gate_on,
-                    noise_gate_threshold_db=gate_thresh
-                )
-
-            # Clip and convert float32 (-1.0 to 1.0) to int16 PCM
-            audio_data = np.clip(audio_data, -1.0, 1.0)
-            pcm16_data = (audio_data * 32767).astype(np.int16)
-
-            # Write into in-memory WAV buffer
-            wav_io = io.BytesIO()
-            with wave.open(wav_io, "wb") as wf:
-                wf.setnchannels(self.channels)
-                wf.setsampwidth(2)  # 16-bit = 2 bytes
-                wf.setframerate(self.sample_rate)
-                wf.writeframes(pcm16_data.tobytes())
-
-            wav_bytes = wav_io.getvalue()
-            logger.info(f"Recorded & DSP filtered {len(wav_bytes)} bytes of WAV audio ({duration:.2f}s).")
+            wav_bytes = self._samples_to_wav(audio_data)
+            logger.info(f"Recorded {len(wav_bytes)} bytes of WAV audio ({duration:.2f}s). Rolling active: {self._rolling_sample_cursor > 0}")
             return wav_bytes, duration
         except Exception as e:
             logger.error(f"Error converting audio to WAV: {e}")

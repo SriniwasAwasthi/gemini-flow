@@ -140,6 +140,11 @@ class FallbackHandler:
         fallback_reason = None
 
         for idx, model in enumerate(models_to_try):
+            # Short-circuit if overall elapsed time exceeds 2.5s so offline Whisper engine takes over before 6.0s deadline
+            if time.time() - start_overall > 2.5:
+                logger.warning(f"Fallback search reached {time.time() - start_overall:.2f}s (>2.5s cutoff). Short-circuiting to trigger fast offline fallback.")
+                break
+
             if idx > 0 and not fallback_occurred:
                 fallback_occurred = True
 
@@ -190,10 +195,12 @@ class FallbackHandler:
                                 retries_attempted=retries_count
                             )
 
-                        # On 500/503/Timeout: retry with exponential backoff
+                        # On 500/503/Timeout: retry with exponential backoff if time permits
                         if attempt < max_retries_per_model - 1:
+                            if time.time() - start_overall >= 2.8:
+                                break
                             retries_count += 1
-                            backoff = 0.4 * (2 ** attempt)
+                            backoff = min(0.4 * (2 ** attempt), max(0.1, 3.0 - (time.time() - start_overall)))
                             logger.info(f"Retrying {model} in {backoff:.2f}s due to: {friendly_msg}")
                             time.sleep(backoff)
                         else:
@@ -207,7 +214,9 @@ class FallbackHandler:
                 except Exception as ex:
                     last_error_msg = str(ex)
                     retries_count += 1
-                    time.sleep(0.3)
+                    if time.time() - start_overall >= 2.8:
+                        break
+                    time.sleep(0.2)
 
         elapsed = time.time() - start_overall
         _, friendly_final = cls.classify_error(0, last_error_msg)

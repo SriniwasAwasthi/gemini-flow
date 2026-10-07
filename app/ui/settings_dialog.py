@@ -1216,7 +1216,8 @@ class SettingsDialog(QDialog):
             "gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
             "gemini-flash-latest (Auto Latest Production Flash)",
             "gemini-3.7-flash (Advanced Reasoning & Technical Dictation)",
-            "gemini-2.5-flash (Standard Flash)"
+            "gemini-2.5-flash (Standard Flash)",
+            "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)"
         ])
         self.model_combo.currentIndexChanged.connect(self._on_general_model_combo_changed)
         layout.addWidget(self.model_combo)
@@ -1566,7 +1567,8 @@ class SettingsDialog(QDialog):
             "gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
             "gemini-flash-latest (Auto Latest Production Flash)",
             "gemini-3.7-flash (Advanced Reasoning & Technical Dictation)",
-            "gemini-2.5-flash (Standard Flash)"
+            "gemini-2.5-flash (Standard Flash)",
+            "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)"
         ])
         self.router_model_combo.currentIndexChanged.connect(self._on_router_model_combo_changed)
         sel_layout.addWidget(self.router_model_combo)
@@ -2729,11 +2731,11 @@ class SettingsDialog(QDialog):
         offline_header.setStyleSheet("font-size: 14px; font-weight: bold; color: #38BDF8; margin-top: 4px;")
         layout.addWidget(offline_header)
 
-        self.cb_offline_fallback = QCheckBox("🎙️ Embedded Local Offline Speech Fallback (Windows SAPI / Local Dictation)")
+        self.cb_offline_fallback = QCheckBox("🎙️ Embedded Local Offline Speech Fallback (Whisper AI Engine — 100% Offline)")
         self.cb_offline_fallback.setStyleSheet("font-weight: 600; color: #F8FAFC;")
         layout.addWidget(self.cb_offline_fallback)
 
-        offline_desc = QLabel("   Seamlessly switches to on-device speech recognition when internet drops or Wi-Fi disconnects.")
+        offline_desc = QLabel("   Seamlessly transcribes speech on-device with OpenAI Whisper (base.en) when internet drops, Wi-Fi disconnects, or API key is absent.")
         offline_desc.setStyleSheet("color: #94A3B8; font-size: 11px;")
         layout.addWidget(offline_desc)
 
