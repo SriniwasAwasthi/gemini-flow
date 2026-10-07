@@ -160,56 +160,36 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ```mermaid
 flowchart TD
-    subgraph Audio_Capture ["Audio Capture & DSP Layer"]
-        A["🎤 Microphone Input"] --> B["🎧 85Hz Butterworth High-Pass Filter"]
+    subgraph Audio ["1. Audio Capture and DSP Engine"]
+        A["🎤 Microphone Hardware Input"] --> B["🎧 85Hz Butterworth High-Pass Filter"]
         B --> C["🔇 Adaptive RMS Noise Gate"]
-        C --> D["📦 PyAudio Low-Latency Audio Stream"]
+        C --> D["📦 Low-Latency Audio Stream Buffer"]
     end
 
-    subgraph Core_AI ["Core AI & Multi-Model Pipeline"]
-        D --> E{"🌐 Online & API Available?"}
-        E -->|"Yes"| F["🚀 Google Gemini API Engine"]
-        E -->|"Offline Fallback"| G["💻 Windows SAPI Offline Engine"]
+    subgraph Routing ["2. Routing and Model Intelligence"]
+        D --> E{"Connection and Quota Check"}
+        E -->|"Online (Valid Key)"| F["🚀 Google Gemini Engine"]
+        E -->|"Offline or 429 Quota"| G["💻 Local Whisper AI (int8 CPU)"]
         
         F --> H["🧠 Intelligent Model Router"]
-        H -->|"Speech Dictation (<1.5s)"| I["🎙️ gemini-3.5-transcribe"]
-        H -->|"Prompt & Text Transformations"| J["⚡ gemini-3.6-flash"]
-        H -->|"Failover Resilience"| K["🔄 Multi-Model Fallback Chain"]
-        
-        I --> L["📁 Contextual Vocabulary Engine"]
+        H -->|"Speech Dictation"| I["🎙️ gemini-3.5-transcribe"]
+        H -->|"Prompt and Polish"| J["⚡ gemini-3.6-flash"]
+        H -->|"Resilient Fallback"| K["🔄 Multi-Model Failover (2.5s)"]
+    end
+
+    subgraph Processing ["3. Context and Linguistic Engine"]
+        I --> L["📁 Custom Vocabulary and Sound-Alikes"]
         J --> L
         K --> L
-        
-        L --> M["📖 Phonetic Sound-Alikes Engine"]
-        M --> N["⚡ App Profile Intelligence"]
-        N --> O["✨ Polished & Formatted Output"]
-        G --> O
+        G --> L
+        L --> M["⚡ App Profile Context Engine"]
+        M --> N["✨ Polished and Structured Text"]
     end
 
-    subgraph Injection_Layer ["Injection & Windows Workspace"]
-        O --> P["⌨️ Win32 Keystroke & Clipboard Injector"]
-        P --> Q["🖥️ Active Target Application / Cursor Focus"]
+    subgraph Injection ["4. Windows OS Integration"]
+        N --> O["⌨️ Win32 Keystroke and Clipboard Injector"]
+        O --> P["🖥️ Active Cursor Focus Location"]
     end
-
-    subgraph UI_Layer ["UI & Controls"]
-        R["🪟 Glassmorphic Floating HUD - Dynamic Waveform"]
-        S["⚙️ Settings Control Center - 11 Modules"]
-        T["⌨️ Global Win32 Key Hooks & Watchdog"]
-    end
-
-    subgraph Security_Layer ["Security & Governance"]
-        U["🔒 Windows DPAPI Secret Encryption"]
-        V["🛡️ Automated Log Redaction"]
-        W["⏳ History Retention Governance"]
-    end
-
-    T --> D
-    D -.-> R
-    O -.-> R
-    S -.-> H
-    S -.-> U
-    S -.-> W
-    U -.-> F
 ```
 
 ---
