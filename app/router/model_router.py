@@ -127,13 +127,13 @@ class RoutingResult:
 
 
 class ModelRouter:
-    """Centralized routing layer force-bound to Gemini 2.5 Flash for sub-2.2s latency and zero-drop dictation."""
-    def __init__(self, default_model: str = "gemini-2.5-flash"):
+    """Centralized routing layer tuned to Gemini 3.5 Flash Lite for ultra-low latency and zero-drop dictation."""
+    def __init__(self, default_model: str = "gemini-3.5-flash-lite"):
         self.default_model = default_model
         self.model_registry = MODEL_REGISTRY
 
     def get_metadata(self, model_name: str) -> ModelMetadata:
-        return self.model_registry.get(model_name, self.model_registry["gemini-2.5-flash"])
+        return self.model_registry.get(model_name, self.model_registry["gemini-3.5-flash-lite"])
 
     @classmethod
     def route_model(
@@ -173,9 +173,9 @@ class ModelRouter:
     ) -> RoutingResult:
         """
         Determines the most appropriate Gemini model.
-        Force-binds the execution context to gemini-2.5-flash for all active text and audio processing pipelines.
+        Binds execution context to gemini-3.5-flash-lite for instant dictation.
         """
-        meta = self.model_registry.get("gemini-2.5-flash", list(self.model_registry.values())[0])
+        meta = self.model_registry.get("gemini-3.5-flash-lite", list(self.model_registry.values())[0])
 
         # 1. Check explicit manual override if not 'auto'
         if manual_override and manual_override != "auto" and manual_override in self.model_registry:
@@ -190,61 +190,61 @@ class ModelRouter:
         app_lower = (app_name or "").lower()
         prof_lower = (profile_name or "").lower()
 
-        speech_meta = self.model_registry.get("gemini-3.5-transcribe", meta)
+        speech_meta = self.model_registry.get("gemini-3.5-flash-lite", meta)
         flash_meta = self.model_registry.get("gemini-3.6-flash", meta)
 
         # 2. Voice Audio Dictation Routing (Dynamic application & profile adaptation)
         if task in ("DICTATE", "VOICE", "TRANSCRIPTION", "SPEECH", "AUDIO"):
-            # Antigravity Developer Environment -> Gemini 3.5 Transcribe
+            # Antigravity Developer Environment -> Gemini 3.5 Flash Lite
             if "antigravity" in app_lower:
                 return RoutingResult(
-                    model_name="gemini-3.5-transcribe",
+                    model_name="gemini-3.5-flash-lite",
                     metadata=speech_meta,
-                    reason="Antigravity environment: Configured for Gemini 3.5 Transcribe speech model",
+                    reason="Antigravity environment: Configured for Gemini 3.5 Flash Lite ultra-fast model",
                     is_auto=True
                 )
 
-            # WhatsApp -> Gemini 3.5 Transcribe
+            # WhatsApp -> Gemini 3.5 Flash Lite
             if "whatsapp" in app_lower:
                 return RoutingResult(
-                    model_name="gemini-3.5-transcribe",
+                    model_name="gemini-3.5-flash-lite",
                     metadata=speech_meta,
-                    reason="WhatsApp: Configured for Gemini 3.5 Transcribe professional speech model",
+                    reason="WhatsApp: Configured for Gemini 3.5 Flash Lite high-speed speech model",
                     is_auto=True
                 )
 
-            # ChatGPT & Claude AI Chat -> Gemini 3.5 Transcribe
+            # ChatGPT & Claude AI Chat -> Gemini 3.5 Flash Lite
             if "chatgpt" in app_lower or "claude" in app_lower:
                 return RoutingResult(
-                    model_name="gemini-3.5-transcribe",
+                    model_name="gemini-3.5-flash-lite",
                     metadata=speech_meta,
-                    reason="AI Chat interface: Configured for Gemini 3.5 Transcribe speech synthesis",
+                    reason="AI Chat interface: Configured for Gemini 3.5 Flash Lite speech synthesis",
                     is_auto=True
                 )
 
             # Professional, Engineering, Academic, or LinkedIn
             if prof_lower in ("professional", "engineering", "academic", "coding") or "linkedin" in app_lower:
                 return RoutingResult(
-                    model_name="gemini-3.5-transcribe",
+                    model_name="gemini-3.5-flash-lite",
                     metadata=speech_meta,
-                    reason=f"Profile '{profile_name}': Configured for Gemini 3.5 Transcribe",
+                    reason=f"Profile '{profile_name}': Configured for Gemini 3.5 Flash Lite",
                     is_auto=True
                 )
 
             # Long-form dictation (up to 20 mins)
             if duration_sec > 60.0:
                 return RoutingResult(
-                    model_name="gemini-3.5-transcribe",
+                    model_name="gemini-3.5-flash-lite",
                     metadata=speech_meta,
-                    reason="Continuous multi-minute audio payload routed to high-throughput Gemini 3.5 Transcribe",
+                    reason="Continuous multi-minute audio payload routed to high-throughput Gemini 3.5 Flash Lite",
                     is_auto=True
                 )
 
             # Fast real-time dictation
             return RoutingResult(
-                model_name="gemini-3.5-transcribe",
+                model_name="gemini-3.5-flash-lite",
                 metadata=speech_meta,
-                reason="Voice dictation routed to Gemini 3.5 Transcribe (Target latency: < 1.5s)",
+                reason="Voice dictation routed to Gemini 3.5 Flash Lite (Target latency: < 1.0s)",
                 is_auto=True
             )
 
@@ -283,9 +283,9 @@ class ModelRouter:
 
         # Default fallback
         return RoutingResult(
-            model_name="gemini-3.5-transcribe",
+            model_name="gemini-3.5-flash-lite",
             metadata=speech_meta,
-            reason="Default execution context routed to Gemini 3.5 Transcribe",
+            reason="Default execution context routed to Gemini 3.5 Flash Lite",
             is_auto=True
         )
 

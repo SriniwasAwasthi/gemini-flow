@@ -190,8 +190,8 @@ DEFAULT_SAVED_PROMPTS = [
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "api_key": "",
-    "model_name": "gemini-2.5-flash",
-    "model_mode": "gemini-2.5-flash",  # Force-bound to gemini-2.5-flash
+    "model_name": "gemini-3.5-flash-lite",
+    "model_mode": "gemini-3.5-flash-lite",
     "active_profile": "coding",
     "hotkey": "<ctrl>+<space>",
     "hotkey_display": "Ctrl + Space",
@@ -388,17 +388,23 @@ class ConfigManager:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
                     self.config.update(loaded)
-                    # Enforce designated API Key override
-                    curr_key = self.config.get("api_key", "")
-                    if not curr_key or curr_key != DEFAULT_CONFIG["api_key"] or any(bad in curr_key for bad in ["KLd4Prd", "ISb0Ozd", "mock_working_key", "KKjYK0n"]):
-                        self.config["api_key"] = DEFAULT_CONFIG["api_key"]
+                    # Enforce valid Gemini API Key (retain config key or load from Windows Registry / DPAPI)
+                    curr_key = self.config.get("api_key", "").strip()
+                    if not curr_key or any(bad in curr_key for bad in ["KLd4Prd", "ISb0Ozd", "mock_working_key", "KKjYK0n"]):
+                        try:
+                            from app.security.security_manager import SecurityManager
+                            sec_key = SecurityManager(APP_DIR).load_api_key("")
+                            if sec_key:
+                                self.config["api_key"] = sec_key
+                                needs_save = True
+                        except Exception:
+                            pass
+                    # Default high-speed model configuration (Gemini 3.5 Flash Lite)
+                    if not self.config.get("model_name") or self.config.get("model_name") in ("gemini-2.5-flash", "gemini-3.5-transcribe"):
+                        self.config["model_name"] = "gemini-3.5-flash-lite"
                         needs_save = True
-                    # Force-bind execution model to Gemini 2.5 Flash
-                    if self.config.get("model_name") != "gemini-2.5-flash":
-                        self.config["model_name"] = "gemini-2.5-flash"
-                        needs_save = True
-                    if self.config.get("model_mode") != "gemini-2.5-flash":
-                        self.config["model_mode"] = "gemini-2.5-flash"
+                    if not self.config.get("model_mode") or self.config.get("model_mode") in ("gemini-2.5-flash", "gemini-3.5-transcribe"):
+                        self.config["model_mode"] = "gemini-3.5-flash-lite"
                         needs_save = True
                     if "active_profile" not in self.config:
                         self.config["active_profile"] = "coding"

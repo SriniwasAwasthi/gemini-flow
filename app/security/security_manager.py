@@ -174,8 +174,17 @@ class SecurityManager:
         2. Secure encrypted credential file
         3. Passed-in configuration fallback
         """
-        # 1. Environment Variable
+        # 1. Environment Variable & Windows User Registry
         env_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if not env_key and os.name == "nt":
+            try:
+                import winreg
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment") as k:
+                    val, _ = winreg.QueryValueEx(k, "GEMINI_API_KEY")
+                    if val:
+                        env_key = str(val).strip()
+            except Exception:
+                pass
         if env_key:
             return self._clean_key(env_key)
 

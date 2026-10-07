@@ -486,8 +486,8 @@ class GeminiEngine:
             try:
                 start_t = time.time()
                 approx_sec = len(chunk_bytes) / 32000.0
-                # Strict interactive dictation timeout: fast failover to local Whisper AI within 6.0s SLA
-                req_timeout = (2.0, min(2.8, max(2.2, float(approx_sec * 0.15) + 2.0)))
+                # Stable production timeout: 4.0s connect, 8.0s+ read to prevent premature timeout aborts
+                req_timeout = (4.0, max(8.0, min(30.0, float(approx_sec * 0.5) + 6.0)))
                 response = self.session.post(url, headers=headers, json=payload, timeout=req_timeout)
 
                 elapsed = time.time() - start_t
@@ -546,7 +546,7 @@ class GeminiEngine:
         def _transcribe_chunk_worker(c_idx: int, c_bytes: bytes):
             c_b64 = base64.b64encode(c_bytes).decode("utf-8")
             c_sec = len(c_bytes) / 32000.0
-            c_timeout = (2.0, min(3.0, max(2.2, float(c_sec * 0.15) + 2.0)))
+            c_timeout = (4.0, max(8.0, min(30.0, float(c_sec * 0.5) + 6.0)))
 
             for try_model in chunk_model_candidates:
                 c_url = f"https://generativelanguage.googleapis.com/v1beta/models/{try_model}:generateContent?key={self.api_key}"
