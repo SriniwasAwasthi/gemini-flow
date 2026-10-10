@@ -148,6 +148,7 @@ class HotkeyManager:
             self._main_hotkey_active = False
             self._prompt_hotkey_active = False
             self._transform_hotkey_active = False
+            self._last_toggle_time = 0.0
             logger.info(f"Hotkey updated: Main={hotkey_str} ({mode}), Prompt={prompt_hotkey_str}, Transform={transform_hotkey_str}")
 
         # Re-register Win32 kernel hotkeys with fresh configuration
