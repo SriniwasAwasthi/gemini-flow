@@ -437,7 +437,7 @@ class GeminiEngine:
 
     def _try_transcribe_with_model(self, model: str, wav_bytes: bytes, system_instruction: str) -> Tuple[bool, str]:
         """Direct REST API implementation with Keep-Alive session, parallel chunking, and resilient fallback."""
-        chunks = self._split_wav_into_chunks(wav_bytes, target_chunk_sec=300.0, max_chunk_sec=420.0)
+        chunks = self._split_wav_into_chunks(wav_bytes, target_chunk_sec=35.0, max_chunk_sec=50.0)
 
         # Single chunk path (standard speech <= 22s)
         if len(chunks) == 1:
@@ -464,7 +464,9 @@ class GeminiEngine:
                                     "CRITICAL TRANSCRIPTION DIRECTIVES:\n"
                                     "1. 100% Transcription Completeness: Transcribe every spoken word, sentence, technical term, list item, and syllabus concept from beginning to end without omitting, summarizing, or condensing ANY part of the speech.\n"
                                     "2. Anti-Repetition Guarantee: NEVER repeat any phrase, word, or sentence in an infinite loop. Even if pauses occur in the audio, transcribe each concept once and continue immediately to the next spoken thought.\n"
-                                    "3. Output ONLY the finalized transcribed text directly without commentary, quotes, or markdown code fence wrappers."
+                                    "3. Strict Vocabulary & Verb Fidelity: NEVER substitute, replace, or alter the speaker's verbs or nouns (e.g. if the user says 'analyze', transcribe 'analyze', NEVER substitute with 'list'). NEVER rephrase prepositional phrases like 'in my Chrome' into action commands like 'Opening Chrome'.\n"
+                                    "4. Zero Hallucination: NEVER hallucinate, invent, or complete sentences with speculative questions, tokens, or phrases (e.g. NEVER invent 'Could you suggest which token...'). Transcribe strictly the actual acoustic words spoken.\n"
+                                    "5. Output ONLY the finalized transcribed text directly without commentary, quotes, or markdown code fence wrappers."
                                 )
                             },
                             {
@@ -569,7 +571,9 @@ class GeminiEngine:
                                         "CRITICAL TRANSCRIPTION DIRECTIVES:\n"
                                         "1. 100% Completeness: Transcribe every spoken word, sentence, technical term, variable in camelCase/snake_case, semicolon (;), colon (:), list item, and syllabus concept in this audio chunk completely without cutting off, summarizing, or omitting anything.\n"
                                         "2. Anti-Repetition Guarantee: NEVER repeat any phrase, word, or sentence in an infinite loop. Even if pauses occur in the audio, transcribe each concept once and continue immediately to the next spoken thought.\n"
-                                        "3. Output ONLY the finalized transcribed text for this audio segment."
+                                        "3. Strict Vocabulary & Verb Fidelity: NEVER substitute verbs or nouns with synonyms (transcribe 'analyze', not 'list'; transcribe 'localhost', not 'token'; transcribe 'in my Chrome', not 'Opening Chrome').\n"
+                                        "4. Zero Hallucination: NEVER invent speculative questions or text. Transcribe strictly the actual acoustic speech.\n"
+                                        "5. Output ONLY the finalized transcribed text for this audio segment."
                                     )
                                 },
                                 {
@@ -615,6 +619,16 @@ class GeminiEngine:
                     except Exception:
                         time.sleep(0.2)
                         continue
+
+            # If all online models failed for this chunk, immediately transcribe via local Whisper AI
+            try:
+                from app.offline.offline_engine import OfflineSpeechEngine
+                ok_off, txt_off = OfflineSpeechEngine.transcribe_wav(c_bytes)
+                if ok_off and txt_off and txt_off.strip():
+                    chunk_results[c_idx] = self._clean_output(txt_off.strip())
+                    return
+            except Exception as off_ex:
+                logger.debug(f"Chunk {c_idx+1} offline fallback note: {off_ex}")
 
             chunk_errors.append(f"Chunk {c_idx+1} could not be transcribed.")
 

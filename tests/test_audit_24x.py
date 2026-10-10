@@ -104,12 +104,14 @@ def run_24x_audit():
             ok, raw_txt = OfflineSpeechEngine.transcribe_wav(test_wav)
         else:
             # Online test path with offline auto-fallback
-            gemini = GeminiEngine(api_key=cfg.get_api_key(), model_name="gemini-2.5-flash")
-            ok, raw_txt = gemini.transcribe_audio(
+            if 'gemini_inst' not in locals():
+                gemini_inst = GeminiEngine(api_key=cfg.get_api_key(), model_name="gemini-3.5-transcribe")
+            ok, raw_txt = gemini_inst.transcribe_audio(
                 wav_bytes=test_wav,
                 system_instruction=cfg.get_system_prompt(),
                 offline_fallback_enabled=True
             )
+            time.sleep(0.4)  # Prevent automated test burst quota rate-limiting
 
         final_text = GeminiEngine.apply_dictionary(raw_txt, dict_rules)
         latency = time.time() - t_start

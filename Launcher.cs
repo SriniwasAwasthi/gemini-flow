@@ -8,7 +8,7 @@ namespace GeminiFlow
 {
     static class Program
     {
-        [DllImport("user32.dll", SetLastError = true)]
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
         [DllImport("user32.dll")]
@@ -32,10 +32,10 @@ namespace GeminiFlow
             try
             {
                 // 1. If dashboard window is already open and visible, instantly bring it to the foreground
-                IntPtr existingHwnd = FindWindow(null, "Gemini Flow — Voice AI Settings & Dashboard");
+                IntPtr existingHwnd = FindWindow(null, "Gemini Flow - Voice AI Settings & Dashboard");
                 if (existingHwnd == IntPtr.Zero)
                 {
-                    existingHwnd = FindWindow(null, "Gemini Flow - Voice AI Settings & Dashboard");
+                    existingHwnd = FindWindow(null, "Gemini Flow — Voice AI Settings & Dashboard");
                 }
                 if (existingHwnd != IntPtr.Zero && IsWindowVisible(existingHwnd))
                 {

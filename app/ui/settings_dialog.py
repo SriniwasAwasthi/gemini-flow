@@ -976,7 +976,7 @@ class SettingsDialog(QDialog):
         self.live_sync_timer.timeout.connect(self._poll_live_updates)
         self.live_sync_timer.start()
 
-        self.setWindowTitle("Gemini Flow — Voice AI Settings & Dashboard")
+        self.setWindowTitle("Gemini Flow - Voice AI Settings & Dashboard")
         self.setWindowFlags(
             Qt.WindowType.Window |
             Qt.WindowType.WindowMinMaxButtonsHint |

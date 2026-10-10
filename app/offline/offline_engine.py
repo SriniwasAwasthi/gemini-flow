@@ -183,7 +183,7 @@ class OfflineSpeechEngine:
         if model is None:
             return False, "Whisper model unavailable"
 
-        default_prompt = "Hi, I am Sriniwas Awasthi, using Gemini Flow voice dictation in offline mode."
+        default_prompt = "Hi, I am Sriniwas Awasthi, using Gemini Flow voice dictation in offline mode. Domain vocabulary: analyze, localhost, Chrome, test my website, verbatim transcription."
         prompt = (initial_prompt.strip() + " " + default_prompt) if initial_prompt else default_prompt
 
         # Estimate duration in seconds

@@ -227,7 +227,7 @@ class AudioRecorder:
                 self.is_recording = False
             return False
 
-    def _samples_to_wav(self, audio_data: np.ndarray) -> bytes:
+    def _samples_to_wav(self, audio_data: np.ndarray, trim_silence: bool = False) -> bytes:
         """Converts raw float32 audio samples to 16-bit PCM WAV bytes with DSP filtering applied."""
         if audio_data is None or len(audio_data) == 0:
             return b""
@@ -247,6 +247,17 @@ class AudioRecorder:
                 noise_gate_threshold_db=gate_thresh
             )
 
+        # Smart dead silence trimming only when explicitly requested (keeps 250ms generous safety padding)
+        if trim_silence and len(audio_data) > 6000:
+            abs_audio = np.abs(audio_data)
+            speech_indices = np.where(abs_audio > 0.002)[0]
+            if len(speech_indices) > 0:
+                pad = int(0.25 * self.sample_rate)
+                start_idx = max(0, speech_indices[0] - pad)
+                end_idx = min(len(audio_data), speech_indices[-1] + pad)
+                if end_idx - start_idx > 2000:
+                    audio_data = audio_data[start_idx:end_idx]
+
         # Clip and convert float32 (-1.0 to 1.0) to int16 PCM
         audio_data = np.clip(audio_data, -1.0, 1.0)
         pcm16_data = (audio_data * 32767).astype(np.int16)
@@ -260,10 +271,10 @@ class AudioRecorder:
 
         return wav_io.getvalue()
 
-    def get_rolling_chunk(self, min_sec: float = 16.0, max_sec: float = 24.0) -> Optional[bytes]:
+    def get_rolling_chunk(self, min_sec: float = 18.0, max_sec: float = 28.0) -> Optional[bytes]:
         """
-        Extracts a silence-aligned audio slice if accumulated speech exceeds min_sec.
-        Enables real-time background transcription while recording long speech (1-20 minutes)
+        Extracts a silence-aligned audio slice if accumulated speech exceeds min_sec (18s+).
+        Enables real-time background transcription while recording long speech (1-120 minutes)
         so that 95%+ of long speech is already transcribed when the user stops.
         """
         with self._buffer_lock:
@@ -298,7 +309,7 @@ class AudioRecorder:
             chunk_audio = full_audio[cursor : cursor + split_sample]
             self._rolling_sample_cursor = cursor + split_sample
 
-        return self._samples_to_wav(chunk_audio)
+        return self._samples_to_wav(chunk_audio, trim_silence=False)
 
     def get_tail_chunk(self) -> Optional[bytes]:
         """Returns the final audio slice recorded after the last rolling chunk."""
@@ -339,15 +350,20 @@ class AudioRecorder:
         try:
             audio_data = np.concatenate(raw_chunks, axis=0)
 
-            # If rolling transcription was active, extract the tail chunk
+            # If rolling transcription was active, extract the tail chunk with zero clipping
             if self._rolling_sample_cursor > 0 and self._rolling_sample_cursor < len(audio_data):
                 tail_audio = audio_data[self._rolling_sample_cursor:]
-                self._tail_wav_bytes = self._samples_to_wav(tail_audio)
+                self._tail_wav_bytes = self._samples_to_wav(tail_audio, trim_silence=False)
             else:
                 self._tail_wav_bytes = None
 
-            wav_bytes = self._samples_to_wav(audio_data)
-            logger.info(f"Recorded {len(wav_bytes)} bytes of WAV audio ({duration:.2f}s). Rolling active: {self._rolling_sample_cursor > 0}")
+            # Optimization for long-form recordings: If rolling chunks were emitted and duration >= 50s,
+            # return the tail chunk as wav_bytes (saving 3-5s of WAV re-encoding latency!)
+            if self._rolling_sample_cursor > 0 and duration >= 50.0:
+                wav_bytes = self._tail_wav_bytes if self._tail_wav_bytes else self._samples_to_wav(audio_data[-min(len(audio_data), 16000 * 2):], trim_silence=False)
+            else:
+                wav_bytes = self._samples_to_wav(audio_data, trim_silence=False)
+            logger.info(f"Recorded audio ({duration:.2f}s). Rolling active: {self._rolling_sample_cursor > 0}, Tail bytes: {len(self._tail_wav_bytes) if self._tail_wav_bytes else 0}")
             return wav_bytes, duration
         except Exception as e:
             logger.error(f"Error converting audio to WAV: {e}")

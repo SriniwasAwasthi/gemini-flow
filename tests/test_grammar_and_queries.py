@@ -93,7 +93,8 @@ def run_tests():
     write_pid_file()
     assert PID_FILE.exists(), "PID file was not written."
     with open(PID_FILE, "r", encoding="utf-8") as f:
-        stored_pid = int(f.read().strip())
+        content = f.read().strip()
+        stored_pid = int(content.split(":")[0]) if ":" in content else int(content)
     assert stored_pid == os.getpid(), "Stored PID does not match current process."
     print(f"  ✓ PID File verified: {stored_pid}")
     

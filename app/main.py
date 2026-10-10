@@ -427,6 +427,9 @@ class GeminiFlowApp:
         """Triggered globally when user presses hotkey to speak."""
         if self.is_busy_processing:
             logger.warning("Still processing previous speech, ignoring new start.")
+            self.hotkey_mgr.set_recording_state(False)
+            if hasattr(self, 'hud') and self.hud:
+                self.hud.show_state(FloatingHUD.STATE_PROCESSING, "Finalizing previous speech...")
             return
 
         self._is_cancelled = False
@@ -455,24 +458,30 @@ class GeminiFlowApp:
             self.tray.update_status("🎙️ Recording Speech...", state="recording")
             self._start_rolling_transcription()
         else:
+            self.hotkey_mgr.set_recording_state(False)
             self.hud.show_state(FloatingHUD.STATE_ERROR, "Microphone Error")
             self.tray.update_status("⚠️ Mic Error", state="ready")
 
     def _start_rolling_transcription(self):
-        """Asynchronously slices and transcribes 16-24s chunks in real-time during long recordings."""
+        """Asynchronously slices and transcribes 25-38s chunks in real-time during long recordings."""
         def _rolling_loop():
             chunk_idx = 0
             while self.recorder.is_recording and not self._is_cancelled and self._rolling_active:
-                time.sleep(1.0)
+                time.sleep(0.5)
                 if not self.recorder.is_recording or self._is_cancelled or not self._rolling_active:
                     break
 
-                chunk_wav = self.recorder.get_rolling_chunk(min_sec=16.0, max_sec=24.0)
+                chunk_wav = self.recorder.get_rolling_chunk(min_sec=18.0, max_sec=28.0)
                 if chunk_wav and len(chunk_wav) > 2000:
                     curr_idx = chunk_idx
                     chunk_idx += 1
                     with self._rolling_lock:
-                        self._rolling_chunks.append("")
+                        self._rolling_chunks.append({
+                            "id": curr_idx,
+                            "done": False,
+                            "text": "",
+                            "wav": chunk_wav
+                        })
 
                     target_hwnd = getattr(self.text_injector, "last_target_hwnd", None)
                     app_context = AppIntelligenceManager.get_active_app_context(target_hwnd)
@@ -483,6 +492,8 @@ class GeminiFlowApp:
                     offline_fallback_on = self.config.get_offline_fallback_enabled() if hasattr(self.config, "get_offline_fallback_enabled") else self.config.get("offline_fallback_enabled", True)
 
                     def _transcribe_slice(c_idx, c_bytes):
+                        ok = False
+                        txt = ""
                         try:
                             ok, txt = self.gemini.transcribe_audio(
                                 wav_bytes=c_bytes,
@@ -492,12 +503,24 @@ class GeminiFlowApp:
                                 auto_cost_mode=auto_cost_mode,
                                 offline_fallback_enabled=offline_fallback_on
                             )
-                            if ok and txt:
-                                with self._rolling_lock:
-                                    if c_idx < len(self._rolling_chunks):
-                                        self._rolling_chunks[c_idx] = txt.strip()
                         except Exception as ex:
-                            logger.debug(f"Rolling slice {c_idx} error: {ex}")
+                            logger.debug(f"Rolling slice {c_idx} online error: {ex}")
+                            ok = False
+
+                        # Immediate local offline Whisper rescue if online transcription failed or returned empty
+                        if (not ok or not txt or not txt.strip()) and offline_fallback_on:
+                            try:
+                                from app.offline.offline_engine import OfflineSpeechEngine
+                                ok_off, txt_off = OfflineSpeechEngine.transcribe_wav(c_bytes)
+                                if ok_off and txt_off and txt_off.strip():
+                                    ok, txt = True, txt_off
+                            except Exception as off_ex:
+                                logger.debug(f"Rolling slice {c_idx} offline fallback error: {off_ex}")
+
+                        with self._rolling_lock:
+                            if c_idx < len(self._rolling_chunks):
+                                self._rolling_chunks[c_idx]["text"] = txt.strip() if (ok and txt) else ""
+                                self._rolling_chunks[c_idx]["done"] = True
 
                     threading.Thread(target=_transcribe_slice, args=(curr_idx, chunk_wav), daemon=True).start()
 
@@ -525,9 +548,10 @@ class GeminiFlowApp:
             except Exception:
                 pass
 
-        # Ignore if speech was under 0.2s or empty
-        if duration < 0.2 or len(wav_bytes) < 2000:
-            logger.info("Speech too brief, ignoring.")
+        # Ignore if speech was under 0.3s or empty (only when no background rolling chunks were emitted)
+        has_rolling = self.recorder.rolling_chunks_were_emitted()
+        if duration < 0.3 or (not has_rolling and (not wav_bytes or len(wav_bytes) < 1000)):
+            logger.info(f"Speech too brief or empty (duration: {duration:.2f}s, rolling: {has_rolling}), ignoring.")
             self.hud.hide_smooth()
             self.tray.update_status("🟢 Ready", state="ready")
             return
@@ -752,47 +776,91 @@ class GeminiFlowApp:
             prompt = self.config.get_system_prompt(preset_override=active_mode, app_context=app_context, profile_id_override=active_profile)
 
             # 4. Transcribe with Gemini / Whisper
-            # If rolling streaming chunks were accumulated during speech (> 16s recording)
-            with self._rolling_lock:
-                has_rolling = bool(self._rolling_chunks)
-
-            if has_rolling:
+            # For all recordings under 50s, ALWAYS transcribe the complete audio in a single pass.
+            # This preserves 100% sentence context, eliminates mid-sentence slice hallucinations, and avoids split-word seam errors.
+            has_rolling = self.recorder.rolling_chunks_were_emitted()
+            if duration < 50.0 or not has_rolling:
+                success, raw_result = self.gemini.transcribe_audio(
+                    wav_bytes=wav_bytes,
+                    system_instruction=prompt,
+                    app_context=app_context,
+                    profile_id=active_profile,
+                    auto_cost_mode=auto_cost_mode,
+                    offline_fallback_enabled=offline_fallback_on
+                )
+            else:
                 logger.info(f"Processing rolling streaming dictation ({len(self._rolling_chunks)} chunks accumulated during speech)...")
-                tail_wav = self.recorder.get_tail_chunk()
-                if tail_wav and len(tail_wav) > 2000:
+                tail_wav = self.recorder.get_tail_chunk() or wav_bytes
+                if tail_wav and len(tail_wav) > 1000:
                     with self._rolling_lock:
                         tail_idx = len(self._rolling_chunks)
-                        self._rolling_chunks.append("")
-                    try:
-                        ok_tail, txt_tail = self.gemini.transcribe_audio(
-                            wav_bytes=tail_wav,
-                            system_instruction=prompt,
-                            app_context=app_context,
-                            profile_id=active_profile,
-                            auto_cost_mode=auto_cost_mode,
-                            offline_fallback_enabled=offline_fallback_on
-                        )
-                        if ok_tail and txt_tail:
-                            with self._rolling_lock:
-                                if tail_idx < len(self._rolling_chunks):
-                                    self._rolling_chunks[tail_idx] = txt_tail.strip()
-                    except Exception as tail_ex:
-                        logger.debug(f"Tail chunk note: {tail_ex}")
+                        self._rolling_chunks.append({"id": tail_idx, "done": False, "text": "", "wav": tail_wav})
 
-                # Wait briefly for in-flight rolling chunks to complete (max 3.5s)
+                    def _transcribe_tail():
+                        ok_tail = False
+                        txt_tail = ""
+                        try:
+                            ok_tail, txt_tail = self.gemini.transcribe_audio(
+                                wav_bytes=tail_wav,
+                                system_instruction=prompt,
+                                app_context=app_context,
+                                profile_id=active_profile,
+                                auto_cost_mode=auto_cost_mode,
+                                offline_fallback_enabled=offline_fallback_on
+                            )
+                        except Exception as tail_ex:
+                            logger.debug(f"Tail chunk online note: {tail_ex}")
+                            ok_tail = False
+
+                        if (not ok_tail or not txt_tail or not txt_tail.strip()) and offline_fallback_on:
+                            try:
+                                from app.offline.offline_engine import OfflineSpeechEngine
+                                ok_off, txt_off = OfflineSpeechEngine.transcribe_wav(tail_wav)
+                                if ok_off and txt_off and txt_off.strip():
+                                    ok_tail, txt_tail = True, txt_off
+                            except Exception as off_ex:
+                                logger.debug(f"Tail chunk offline fallback error: {off_ex}")
+
+                        with self._rolling_lock:
+                            if tail_idx < len(self._rolling_chunks):
+                                self._rolling_chunks[tail_idx]["text"] = txt_tail.strip() if (ok_tail and txt_tail) else ""
+                                self._rolling_chunks[tail_idx]["done"] = True
+
+                    # Run tail chunk concurrently with any remaining in-flight background chunks
+                    threading.Thread(target=_transcribe_tail, daemon=True, name="TailChunkWorker").start()
+
+                # Wait for in-flight rolling chunks and tail chunk to complete (max 3.0s, polling every 25ms)
                 t_wait_start = time.time()
-                while time.time() - t_wait_start < 3.5:
+                while time.time() - t_wait_start < 3.0:
                     with self._rolling_lock:
-                        all_done = all(len(c) > 0 for c in self._rolling_chunks)
+                        all_done = all(c.get("done", False) if isinstance(c, dict) else bool(c) for c in self._rolling_chunks)
                     if all_done:
                         break
-                    time.sleep(0.08)
+                    time.sleep(0.025)
+
+                # Zero-Loss Rescue: If any chunk timed out or failed to return text, rescue it locally with Whisper AI immediately!
+                if offline_fallback_on:
+                    with self._rolling_lock:
+                        for c in self._rolling_chunks:
+                            if isinstance(c, dict) and not c.get("text") and c.get("wav") and len(c.get("wav")) > 1000:
+                                try:
+                                    from app.offline.offline_engine import OfflineSpeechEngine
+                                    ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(c["wav"])
+                                    if ok_r and txt_r and txt_r.strip():
+                                        c["text"] = txt_r.strip()
+                                        c["done"] = True
+                                except Exception:
+                                    pass
 
                 with self._rolling_lock:
-                    valid_chunks = [c.strip() for c in self._rolling_chunks if c and c.strip()]
+                    valid_chunks = [
+                        (c["text"].strip() if isinstance(c, dict) else str(c).strip())
+                        for c in self._rolling_chunks
+                        if (isinstance(c, dict) and c.get("text") and c["text"].strip()) or (isinstance(c, str) and c.strip())
+                    ]
 
                 if valid_chunks:
-                    raw_result = " ".join(valid_chunks).strip()
+                    raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
                     success = True
                 else:
                     success, raw_result = self.gemini.transcribe_audio(
@@ -803,16 +871,6 @@ class GeminiFlowApp:
                         auto_cost_mode=auto_cost_mode,
                         offline_fallback_enabled=offline_fallback_on
                     )
-            else:
-                # Standard path for short speech (< 16s)
-                success, raw_result = self.gemini.transcribe_audio(
-                    wav_bytes=wav_bytes,
-                    system_instruction=prompt,
-                    app_context=app_context,
-                    profile_id=active_profile,
-                    auto_cost_mode=auto_cost_mode,
-                    offline_fallback_enabled=offline_fallback_on
-                )
 
             if self._is_cancelled:
                 return
@@ -1235,7 +1293,7 @@ def start_app(show_window: bool = True):
         if notified and show_window:
             # Verify that the dashboard window actually became visible on screen
             window_visible = False
-            for _ in range(10):
+            for _ in range(35):
                 time.sleep(0.1)
                 if is_dashboard_window_visible():
                     window_visible = True
@@ -1244,10 +1302,14 @@ def start_app(show_window: bool = True):
                 logger.info("Gemini Flow is already running and dashboard was brought to front.")
                 sys.exit(0)
             else:
-                logger.warning("Existing instance failed to display visible dashboard on screen. Recycling old instance to guarantee app opens...")
+                logger.warning("Existing instance acknowledged SHOW request over IPC but failed to display window on screen within 3.5s. Recycling unresponsive instance to guarantee app opens...")
                 terminate_other_gemini_flow_instances()
                 release_app_mutex()
-                time.sleep(0.3)
+                try:
+                    QLocalServer.removeServer(IPC_PIPE_NAME)
+                except Exception:
+                    pass
+                time.sleep(0.4)
                 continue
         elif notified and not show_window:
             logger.info("Gemini Flow is already running in background.")
