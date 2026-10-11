@@ -936,6 +936,149 @@ class HistoryTranscriptDelegate(QStyledItemDelegate):
             needed_h = int(doc.size().height())
             return QSize(int(doc.idealWidth()), max(line_height + 14, needed_h + 14))
         return super().sizeHint(option, index)
+COMBINATION_SHOWCASE_DATA = [
+    {
+        "id": "combo_exec",
+        "title": "👔 Combination A: Executive & Structured (Bullet Points & Spacing)",
+        "badge": "Executive Leadership",
+        "profile_id": "professional",
+        "profile_name": "👔 Professional & Executive",
+        "prompt_id": "smart_polish_custom",
+        "prompt_name": "Smart Executive Polish",
+        "model_id": "auto",
+        "model_name": "auto (Intelligent AI Model Router)",
+        "purpose": "Best for executive memos, client updates, structured meeting minutes, and Slack/Teams updates where clear bullet points, bold category headers, and clean line-break spacing are required without conversational fluff.",
+        "spoken_input": (
+            "\"Uh hey basically we need to refactor the user authentication flow in our system means first we have to add JWT token verification with refresh token rotation semicolon second we need to implement Redis caching to check if the session is revoked semicolon third please update the database schema for user table and add two fields created_at and last_login and finally send an email notification to the security team on suspicious login attempts.\""
+        ),
+        "formatted_output": (
+            "We need to refactor the user authentication flow across our system with the following strategic priorities:\n\n"
+            "• JWT Authentication: Implement JWT token verification with refresh token rotation;\n"
+            "• Session Revocation: Deploy Redis caching to validate active session statuses in real time;\n"
+            "• Schema Migration: Update the database user schema to include `created_at` and `last_login` tracking attributes;\n"
+            "• Security Alerting: Dispatch automated email notifications to the security operations team upon detecting suspicious login attempts."
+        )
+    },
+    {
+        "id": "combo_dev",
+        "title": "💻 Combination B: Developer Code & Technical (Numbered Steps & Syntax)",
+        "badge": "Engineering & Development",
+        "profile_id": "coding",
+        "profile_name": "💻 Coding & Development",
+        "prompt_id": "code_dev_custom",
+        "prompt_name": "Developer Code & Technical Assistant",
+        "model_id": "gemini-3.6-flash",
+        "model_name": "gemini-3.6-flash (Fast Advanced Reasoning)",
+        "purpose": "Best for Pull Request (PR) descriptions, code reviews, technical architecture specifications, Jira/Linear task tickets, and database migration notes with code identifiers in backticks and statement semicolons.",
+        "spoken_input": (
+            "\"Uh hey basically we need to refactor the user authentication flow in our system means first we have to add JWT token verification with refresh token rotation semicolon second we need to implement Redis caching to check if the session is revoked semicolon third please update the database schema for user table and add two fields created_at and last_login and finally send an email notification to the security team on suspicious login attempts.\""
+        ),
+        "formatted_output": (
+            "We need to refactor the user authentication flow across our system:\n\n"
+            "1. JWT Verification: Add JWT token verification with refresh token rotation;\n"
+            "2. Session Management: Implement Redis caching to check if the session is revoked;\n"
+            "3. Database Migration: Update the `user` table schema by adding two new fields: `created_at` and `last_login`;\n"
+            "4. Incident Alerting: Send an automated email notification to the security team upon detecting suspicious login attempts."
+        )
+    },
+    {
+        "id": "combo_casual",
+        "title": "☕ Combination C: Casual & Everyday Speech (Natural Fluent Prose)",
+        "badge": "Everyday Messaging",
+        "profile_id": "casual",
+        "profile_name": "☕ Casual & Everyday Dictation",
+        "prompt_id": "clean_dictation_custom",
+        "prompt_name": "Clean Speech & Grammar Enhancement",
+        "model_id": "gemini-3.5-flash-lite",
+        "model_name": "gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
+        "purpose": "Best for rapid day-to-day messaging on Slack, Teams, WhatsApp, casual emails, quick scratchpad notes, and brainstorms. Eliminates 'uh', 'um', and 'means' while preserving a natural, authentic conversational tone.",
+        "spoken_input": (
+            "\"Uh hey basically we need to refactor the user authentication flow in our system means first we have to add JWT token verification with refresh token rotation semicolon second we need to implement Redis caching to check if the session is revoked semicolon third please update the database schema for user table and add two fields created_at and last_login and finally send an email notification to the security team on suspicious login attempts.\""
+        ),
+        "formatted_output": (
+            "We need to refactor the user authentication flow in our system. First, we have to add JWT token verification with refresh token rotation; second, we need to implement Redis caching to check if the session is revoked; third, please update the database schema for the user table and add two fields, created_at and last_login; and finally, send an email notification to the security team on suspicious login attempts."
+        )
+    },
+    {
+        "id": "combo_academic",
+        "title": "🎓 Combination D: Academic & Research Rigor (Methodological Definitions)",
+        "badge": "Research & Scholarly",
+        "profile_id": "academic",
+        "profile_name": "🎓 Academic & Research",
+        "prompt_id": "clean_dictation_custom",
+        "prompt_name": "Clean Speech & Grammar Enhancement",
+        "model_id": "gemini-3.6-flash",
+        "model_name": "gemini-3.6-flash (Deep Reasoning & Analysis)",
+        "purpose": "Best for scientific literature, research papers, dissertation chapters, grant proposals, and system analysis where scholarly vocabulary, disciplined sequencing, and formal terminology are paramount.",
+        "spoken_input": (
+            "\"Uh hey basically we need to refactor the user authentication flow in our system means first we have to add JWT token verification with refresh token rotation semicolon second we need to implement Redis caching to check if the session is revoked semicolon third please update the database schema for user table and add two fields created_at and last_login and finally send an email notification to the security team on suspicious login attempts.\""
+        ),
+        "formatted_output": (
+            "The user authentication pipeline requires architectural refactoring according to the following protocol:\n\n"
+            "1. Verification Architecture: Implementation of JSON Web Token (JWT) verification coupled with refresh token rotation;\n"
+            "2. State Validation: Integration of Redis caching mechanisms to evaluate session revocation states;\n"
+            "3. Schema Normalization: Extension of the user relation schema with temporal attributes (created_at and last_login);\n"
+            "4. Anomaly Notification: Automated transmission of security alerts to the administration team upon detection of anomalous login events."
+        )
+    },
+    {
+        "id": "combo_arch",
+        "title": "🏗️ Combination E: Engineering Architecture (System Specs & Trade-offs)",
+        "badge": "Principal Systems Design",
+        "profile_id": "engineering",
+        "profile_name": "🏗️ Engineering & Architecture",
+        "prompt_id": "code_dev_custom",
+        "prompt_name": "Developer Code & Technical Assistant",
+        "model_id": "gemini-3.7-flash",
+        "model_name": "gemini-3.7-flash (Advanced Reasoning)",
+        "purpose": "Best for High-Level Design (HLD), cloud architecture trade-off discussions, schema design, and microservice SLA definitions with section headers and tiered architectural bullets.",
+        "spoken_input": (
+            "\"Uh hey basically we need to refactor the user authentication flow in our system means first we have to add JWT token verification with refresh token rotation semicolon second we need to implement Redis caching to check if the session is revoked semicolon third please update the database schema for user table and add two fields created_at and last_login and finally send an email notification to the security team on suspicious login attempts.\""
+        ),
+        "formatted_output": (
+            "### Architectural Specification: User Authentication Refactor\n\n"
+            "**1. Authentication Tier:**\n"
+            "- Deploy stateless JWT verification with automated refresh token rotation to minimize token replay vulnerabilities.\n\n"
+            "**2. Session State Tier:**\n"
+            "- Integrate distributed Redis cluster cache for O(1) revocation verification during high-throughput token introspection.\n\n"
+            "**3. Persistence Tier:**\n"
+            "- Apply schema migration on `user` entity:\n"
+            "  * `created_at`: TIMESTAMPTZ NOT NULL DEFAULT NOW()\n"
+            "  * `last_login`: TIMESTAMPTZ NULL\n\n"
+            "**4. Security Operations & Telemetry:**\n"
+            "- Publish anomalous login events to Pub/Sub queue triggering immediate security incident alerts."
+        )
+    },
+    {
+        "id": "combo_prompt",
+        "title": "🤖 Combination F: AI Prompt Engineer (Structured Prompt Architecture)",
+        "badge": "GenAI Prompt Crafter",
+        "profile_id": "coding",
+        "profile_name": "💻 Coding & Development",
+        "prompt_id": "code_dev_custom",
+        "prompt_name": "Developer Code & Technical Assistant",
+        "model_id": "gemini-3.6-flash",
+        "model_name": "gemini-3.6-flash (Fast Advanced Reasoning)",
+        "purpose": "Best for dictating instructions intended for Claude, Antigravity, ChatGPT, or Gemini. Structures spoken requests into structured Role, Context, Steps, and Acceptance Criteria prompts.",
+        "spoken_input": (
+            "\"Uh hey basically we need to refactor the user authentication flow in our system means first we have to add JWT token verification with refresh token rotation semicolon second we need to implement Redis caching to check if the session is revoked semicolon third please update the database schema for user table and add two fields created_at and last_login and finally send an email notification to the security team on suspicious login attempts.\""
+        ),
+        "formatted_output": (
+            "**Role & Objective:**\n"
+            "Act as a Senior Backend Security Engineer refactoring the user authentication pipeline.\n\n"
+            "**Context & Requirements:**\n"
+            "- Implement robust JWT authentication with refresh token rotation.\n"
+            "- Integrate Redis session revocation checking.\n"
+            "- Add `created_at` and `last_login` timestamps to the user table schema.\n"
+            "- Trigger automated security notifications on anomalous login behavior.\n\n"
+            "**Step-by-Step Implementation:**\n"
+            "1. Configure JWT signing middleware and refresh token rotation handlers.\n"
+            "2. Set up Redis key-value revocation checks with TTL.\n"
+            "3. Run database migrations for the user model.\n"
+            "4. Bind security alerting hooks to the authentication middleware."
+        )
+    }
+]
 
 
 class SettingsDialog(QDialog):
@@ -2534,21 +2677,129 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(prompt_card)
 
-        # 2. Custom Vocabulary Input
-        vocab_card = QFrame(self)
-        vocab_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
-        vc_layout = QVBoxLayout(vocab_card)
-        vc_layout.setSpacing(6)
-        
-        vocab_label = QLabel("🔤 Custom Vocabulary & Jargon (Comma Separated):", vocab_card)
-        vocab_label.setStyleSheet("font-weight: 700; font-size: 13px; color: #38BDF8; border: none;")
-        vc_layout.addWidget(vocab_label)
-        
-        self.vocab_input = QLineEdit(vocab_card)
-        self.vocab_input.setPlaceholderText("e.g. Srinivas, Awasthi, Gemini, Wispr, PyTorch, LeetCode, TypeScript...")
-        self.vocab_input.setStyleSheet("font-size: 13px; padding: 6px 10px;")
-        vc_layout.addWidget(self.vocab_input)
-        layout.addWidget(vocab_card)
+        # 2. Hidden legacy input for backwards compatibility
+        self.vocab_input = QLineEdit(self)
+        self.vocab_input.setVisible(False)
+
+        # 3. Interactive Profile & Dictation Style Combination Showcase
+        showcase_card = QFrame(self)
+        showcase_card.setObjectName("showcaseCard")
+        showcase_card.setStyleSheet("QFrame#showcaseCard { background-color: #0F172A; border: 1px solid #334155; border-radius: 10px; padding: 16px; }")
+        sc_layout = QVBoxLayout(showcase_card)
+        sc_layout.setSpacing(12)
+
+        # Header
+        sc_header = QHBoxLayout()
+        sc_title = QLabel("💡 Profile & Dictation Style Combination Showcase", showcase_card)
+        sc_title.setStyleSheet("font-weight: 700; font-size: 15px; color: #38BDF8; border: none;")
+        sc_header.addWidget(sc_title)
+        sc_header.addStretch()
+
+        sc_badge = QLabel("Interactive Output Guide", showcase_card)
+        sc_badge.setStyleSheet("color: #38BDF8; font-weight: bold; font-size: 11px; background: #0369A1; border-radius: 4px; padding: 3px 8px; border: none;")
+        sc_header.addWidget(sc_badge)
+        sc_layout.addLayout(sc_header)
+
+        sc_desc = QLabel(
+            "See how different Developer Productivity Profiles and Dictation Styles transform the exact same spoken words "
+            "into specialized, structured outputs (bullet points, numbered lists, spacing, code syntax, or clean conversational text). "
+            "Select any combination below to preview its formatted output and apply it with one click.",
+            showcase_card
+        )
+        sc_desc.setStyleSheet("color: #94A3B8; font-size: 12px; border: none;")
+        sc_desc.setWordWrap(True)
+        sc_layout.addWidget(sc_desc)
+
+        # Raw Spoken Input Box
+        spoken_box = QFrame(showcase_card)
+        spoken_box.setStyleSheet("QFrame { background-color: #1E293B; border: 1px dashed #6366F1; border-radius: 8px; padding: 10px 12px; }")
+        sb_layout = QVBoxLayout(spoken_box)
+        sb_layout.setSpacing(4)
+        sb_layout.setContentsMargins(0, 0, 0, 0)
+
+        sb_lbl = QLabel("🎙️ Raw Spoken Input (What you dictate into the microphone):", spoken_box)
+        sb_lbl.setStyleSheet("font-weight: 700; font-size: 12px; color: #A78BFA; border: none;")
+        sb_layout.addWidget(sb_lbl)
+
+        self.showcase_spoken_text = QLabel(
+            "\"Uh hey basically we need to refactor the user authentication flow in our system means first we have to add JWT token verification with refresh token rotation semicolon second we need to implement Redis caching to check if the session is revoked semicolon third please update the database schema for user table and add two fields created_at and last_login and finally send an email notification to the security team on suspicious login attempts.\"",
+            spoken_box
+        )
+        self.showcase_spoken_text.setStyleSheet("color: #CBD5E1; font-size: 12px; font-style: italic; border: none;")
+        self.showcase_spoken_text.setWordWrap(True)
+        sb_layout.addWidget(self.showcase_spoken_text)
+        sc_layout.addWidget(spoken_box)
+
+        # Combination Selector Row
+        sel_combo_row = QHBoxLayout()
+        sel_combo_lbl = QLabel("Choose Combination to Preview:", showcase_card)
+        sel_combo_lbl.setStyleSheet("font-weight: 600; color: #E2E8F0; font-size: 13px; border: none;")
+        sel_combo_row.addWidget(sel_combo_lbl)
+
+        self.showcase_combo = QComboBox(showcase_card)
+        self.showcase_combo.setView(QListView())
+        for idx, item in enumerate(COMBINATION_SHOWCASE_DATA):
+            self.showcase_combo.addItem(item["title"], idx)
+        self.showcase_combo.currentIndexChanged.connect(self._on_showcase_combo_changed)
+        sel_combo_row.addWidget(self.showcase_combo, stretch=2)
+        sc_layout.addLayout(sel_combo_row)
+
+        # Metadata Badges Row (Profile, Prompt, Recommended Model)
+        meta_row = QHBoxLayout()
+        meta_row.setSpacing(8)
+
+        self.showcase_profile_badge = QLabel("", showcase_card)
+        self.showcase_profile_badge.setStyleSheet("color: #FBBF24; font-weight: 600; font-size: 11px; background: #78350F; border-radius: 4px; padding: 4px 8px; border: none;")
+        meta_row.addWidget(self.showcase_profile_badge)
+
+        self.showcase_prompt_badge = QLabel("", showcase_card)
+        self.showcase_prompt_badge.setStyleSheet("color: #34D399; font-weight: 600; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 4px 8px; border: none;")
+        meta_row.addWidget(self.showcase_prompt_badge)
+
+        self.showcase_model_badge = QLabel("", showcase_card)
+        self.showcase_model_badge.setStyleSheet("color: #38BDF8; font-weight: 600; font-size: 11px; background: #0C4A6E; border-radius: 4px; padding: 4px 8px; border: none;")
+        meta_row.addWidget(self.showcase_model_badge)
+
+        meta_row.addStretch()
+        sc_layout.addLayout(meta_row)
+
+        # Purpose Description Box
+        self.showcase_purpose_label = QLabel("", showcase_card)
+        self.showcase_purpose_label.setStyleSheet("color: #E2E8F0; font-size: 12px; background: #1E293B; border-radius: 6px; padding: 8px 10px; border: 1px solid #334155;")
+        self.showcase_purpose_label.setWordWrap(True)
+        sc_layout.addWidget(self.showcase_purpose_label)
+
+        # Output Preview Header & Text Area
+        out_lbl = QLabel("📋 Resulting Formatted Output (What appears on screen & pastes automatically):", showcase_card)
+        out_lbl.setStyleSheet("font-weight: 700; font-size: 12px; color: #10B981; border: none;")
+        sc_layout.addWidget(out_lbl)
+
+        self.showcase_output_edit = QTextEdit(showcase_card)
+        self.showcase_output_edit.setReadOnly(True)
+        self.showcase_output_edit.setMinimumHeight(130)
+        self.showcase_output_edit.setMaximumHeight(160)
+        self.showcase_output_edit.setStyleSheet(
+            "QTextEdit { background-color: #0B1120; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; font-family: Consolas, 'Courier New', monospace; font-size: 12px; padding: 8px; }"
+        )
+        sc_layout.addWidget(self.showcase_output_edit)
+
+        # Apply Button & Feedback Row
+        action_row = QHBoxLayout()
+        self.btn_apply_showcase = QPushButton("⚡ Apply This Combination Now", showcase_card)
+        self.btn_apply_showcase.setStyleSheet("background-color: #0284C7; color: white; font-weight: bold; padding: 8px 16px; border-radius: 6px; font-size: 12px;")
+        self.btn_apply_showcase.clicked.connect(self._on_apply_showcase_combination)
+        action_row.addWidget(self.btn_apply_showcase)
+
+        self.showcase_status_label = QLabel("", showcase_card)
+        self.showcase_status_label.setStyleSheet("color: #10B981; font-size: 12px; font-weight: 600; border: none;")
+        action_row.addWidget(self.showcase_status_label)
+        action_row.addStretch()
+        sc_layout.addLayout(action_row)
+
+        layout.addWidget(showcase_card)
+
+        # Trigger initial showcase population
+        self._on_showcase_combo_changed(0)
 
         layout.addStretch()
 
@@ -3749,6 +4000,79 @@ class SettingsDialog(QDialog):
         self.prompt_status_label.setText(f"✓ '{title}' is now your active dictation system prompt!")
         self.prompt_status_label.setStyleSheet("color: #10B981; font-weight: bold; font-size: 12px; border: none;")
         self.settings_applied.emit()
+
+    def _on_showcase_combo_changed(self, index: int = 0):
+        if not hasattr(self, "showcase_combo") or not self.showcase_combo:
+            return
+        idx = self.showcase_combo.currentIndex()
+        if idx < 0 or idx >= len(COMBINATION_SHOWCASE_DATA):
+            idx = 0
+        item = COMBINATION_SHOWCASE_DATA[idx]
+
+        if hasattr(self, "showcase_profile_badge"):
+            self.showcase_profile_badge.setText(f"⚡ Profile: {item['profile_name']}")
+        if hasattr(self, "showcase_prompt_badge"):
+            self.showcase_prompt_badge.setText(f"📚 Style: {item['prompt_name']}")
+        if hasattr(self, "showcase_model_badge"):
+            self.showcase_model_badge.setText(f"🤖 Model: {item['model_id']}")
+        if hasattr(self, "showcase_purpose_label"):
+            self.showcase_purpose_label.setText(f"🎯 Recommended For: {item['purpose']}")
+        if hasattr(self, "showcase_output_edit"):
+            self.showcase_output_edit.setPlainText(item["formatted_output"])
+        if hasattr(self, "showcase_status_label"):
+            self.showcase_status_label.setText("")
+
+    def _on_apply_showcase_combination(self):
+        if not hasattr(self, "showcase_combo") or not self.showcase_combo:
+            return
+        idx = self.showcase_combo.currentIndex()
+        if idx < 0 or idx >= len(COMBINATION_SHOWCASE_DATA):
+            return
+        item = COMBINATION_SHOWCASE_DATA[idx]
+
+        # 1. Update and activate Profile
+        prof_id = item["profile_id"]
+        self.config.set("active_profile", prof_id)
+        if hasattr(self, "profile_combo") and self.profile_combo:
+            c_idx = self.profile_combo.findData(prof_id)
+            if c_idx >= 0:
+                self.profile_combo.blockSignals(True)
+                self.profile_combo.setCurrentIndex(c_idx)
+                self.profile_combo.blockSignals(False)
+                self._on_profile_combo_changed()
+
+        # 2. Update and activate Prompt / Dictation Style
+        prompt_id = item["prompt_id"]
+        self.config.set_active_saved_prompt(prompt_id)
+        if hasattr(self, "saved_prompts_combo") and self.saved_prompts_combo:
+            p_idx = self.saved_prompts_combo.findData(prompt_id)
+            if p_idx >= 0:
+                self.saved_prompts_combo.blockSignals(True)
+                self.saved_prompts_combo.setCurrentIndex(p_idx)
+                self.saved_prompts_combo.blockSignals(False)
+                self._on_saved_prompt_selected()
+
+        # 3. Update Model if specified
+        model_id = item["model_id"]
+        if model_id and model_id != "auto":
+            self.config.set("model_name", model_id)
+            if hasattr(self, "model_combo") and self.model_combo:
+                m_idx = self.model_combo.findData(model_id)
+                if m_idx >= 0:
+                    self.model_combo.setCurrentIndex(m_idx)
+            if hasattr(self, "router_model_combo") and self.router_model_combo:
+                rm_idx = self.router_model_combo.findData(model_id)
+                if rm_idx >= 0:
+                    self.router_model_combo.setCurrentIndex(rm_idx)
+
+        self.config.save_config()
+        self.settings_applied.emit()
+
+        if hasattr(self, "showcase_status_label"):
+            self.showcase_status_label.setText(f"✓ Applied! Active Profile set to '{item['profile_name']}' & Style set to '{item['prompt_name']}'.")
+            self.showcase_status_label.setStyleSheet("color: #10B981; font-weight: bold; font-size: 12px; border: none;")
+            QTimer.singleShot(4000, lambda: self.showcase_status_label.setText("") if hasattr(self, "showcase_status_label") else None)
+
     def _on_general_model_combo_changed(self, index: int):
         if hasattr(self, 'router_model_combo') and self.router_model_combo.currentIndex() != index:
             self.router_model_combo.blockSignals(True)
