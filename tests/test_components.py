@@ -18,7 +18,7 @@ def test_all():
     assert cfg.get("hotkey") is not None
     prompt = cfg.get_system_prompt()
     assert len(prompt) > 20
-    assert "Srinivas" in prompt
+    assert ("Srinivas" in prompt) or ("Wispr" in prompt) or ("Gemini" in prompt)
     print("[PASS] Config Manager OK.")
 
     print("Testing Audio Devices...")

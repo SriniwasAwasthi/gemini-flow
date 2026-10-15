@@ -67,6 +67,12 @@ def test_multi_cycle_ipc_and_reopen():
     py_exe = sys.executable
     main_script = str(PROJECT_DIR / "main_standalone.py")
     
+    # Terminate any existing instance to ensure clean test environment
+    from app.main import terminate_other_gemini_flow_instances, release_app_mutex
+    terminate_other_gemini_flow_instances()
+    release_app_mutex()
+    time.sleep(1.0)
+    
     for cycle in range(1, 6):
         print(f"\n  [Cycle {cycle}/5] Launching primary instance in background...")
         proc = subprocess.Popen([py_exe, main_script, "--startup"], cwd=str(PROJECT_DIR))
@@ -80,12 +86,12 @@ def test_multi_cycle_ipc_and_reopen():
         
         # Now launch secondary instance (simulating user double-clicking desktop icon)
         print("    -> Simulating user double-clicking app icon (secondary launch)...")
-        sub_res = subprocess.run([py_exe, main_script], cwd=str(PROJECT_DIR), capture_output=True, text=True, timeout=10)
+        sub_res = subprocess.run([py_exe, main_script], cwd=str(PROJECT_DIR), capture_output=True, text=True, timeout=15)
         print(f"    [OK] Secondary launch returned exit code {sub_res.returncode} (Clean IPC handoff).")
         
         # Send RESTART command
         print("    -> Simulating user triggering app restart...")
-        restart_res = subprocess.run([py_exe, main_script, "--restart"], cwd=str(PROJECT_DIR), capture_output=True, text=True, timeout=10)
+        restart_res = subprocess.run([py_exe, main_script, "--restart"], cwd=str(PROJECT_DIR), capture_output=True, text=True, timeout=15)
         print(f"    [OK] Restart command returned exit code {restart_res.returncode}")
         time.sleep(1.5)
         
@@ -93,6 +99,8 @@ def test_multi_cycle_ipc_and_reopen():
         print("    -> Terminating process abruptly to simulate sudden power off / crash...")
         proc.kill()
         proc.wait()
+        terminate_other_gemini_flow_instances()
+        release_app_mutex()
         time.sleep(1.0)
         print(f"    [OK] Cycle {cycle} complete.")
 

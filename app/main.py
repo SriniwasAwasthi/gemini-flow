@@ -92,6 +92,28 @@ def is_dashboard_window_visible() -> bool:
                 u32.ShowWindow(hwnd, SW_RESTORE)
                 u32.SetForegroundWindow(hwnd)
                 return True
+
+        # Fallback to EnumWindows to catch any variation in unicode dashes or locale titles
+        from ctypes import wintypes
+        visible_found = False
+        def _enum_win(h, _):
+            nonlocal visible_found
+            if u32.IsWindowVisible(h):
+                length = u32.GetWindowTextLengthW(h)
+                if length > 0:
+                    buf = ctypes.create_unicode_buffer(length + 1)
+                    u32.GetWindowTextW(h, buf, length + 1)
+                    t = buf.value
+                    if "Gemini Flow" in t and ("Settings" in t or "Dashboard" in t):
+                        u32.ShowWindow(h, 9)
+                        u32.SetForegroundWindow(h)
+                        visible_found = True
+                        return False
+            return True
+
+        WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        u32.EnumWindows(WNDENUMPROC(_enum_win), 0)
+        return visible_found
     except Exception:
         pass
     return False
@@ -168,11 +190,11 @@ def notify_running_instance(command: str = "SHOW") -> bool:
 
     socket = QLocalSocket()
     socket.connectToServer(IPC_PIPE_NAME)
-    if socket.waitForConnected(1200):
+    if socket.waitForConnected(1500):
         socket.write(f"{command}\n".encode("utf-8"))
         socket.waitForBytesWritten(800)
         # Wait for acknowledgment
-        if socket.waitForReadyRead(1000):
+        if socket.waitForReadyRead(5000):
             socket.readAll()
         socket.disconnectFromServer()
         return True
@@ -1054,14 +1076,14 @@ class GeminiFlowApp:
                         return
                     elif "SHOW" in data:
                         logger.info("IPC: Received SHOW request from another instance. Forcing dashboard to front.")
+                        self.open_settings()
+                        if hasattr(self, 'hud') and self.hud:
+                            self.hud.show_state(FloatingHUD.STATE_READY, "Gemini Flow — Voice AI Ready 🎙️")
                         try:
                             client.write(b"OK\n")
                             client.flush()
                         except Exception:
                             pass
-                        self.open_settings()
-                        if hasattr(self, 'hud') and self.hud:
-                            self.hud.show_state(FloatingHUD.STATE_READY, "Gemini Flow — Voice AI Ready 🎙️")
                 client.disconnectFromServer()
         except Exception as e:
             logger.error(f"Error handling IPC connection: {e}")
@@ -1228,7 +1250,15 @@ class GeminiFlowApp:
 def start_app(show_window: bool = True):
     from PyQt6.QtWidgets import QApplication
     args = sys.argv[1:]
-    is_force_restart = any(f in args for f in ("--force-restart", "--restart", "-r", "-f"))
+    is_force_restart = any(f in args for f in ("--force-restart", "-f"))
+
+    if "--restart" in args and not is_force_restart:
+        logger.info("Restart requested via CLI. Notifying running instance to restart...")
+        if notify_running_instance(command="RESTART"):
+            print("Running Gemini Flow instance notified to reload.")
+            os._exit(0)
+        else:
+            is_force_restart = True
 
     if is_force_restart:
         logger.info("Restart requested via CLI. Forcefully terminating old instances and starting fresh...")
@@ -1293,16 +1323,16 @@ def start_app(show_window: bool = True):
         if notified and show_window:
             # Verify that the dashboard window actually became visible on screen
             window_visible = False
-            for _ in range(35):
+            for _ in range(50):
                 time.sleep(0.1)
                 if is_dashboard_window_visible():
                     window_visible = True
                     break
             if window_visible:
                 logger.info("Gemini Flow is already running and dashboard was brought to front.")
-                sys.exit(0)
+                os._exit(0)
             else:
-                logger.warning("Existing instance acknowledged SHOW request over IPC but failed to display window on screen within 3.5s. Recycling unresponsive instance to guarantee app opens...")
+                logger.warning("Existing instance acknowledged SHOW request over IPC but failed to display window on screen within 5.0s. Recycling unresponsive instance to guarantee app opens...")
                 terminate_other_gemini_flow_instances()
                 release_app_mutex()
                 try:
@@ -1313,7 +1343,7 @@ def start_app(show_window: bool = True):
                 continue
         elif notified and not show_window:
             logger.info("Gemini Flow is already running in background.")
-            sys.exit(0)
+            os._exit(0)
         else:
             logger.warning(f"Named Mutex held by unresponsive instance (attempt {attempt+1}/4). Purging zombie processes...")
             terminate_other_gemini_flow_instances()
