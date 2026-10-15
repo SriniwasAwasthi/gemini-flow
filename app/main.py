@@ -1319,30 +1319,11 @@ def start_app(show_window: bool = True):
             continue
 
         # Check if an existing primary instance is actually responsive
-        notified = notify_running_instance("SHOW")
-        if notified and show_window:
-            # Verify that the dashboard window actually became visible on screen
-            window_visible = False
-            for _ in range(50):
-                time.sleep(0.1)
-                if is_dashboard_window_visible():
-                    window_visible = True
-                    break
-            if window_visible:
-                logger.info("Gemini Flow is already running and dashboard was brought to front.")
-                os._exit(0)
-            else:
-                logger.warning("Existing instance acknowledged SHOW request over IPC but failed to display window on screen within 5.0s. Recycling unresponsive instance to guarantee app opens...")
-                terminate_other_gemini_flow_instances()
-                release_app_mutex()
-                try:
-                    QLocalServer.removeServer(IPC_PIPE_NAME)
-                except Exception:
-                    pass
-                time.sleep(0.4)
-                continue
-        elif notified and not show_window:
-            logger.info("Gemini Flow is already running in background.")
+        notified = notify_running_instance("SHOW" if show_window else "PING")
+        if notified:
+            logger.info(f"Gemini Flow is already running and acknowledged {'SHOW' if show_window else 'PING'} over IPC.")
+            if show_window:
+                is_dashboard_window_visible()
             os._exit(0)
         else:
             logger.warning(f"Named Mutex held by unresponsive instance (attempt {attempt+1}/4). Purging zombie processes...")
@@ -1353,6 +1334,7 @@ def start_app(show_window: bool = True):
             except Exception:
                 pass
             time.sleep(0.4)
+            continue
 
     app = GeminiFlowApp()
     sys.exit(app.run(show_window=show_window))
