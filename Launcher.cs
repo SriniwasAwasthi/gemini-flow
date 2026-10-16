@@ -2,14 +2,27 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
 
 namespace GeminiFlow
 {
     static class Program
     {
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int GetWindowTextLength(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -21,7 +34,7 @@ namespace GeminiFlow
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
-        private static extern bool IsWindowVisible(IntPtr hWnd);
+        private static extern bool BringWindowToTop(IntPtr hWnd);
 
         private const int SW_RESTORE = 9;
 
@@ -32,16 +45,35 @@ namespace GeminiFlow
             try
             {
                 // 1. If dashboard window is already open and visible, instantly bring it to the foreground
-                IntPtr existingHwnd = FindWindow(null, "Gemini Flow - Voice AI Settings & Dashboard");
-                if (existingHwnd == IntPtr.Zero)
+                IntPtr targetHwnd = IntPtr.Zero;
+                EnumWindows(delegate(IntPtr hWnd, IntPtr lParam)
                 {
-                    existingHwnd = FindWindow(null, "Gemini Flow — Voice AI Settings & Dashboard");
-                }
-                if (existingHwnd != IntPtr.Zero && IsWindowVisible(existingHwnd))
+                    if (IsWindowVisible(hWnd))
+                    {
+                        int len = GetWindowTextLength(hWnd);
+                        if (len > 0)
+                        {
+                            StringBuilder sb = new StringBuilder(len + 1);
+                            GetWindowText(hWnd, sb, sb.Capacity);
+                            string title = sb.ToString();
+                            if (title.IndexOf("Gemini Flow", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                (title.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                 title.IndexOf("Dashboard", StringComparison.OrdinalIgnoreCase) >= 0))
+                            {
+                                targetHwnd = hWnd;
+                                return false; // Stop enumeration
+                            }
+                        }
+                    }
+                    return true;
+                }, IntPtr.Zero);
+
+                if (targetHwnd != IntPtr.Zero)
                 {
-                    ShowWindow(existingHwnd, SW_RESTORE);
-                    SwitchToThisWindow(existingHwnd, true);
-                    SetForegroundWindow(existingHwnd);
+                    ShowWindow(targetHwnd, SW_RESTORE);
+                    BringWindowToTop(targetHwnd);
+                    SwitchToThisWindow(targetHwnd, true);
+                    SetForegroundWindow(targetHwnd);
                     return;
                 }
 
@@ -50,11 +82,19 @@ namespace GeminiFlow
                 string scriptPath = Path.Combine(exeDir, "main_standalone.py");
                 if (!File.Exists(scriptPath))
                 {
+                    scriptPath = Path.Combine(exeDir, "app", "main.py");
+                }
+                if (!File.Exists(scriptPath))
+                {
                     scriptPath = Path.Combine(exeDir, "main.py");
                 }
                 if (!File.Exists(scriptPath) && Directory.Exists(defaultDir))
                 {
                     scriptPath = Path.Combine(defaultDir, "main_standalone.py");
+                    if (!File.Exists(scriptPath))
+                    {
+                        scriptPath = Path.Combine(defaultDir, "app", "main.py");
+                    }
                     if (!File.Exists(scriptPath))
                     {
                         scriptPath = Path.Combine(defaultDir, "main.py");
@@ -72,12 +112,14 @@ namespace GeminiFlow
                     return;
                 }
 
+                string projectDir = Path.GetDirectoryName(scriptPath);
+
                 // 3. Locate Python executable dynamically across any laptop/PC
                 string pythonPath = "";
 
                 // Priority A: Project Virtual Environment (created by run.bat)
-                string venvPythonw = Path.Combine(exeDir, "venv", "Scripts", "pythonw.exe");
-                string venvPython = Path.Combine(exeDir, "venv", "Scripts", "python.exe");
+                string venvPythonw = Path.Combine(projectDir, "venv", "Scripts", "pythonw.exe");
+                string venvPython = Path.Combine(projectDir, "venv", "Scripts", "python.exe");
                 if (File.Exists(venvPythonw))
                 {
                     pythonPath = venvPythonw;
@@ -127,7 +169,7 @@ namespace GeminiFlow
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.FileName = pythonPath;
                 psi.Arguments = "\"" + scriptPath + "\"" + extraArgs;
-                psi.WorkingDirectory = exeDir;
+                psi.WorkingDirectory = projectDir;
                 psi.UseShellExecute = false;
                 psi.CreateNoWindow = true;
                 psi.WindowStyle = ProcessWindowStyle.Hidden;

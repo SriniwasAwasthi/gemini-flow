@@ -84,7 +84,12 @@ def is_dashboard_window_visible() -> bool:
     try:
         import ctypes
         u32 = ctypes.windll.user32
-        for title in ("Gemini Flow — Voice AI Settings & Dashboard", "Gemini Flow - Voice AI Settings & Dashboard"):
+        for title in (
+            "Gemini Flow - Voice AI Settings & Dashboard - Gemini Flow — Voice AI",
+            "Gemini Flow — Voice AI Settings & Dashboard - Gemini Flow — Voice AI",
+            "Gemini Flow - Voice AI Settings & Dashboard",
+            "Gemini Flow — Voice AI Settings & Dashboard"
+        ):
             hwnd = u32.FindWindowW(None, title)
             if hwnd and u32.IsWindowVisible(hwnd):
                 # Ensure it is restored and brought to top
@@ -230,8 +235,13 @@ def force_window_to_foreground(window):
         WS_EX_TOOLWINDOW = 0x00000080
         get_long = getattr(user32, 'GetWindowLongPtrW', getattr(user32, 'GetWindowLongW', None))
         set_long = getattr(user32, 'SetWindowLongPtrW', getattr(user32, 'SetWindowLongW', None))
-        cur_style = get_long(hwnd, GWL_EXSTYLE)
-        set_long(hwnd, GWL_EXSTYLE, (cur_style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW)
+        if get_long and set_long:
+            get_long.argtypes = [c_void_p, c_int]
+            get_long.restype = ctypes.c_ssize_t
+            set_long.argtypes = [c_void_p, c_int, ctypes.c_ssize_t]
+            set_long.restype = ctypes.c_ssize_t
+            cur_style = get_long(hwnd, GWL_EXSTYLE)
+            set_long(hwnd, GWL_EXSTYLE, (cur_style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW)
 
         # Un-minimize
         SW_RESTORE = 9
@@ -264,13 +274,14 @@ def force_window_to_foreground(window):
         SWP_NOMOVE = 0x0002
         SWP_NOSIZE = 0x0001
         SWP_SHOWWINDOW = 0x0040
-        flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW
+        SWP_FRAMECHANGED = 0x0020
+        flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_FRAMECHANGED
         user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags)
 
         # After 1200ms, demote HWND_TOPMOST back to normal so it doesn't stay permanently locked on top
         def _demote_topmost():
             try:
-                user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+                user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED)
             except Exception:
                 pass
         QTimer.singleShot(1200, _demote_topmost)
@@ -440,6 +451,17 @@ class GeminiFlowApp:
                 logger.debug(f"Async startup warmup note: {ex}")
 
         threading.Thread(target=_async_startup_warmup, daemon=True, name="AppStartupWarmup").start()
+        QTimer.singleShot(1500, self._lazy_preinit_settings)
+
+    def _lazy_preinit_settings(self):
+        """Silently instantiates SettingsDialog on the main thread during idle for instant opening."""
+        if getattr(self, 'settings_dialog', None) is None:
+            try:
+                self.settings_dialog = SettingsDialog(self.config, self.gemini, self.text_injector, main_app=self)
+                self.settings_dialog.settings_applied.connect(self._on_settings_applied)
+                self.settings_dialog.finished.connect(self._on_settings_closed)
+            except Exception as e:
+                logger.debug(f"Lazy pre-init settings note: {e}")
 
     def _on_audio_amplitude(self, amp: float):
         if self.recorder.is_recording:
@@ -1048,14 +1070,8 @@ class GeminiFlowApp:
                     logger.warning(f"Recording reached maximum safety limit ({elapsed:.1f}s / {max_recording_limit:.0f}s). Auto-stopping.")
                     self.on_stop_speech()
 
-            # 3. Detect codebase changes on disk while idle (e.g. after code edits/updates)
-            if hasattr(self, '_startup_code_mtime') and self._startup_code_mtime > 0:
-                latest_code_mtime = get_codebase_last_modified()
-                if latest_code_mtime > self._startup_code_mtime + 2.0:
-                    if not (hasattr(self, 'recorder') and self.recorder and self.recorder.is_recording) and not self.is_busy_processing:
-                        logger.info("Codebase modified on disk while running! Auto-reloading Gemini Flow to apply updates...")
-                        self.restart_app()
-                        return
+            # Codebase mtime auto-reload intentionally removed: OneDrive background synchronization
+            # touches file timestamps overnight, which previously triggered false-positive restarts.
         except Exception as e:
             logger.debug(f"Watchdog tick note: {e}")
 
@@ -1135,7 +1151,7 @@ class GeminiFlowApp:
                     break
 
     def _on_settings_closed(self, result):
-        self.settings_dialog = None
+        # Keep settings_dialog instance cached in memory so reopening is instant (<10ms)
         # Reload hotkey settings in listener
         hotkey = self.config.get("hotkey", "<ctrl>+<space>")
         mode = self.config.get("hotkey_mode", "toggle")
@@ -1299,35 +1315,21 @@ def start_app(show_window: bool = True):
             time.sleep(0.3)
             continue
 
-        # Check if codebase was updated on disk since the running instance started
-        code_mtime = get_codebase_last_modified()
-        pid_mtime = 0.0
-        if PID_FILE.exists():
-            try:
-                with open(PID_FILE, "r", encoding="utf-8") as f:
-                    c = f.read().strip()
-                    if ":" in c:
-                        pid_mtime = float(c.split(":")[1])
-                    else:
-                        pid_mtime = PID_FILE.stat().st_mtime
-            except Exception:
-                pid_mtime = PID_FILE.stat().st_mtime
-
-        if code_mtime > pid_mtime + 1.0 and pid_mtime > 0:
-            logger.info("Codebase has been updated on disk since the running instance started! Recycling old instance to load fresh code...")
-            terminate_other_gemini_flow_instances()
-            release_app_mutex()
-            time.sleep(0.3)
-            continue
-
         # Check if an existing primary instance is actually responsive
         notified = notify_running_instance("SHOW" if show_window else "PING")
         if notified:
             logger.info(f"Gemini Flow is already running and acknowledged {'SHOW' if show_window else 'PING'} over IPC.")
             if show_window:
-                is_dashboard_window_visible()
+                for _ in range(25):
+                    if is_dashboard_window_visible():
+                        break
+                    time.sleep(0.1)
             os._exit(0)
         else:
+            if attempt < 2:
+                # Primary may still be initializing or starting up; give it time before assuming zombie
+                time.sleep(0.5)
+                continue
             logger.warning(f"Named Mutex held by unresponsive instance (attempt {attempt+1}/4). Purging zombie processes...")
             terminate_other_gemini_flow_instances()
             release_app_mutex()
@@ -1337,6 +1339,13 @@ def start_app(show_window: bool = True):
                 pass
             time.sleep(0.4)
             continue
+
+    if not is_primary:
+        logger.warning("Could not acquire mutex via standard attempts. Performing final cleanup and starting fresh...")
+        terminate_other_gemini_flow_instances()
+        release_app_mutex()
+        time.sleep(0.3)
+        acquire_app_mutex()
 
     app = GeminiFlowApp()
     sys.exit(app.run(show_window=show_window))
