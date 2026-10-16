@@ -239,6 +239,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "hud_theme": "dark_glass",
     "start_with_windows": True,
     "history_limit": 5000,
+    "max_recording_seconds": 14400,  # 4 hours continuous speech support
     "settings_window_state": {
         "x": None,
         "y": None,

@@ -543,6 +543,8 @@ class GeminiFlowApp:
                             if c_idx < len(self._rolling_chunks):
                                 self._rolling_chunks[c_idx]["text"] = txt.strip() if (ok and txt) else ""
                                 self._rolling_chunks[c_idx]["done"] = True
+                                if ok and txt:
+                                    self._rolling_chunks[c_idx]["wav"] = None
 
                     threading.Thread(target=_transcribe_slice, args=(curr_idx, chunk_wav), daemon=True).start()
 
@@ -1039,11 +1041,12 @@ class GeminiFlowApp:
                 self.hotkey_mgr.check_health()
             self._last_watchdog_time = now
 
-            # 2. Maximum recording duration safety net (auto-stop after 1800s / 30 mins)
+            # 2. Maximum recording duration safety net (supports 4+ hours continuous marathon dictation)
+            max_recording_limit = float(self.config.get("max_recording_seconds", 14400.0))
             if hasattr(self, 'recorder') and self.recorder and self.recorder.is_recording:
                 elapsed = time.time() - self.recorder.start_time
-                if elapsed > 1800.0:
-                    logger.warning(f"Recording reached 30-minute safety limit ({elapsed:.1f}s). Auto-stopping.")
+                if elapsed > max_recording_limit:
+                    logger.warning(f"Recording reached maximum safety limit ({elapsed:.1f}s / {max_recording_limit:.0f}s). Auto-stopping.")
                     self.on_stop_speech()
 
             # 3. Detect codebase changes on disk while idle (e.g. after code edits/updates)
