@@ -150,6 +150,14 @@ class SecurityManager:
                     self.cred_file.unlink()
                 except Exception:
                     pass
+            if os.name == "nt":
+                try:
+                    import winreg
+                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment", 0, winreg.KEY_SET_VALUE) as k:
+                        winreg.DeleteValue(k, "GEMINI_API_KEY")
+                except Exception:
+                    pass
+            os.environ.pop("GEMINI_API_KEY", None)
             return True
 
         dpapi_bytes = self._encrypt_dpapi(cleaned)
@@ -162,6 +170,17 @@ class SecurityManager:
                 obfuscated = base64.b64encode(cleaned.encode("utf-8"))
                 with open(self.cred_file, "wb") as f:
                     f.write(b"B64:" + obfuscated)
+
+            # Keep environment and Windows registry in sync so external shells/services match
+            os.environ["GEMINI_API_KEY"] = cleaned
+            if os.name == "nt":
+                try:
+                    import winreg
+                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment", 0, winreg.KEY_SET_VALUE) as k:
+                        winreg.SetValueEx(k, "GEMINI_API_KEY", 0, winreg.REG_SZ, cleaned)
+                except Exception as ex:
+                    logger.debug(f"Registry GEMINI_API_KEY update note: {ex}")
+
             return True
         except Exception as e:
             logger.error(f"Failed to securely persist API key: {e}")
@@ -170,25 +189,11 @@ class SecurityManager:
     def load_api_key(self, fallback_key: str = "") -> str:
         """
         Loads API key prioritizing:
-        1. GEMINI_API_KEY environment variable
-        2. Secure encrypted credential file
+        1. Secure encrypted credential file (explicit user configuration in Gemini Flow)
+        2. GEMINI_API_KEY environment variable & Windows User Registry
         3. Passed-in configuration fallback
         """
-        # 1. Environment Variable & Windows User Registry
-        env_key = os.environ.get("GEMINI_API_KEY", "").strip()
-        if not env_key and os.name == "nt":
-            try:
-                import winreg
-                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment") as k:
-                    val, _ = winreg.QueryValueEx(k, "GEMINI_API_KEY")
-                    if val:
-                        env_key = str(val).strip()
-            except Exception:
-                pass
-        if env_key:
-            return self._clean_key(env_key)
-
-        # 2. Secure credential file
+        # 1. Secure credential file (explicitly saved by user inside Gemini Flow)
         if self.cred_file.exists():
             try:
                 with open(self.cred_file, "rb") as f:
@@ -206,6 +211,20 @@ class SecurityManager:
                         return cleaned
             except Exception as e:
                 logger.error(f"Error reading secure credentials: {e}")
+
+        # 2. Environment Variable & Windows User Registry
+        env_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if not env_key and os.name == "nt":
+            try:
+                import winreg
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment") as k:
+                    val, _ = winreg.QueryValueEx(k, "GEMINI_API_KEY")
+                    if val:
+                        env_key = str(val).strip()
+            except Exception:
+                pass
+        if env_key:
+            return self._clean_key(env_key)
 
         # 3. Fallback
         cleaned_fb = self._clean_key(fallback_key)

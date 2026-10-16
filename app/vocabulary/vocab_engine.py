@@ -273,15 +273,38 @@ class VocabularyEngine:
     format_prompt_injection = get_prompt_injection
     save = save_vocabulary
 
+    @staticmethod
+    def collapse_repetitions_and_stutters(text: str) -> str:
+        """
+        AI Brain post-processing: Detects and collapses identical repeated words or phrases
+        spoken due to mic checks, stuttering, or hesitation (e.g. 'hello hello hello' -> 'Hello',
+        'hello, I am Sriniwas hello, I am Sriniwas' -> 'Hello, I am Sriniwas').
+        """
+        if not text:
+            return text
+        prev = ""
+        result = text
+        while prev != result:
+            prev = result
+            result = re.sub(r'\b([A-Za-z0-9_\'-]+)(?:[,\s]+)\1\b', r'\1', result, flags=re.IGNORECASE)
+            for k in range(8, 1, -1):
+                pat = r'(\b[A-Za-z0-9_\'-]+(?:[,\s]+[A-Za-z0-9_\'-]+){' + str(k - 1) + r'})(?:[,\s]+)\1\b'
+                result = re.sub(pat, r'\1', result, flags=re.IGNORECASE)
+        result = re.sub(r'\s+([,.:;?!])', r'\1', result)
+        result = re.sub(r'\s+', ' ', result).strip()
+        if result and result[0].islower():
+            result = result[0].upper() + result[1:]
+        return result
+
     def normalize(self, text: str) -> str:
         """
-        Post-processes recognized text. Replaces any spoken variants or aliases
-        with their canonical terms cleanly.
+        Post-processes recognized text. Collapses stuttered/repeated phrases and
+        replaces any spoken variants or aliases with their canonical terms cleanly.
         """
         if not text:
             return text
 
-        result = text
+        result = self.collapse_repetitions_and_stutters(text)
         for e in self.entries:
             if not e.enabled:
                 continue

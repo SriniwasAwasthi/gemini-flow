@@ -853,28 +853,27 @@ class GeminiFlowApp:
                     # Run tail chunk concurrently with any remaining in-flight background chunks
                     threading.Thread(target=_transcribe_tail, daemon=True, name="TailChunkWorker").start()
 
-                # Wait for in-flight rolling chunks and tail chunk to complete (max 3.0s, polling every 25ms)
+                # Wait for in-flight rolling chunks and tail chunk to complete (up to 6.5s, breaks immediately when all_done)
                 t_wait_start = time.time()
-                while time.time() - t_wait_start < 3.0:
+                while time.time() - t_wait_start < 6.5:
                     with self._rolling_lock:
                         all_done = all(c.get("done", False) if isinstance(c, dict) else bool(c) for c in self._rolling_chunks)
                     if all_done:
                         break
                     time.sleep(0.025)
 
-                # Zero-Loss Rescue: If any chunk timed out or failed to return text, rescue it locally with Whisper AI immediately!
-                if offline_fallback_on:
-                    with self._rolling_lock:
-                        for c in self._rolling_chunks:
-                            if isinstance(c, dict) and not c.get("text") and c.get("wav") and len(c.get("wav")) > 1000:
-                                try:
-                                    from app.offline.offline_engine import OfflineSpeechEngine
-                                    ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(c["wav"])
-                                    if ok_r and txt_r and txt_r.strip():
-                                        c["text"] = txt_r.strip()
-                                        c["done"] = True
-                                except Exception:
-                                    pass
+                # Zero-Loss Guarantee: If any chunk timed out or failed to return text, rescue it immediately
+                with self._rolling_lock:
+                    for c in self._rolling_chunks:
+                        if isinstance(c, dict) and not c.get("text") and c.get("wav") and len(c.get("wav")) > 1000:
+                            try:
+                                from app.offline.offline_engine import OfflineSpeechEngine
+                                ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(c["wav"])
+                                if ok_r and txt_r and txt_r.strip():
+                                    c["text"] = txt_r.strip()
+                                    c["done"] = True
+                            except Exception:
+                                pass
 
                 with self._rolling_lock:
                     valid_chunks = [
