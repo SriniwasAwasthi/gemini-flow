@@ -51,11 +51,25 @@ class VocabularyEntry:
 
 DEFAULT_VOCABULARY = [
     {
-        "canonical_term": "Srinivas Awasthi",
-        "aliases": ["Sriniwas Awasthi", "Sriniwas Awasti", "Srinivas Awasti", "Srinivas Avasthi", "Sriniwas"],
+        "canonical_term": "Sriniwas Awasthi",
+        "aliases": ["Srinivas Awasthi", "Sriniwas Awasti", "Srinivas Awasti", "Srinivas Avasthi", "Sriniwas Avasthi", "Sri Srinivas Awasthi", "Sri Sriniwas Awasthi", "Sri Srinivas"],
         "category": "Personal",
         "enabled": True,
         "notes": "Full user name"
+    },
+    {
+        "canonical_term": "Sriniwas",
+        "aliases": ["Srinivas", "Shriniwas", "Shreeniwas", "Shreenivas"],
+        "category": "Personal",
+        "enabled": True,
+        "notes": "First name"
+    },
+    {
+        "canonical_term": "Awasthi",
+        "aliases": ["Avasthi", "Awasti", "Avasti"],
+        "category": "Personal",
+        "enabled": True,
+        "notes": "Last name"
     },
     {
         "canonical_term": "Wispr",
@@ -276,24 +290,87 @@ class VocabularyEngine:
     @staticmethod
     def collapse_repetitions_and_stutters(text: str) -> str:
         """
-        AI Brain post-processing: Detects and collapses identical repeated words or phrases
-        spoken due to mic checks, stuttering, or hesitation (e.g. 'hello hello hello' -> 'Hello',
-        'hello, I am Sriniwas hello, I am Sriniwas' -> 'Hello, I am Sriniwas').
+        AI Brain post-processing: Detects and collapses identical repeated words, phrases,
+        sentence re-takes, and false starts with intervening filler spoken due to mic checks,
+        stuttering, or hesitation (e.g. 'hello, hello, hello' -> 'Hello',
+        'Hello, I am Sriniwas Awasthi. Hello, I am Sriniwas Awasthi' -> 'Hello, I am Sriniwas Awasthi.',
+        'Analyze this PDF, and again I say analyze this word, and again I say analyze this PDF' -> 'Analyze this PDF').
         """
-        if not text:
+        if not text or not text.strip():
             return text
-        prev = ""
-        result = text
-        while prev != result:
-            prev = result
-            result = re.sub(r'\b([A-Za-z0-9_\'-]+)(?:[,\s]+)\1\b', r'\1', result, flags=re.IGNORECASE)
-            for k in range(8, 1, -1):
-                pat = r'(\b[A-Za-z0-9_\'-]+(?:[,\s]+[A-Za-z0-9_\'-]+){' + str(k - 1) + r'})(?:[,\s]+)\1\b'
-                result = re.sub(pat, r'\1', result, flags=re.IGNORECASE)
+
+        result = text.strip()
+
+        # Pass 1: Collapse consecutive identical multi-word phrase loops and single-word stutters
+        # Handles: 'hello, hello, hello' -> 'hello', 'analyze this PDF, analyze this PDF' -> 'analyze this PDF'
+        token = r"[A-Za-z0-9_\'-]+"
+        for phrase_len in range(12, 0, -1):
+            pat = re.compile(
+                r'\b((?:' + token + r'[\s,;—\-]+){' + str(phrase_len - 1) + r'}' + token + r')(?:[\s,;—\-]+)\1\b',
+                flags=re.IGNORECASE
+            )
+            prev = None
+            iters = 0
+            while prev != result and iters < 10:
+                prev = result
+                iters += 1
+                result = pat.sub(r'\1', result)
+
+        # Pass 2: Consecutive identical sentence deduplication across sentence terminators (. ! ?)
+        # Handles: 'We deploy on Friday. We deploy on Friday.' -> 'We deploy on Friday.'
+        sentences = re.split(r'([.!?]+(?:\s+|\n+|$))', result)
+        if len(sentences) > 1:
+            merged = []
+            i = 0
+            while i < len(sentences):
+                s = sentences[i]
+                punct = sentences[i+1] if i + 1 < len(sentences) else ""
+                if s.strip():
+                    merged.append((s.strip(), punct))
+                i += 2
+
+            deduped = []
+            for s, p in merged:
+                norm_s = re.sub(r'[^\w\s]', '', s).strip().lower()
+                if not deduped:
+                    deduped.append((s, p))
+                else:
+                    last_norm = re.sub(r'[^\w\s]', '', deduped[-1][0]).strip().lower()
+                    if norm_s != last_norm:
+                        deduped.append((s, p))
+            result = "".join([f"{s}{p}" for s, p in deduped]).strip()
+
+        # Pass 3: Context-aware false start / restart collapse with explicit restart markers
+        # Requires explicit restart indicators (e.g. 'and again I say', 'or rather', 'I mean', 'no wait', etc.)
+        # within the SAME sentence. NEVER bridges across sentence boundaries (. ! ?).
+        restart_markers = (
+            r'(?:and again I say|and again|or rather|I mean|let me rephrase|no wait|scratch that|sorry|'
+            r'uh|um|ah|actually|rather)'
+        )
+        for w_len in range(8, 0, -1):
+            pat_restart = re.compile(
+                r'\b((?:' + token + r'[\s,;—\-]+){' + str(w_len - 1) + r'}' + token + r')'
+                r'[\s,;—\-]+' + restart_markers + r'[\s,;—\-]+(?:\w+[\s,;—\-]+){0,3}?\1\b',
+                flags=re.IGNORECASE
+            )
+            prev = None
+            iters = 0
+            while prev != result and iters < 5:
+                prev = result
+                iters += 1
+                result = pat_restart.sub(r'\1', result)
+
+        # Pass 4: Clean dangling punctuation & normalize spacing without corrupting currency or formatting
+        result = re.sub(r'[,;]\s*(na|ya)\s*([.?!]?)$', r'\2', result, flags=re.IGNORECASE)
+        result = re.sub(r'\s*,\s*,+', ',', result)
+        result = re.sub(r'\s*,\s*\.', '.', result)
+        result = re.sub(r'^\s*[,;:\.]\s*', '', result)
         result = re.sub(r'\s+([,.:;?!])', r'\1', result)
-        result = re.sub(r'\s+', ' ', result).strip()
-        if result and result[0].islower():
+        result = re.sub(r'[ \t]{2,}', ' ', result).strip()
+
+        if result and result[0].islower() and not result.startswith("http"):
             result = result[0].upper() + result[1:]
+
         return result
 
     def normalize(self, text: str) -> str:
@@ -305,12 +382,14 @@ class VocabularyEngine:
             return text
 
         result = self.collapse_repetitions_and_stutters(text)
-        for e in self.entries:
+        sorted_entries = sorted(self.entries, key=lambda e: len(e.canonical_term), reverse=True)
+        for e in sorted_entries:
             if not e.enabled:
                 continue
 
-            # Replace aliases with canonical
-            for alias in e.aliases:
+            # Sort aliases by length descending so longer phrases match first
+            sorted_aliases = sorted(e.aliases, key=lambda a: len(a.strip()), reverse=True)
+            for alias in sorted_aliases:
                 if not alias.strip():
                     continue
                 flags = 0 if e.case_sensitive else re.IGNORECASE

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
@@ -44,6 +45,26 @@ namespace GeminiFlow
             string defaultDir = @"E:\W c One Drive\Wisper";
             try
             {
+                // 0. If Gemini Flow is already running in background or system tray, notify it to SHOW window instantly
+                try
+                {
+                    using (NamedPipeClientStream pipeClient = new NamedPipeClientStream(".", "GeminiFlow_SingleInstance_IPC", PipeDirection.Out))
+                    {
+                        pipeClient.Connect(350);
+                        using (StreamWriter writer = new StreamWriter(pipeClient))
+                        {
+                            writer.WriteLine("SHOW");
+                            writer.Flush();
+                        }
+                        // Running instance received SHOW and brought window to front. Exit immediately without spawning Python.
+                        return;
+                    }
+                }
+                catch
+                {
+                    // Instance not running or pipe not ready; continue with standard launch
+                }
+
                 // 1. If dashboard window is already open and visible, instantly bring it to the foreground
                 IntPtr targetHwnd = IntPtr.Zero;
                 EnumWindows(delegate(IntPtr hWnd, IntPtr lParam)

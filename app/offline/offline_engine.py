@@ -183,8 +183,8 @@ class OfflineSpeechEngine:
         if model is None:
             return False, "Whisper model unavailable"
 
-        default_prompt = "Hi, I am Sriniwas Awasthi, using Gemini Flow voice dictation in offline mode. Domain vocabulary: analyze, localhost, Chrome, test my website, verbatim transcription."
-        prompt = (initial_prompt.strip() + " " + default_prompt) if initial_prompt else default_prompt
+        default_prompt = "Clean verbatim speech dictation, articulate English grammar, proper punctuation."
+        prompt = initial_prompt if initial_prompt else default_prompt
 
         # Estimate duration in seconds
         approx_sec = len(wav_bytes) / 32000.0
@@ -199,10 +199,11 @@ class OfflineSpeechEngine:
                     c_stream = io.BytesIO(b)
                     segs, _ = model.transcribe(
                         c_stream,
-                        beam_size=1,
+                        beam_size=3,
                         condition_on_previous_text=False,
                         temperature=0.0,
                         vad_filter=True,
+                        vad_parameters=dict(min_silence_duration_ms=450, speech_pad_ms=300),
                         initial_prompt=prompt
                     )
                     return idx, " ".join([s.text.strip() for s in segs if s.text.strip()])
@@ -214,16 +215,16 @@ class OfflineSpeechEngine:
                 final_text = " ".join([r[1] for r in results if r[1].strip()]).strip()
                 return True, final_text
 
-        # Standard direct ultra-fast transcription (<= 28s)
+        # Standard direct high-accuracy transcription (<= 28s)
         audio_stream = io.BytesIO(wav_bytes)
         t0 = time.time()
         segments, info = model.transcribe(
             audio_stream,
-            beam_size=1,
+            beam_size=3,
             condition_on_previous_text=False,
             temperature=0.0,
             vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=250, speech_pad_ms=200),
+            vad_parameters=dict(min_silence_duration_ms=450, speech_pad_ms=300),
             initial_prompt=prompt
         )
 

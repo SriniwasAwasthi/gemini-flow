@@ -216,7 +216,7 @@ class GeminiEngine:
                 self.last_model_used = "Offline Local Speech (Whisper AI)"
                 self.last_fallback = not is_explicit_offline
                 t_off_start = time.time()
-                prompt_ctx = "Hi, I am Sriniwas Awasthi, using Gemini Flow voice dictation in offline mode."
+                prompt_ctx = "Clean speech dictation, articulate English grammar, proper punctuation."
                 offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx)
                 self.last_latency = time.time() - t_off_start
                 if offline_ok:
@@ -267,7 +267,7 @@ class GeminiEngine:
                 logger.info("Online Gemini execution did not succeed. Fast fallback to local offline Whisper AI...")
                 try:
                     t_off_start = time.time()
-                    prompt_ctx = "Hi, I am Sriniwas Awasthi, using Gemini Flow voice dictation."
+                    prompt_ctx = "Clean speech dictation, articulate English grammar, proper punctuation."
                     offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx)
                     if offline_ok:
                         if offline_text:
@@ -448,10 +448,10 @@ class GeminiEngine:
             gen_config: Dict[str, Any] = {
                 "temperature": 0.0,
                 "topP": 0.95,
-                "maxOutputTokens": 8192
+                "maxOutputTokens": 2048
             }
-            # Optimize Gemini Flash for sub-second speech transcription by disabling thinking overhead
-            if "2.5" in model or "2.0" in model:
+            # Optimize Gemini 2.5/2.0 Flash for sub-2-second speech transcription by disabling thinking overhead
+            if "2.5" in model.lower() or "2.0" in model.lower():
                 gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
             payload = {
@@ -461,12 +461,13 @@ class GeminiEngine:
                             {
                                 "text": (
                                     f"{system_instruction}\n\n"
-                                    "CRITICAL TRANSCRIPTION DIRECTIVES:\n"
-                                    "1. 100% Transcription Completeness: Transcribe every spoken word, sentence, technical term, list item, and syllabus concept from beginning to end without omitting, summarizing, or condensing ANY part of the speech.\n"
-                                    "2. Anti-Repetition Guarantee: NEVER repeat any phrase, word, or sentence in an infinite loop. Even if pauses occur in the audio, transcribe each concept once and continue immediately to the next spoken thought.\n"
-                                    "3. Strict Vocabulary & Verb Fidelity: NEVER substitute, replace, or alter the speaker's verbs or nouns (e.g. if the user says 'analyze', transcribe 'analyze', NEVER substitute with 'list'). NEVER rephrase prepositional phrases like 'in my Chrome' into action commands like 'Opening Chrome'.\n"
-                                    "4. Zero Hallucination: NEVER hallucinate, invent, or complete sentences with speculative questions, tokens, or phrases (e.g. NEVER invent 'Could you suggest which token...'). Transcribe strictly the actual acoustic words spoken.\n"
-                                    "5. Output ONLY the finalized transcribed text directly without commentary, quotes, or markdown code fence wrappers."
+                                    "CRITICAL SPEECH-TO-TEXT RULES:\n"
+                                    "1. High-Speed Verbatim Transcription & False-Start Deduplication: Transcribe what the speaker intended into clear, articulate English. If the speaker stutters, restarts sentences, or repeats greetings/phrases/clauses mistakenly (e.g. saying 'hello I am Sriniwas Awasthi' 2-3 times, or 'analyze this PDF... analyze this PDF'), transcribe the finalized thought strictly ONCE with correct grammar and punctuation. Never invent or hallucinate words.\n"
+                                    "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting (Wispr Flow Intelligence): Intelligently detect if the speaker is dictating structured points, advantages/disadvantages, sequential items ('first, second', 'one, two', 'points are', 'tasks are'), or lists. If so, automatically break lines, insert natural section headers where appropriate (e.g. 'Advantages:', 'Key Points:'), and format each distinct point on its own new line with a clean bullet point ('• '). For continuous narrative, use clean paragraphs.\n"
+                                    "3. Anti-Hallucination: If the audio contains only silence, breathing, or room noise, return an empty string. NEVER generate conversational responses, questions, or commentary (e.g. NEVER output 'Vocal audio not in effect', 'Critical', or greetings).\n"
+                                    "4. Clean Grammar Polish: Seamlessly polish grammar, punctuation (periods, commas, question marks, semicolons), and remove verbal fillers ('uh', 'um', 'ah', 'like', 'means', 'basically') while keeping the exact vocabulary.\n"
+                                    "5. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names or greetings that were not uttered in this audio.\n"
+                                    "6. Output Format: Output ONLY the finalized transcribed text directly without preamble, commentary, or markdown blocks."
                                 )
                             },
                             {
@@ -537,27 +538,24 @@ class GeminiEngine:
         # Resilient chunk models
         chunk_model_candidates = [
             "gemini-3.5-transcribe",
-            "gemini-3.6-flash",
             "gemini-3.5-flash-lite",
             "gemini-3.5-flash",
-            "gemini-flash-latest",
-            "gemini-flash-lite-latest",
             "gemini-2.5-flash"
         ]
 
         def _transcribe_chunk_worker(c_idx: int, c_bytes: bytes):
             c_b64 = base64.b64encode(c_bytes).decode("utf-8")
             c_sec = len(c_bytes) / 32000.0
-            c_timeout = (4.0, max(8.0, min(30.0, float(c_sec * 0.5) + 6.0)))
+            c_timeout = (3.0, max(6.0, min(25.0, float(c_sec * 0.5) + 4.0)))
 
             for try_model in chunk_model_candidates:
                 c_url = f"https://generativelanguage.googleapis.com/v1beta/models/{try_model}:generateContent?key={self.api_key}"
                 c_gen_config: Dict[str, Any] = {
                     "temperature": 0.0,
                     "topP": 0.95,
-                    "maxOutputTokens": 8192
+                    "maxOutputTokens": 2048
                 }
-                if "2.5" in try_model or "2.0" in try_model:
+                if "2.5" in try_model.lower() or "2.0" in try_model.lower():
                     c_gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
                 c_payload = {
@@ -569,11 +567,12 @@ class GeminiEngine:
                                         f"{system_instruction}\n\n"
                                         f"Task: Transcribe part {c_idx+1} of {len(chunks)} of the user's continuous speech.\n"
                                         "CRITICAL TRANSCRIPTION DIRECTIVES:\n"
-                                        "1. 100% Completeness: Transcribe every spoken word, sentence, technical term, variable in camelCase/snake_case, semicolon (;), colon (:), list item, and syllabus concept in this audio chunk completely without cutting off, summarizing, or omitting anything.\n"
-                                        "2. Anti-Repetition Guarantee: NEVER repeat any phrase, word, or sentence in an infinite loop. Even if pauses occur in the audio, transcribe each concept once and continue immediately to the next spoken thought.\n"
-                                        "3. Strict Vocabulary & Verb Fidelity: NEVER substitute verbs or nouns with synonyms (transcribe 'analyze', not 'list'; transcribe 'localhost', not 'token'; transcribe 'in my Chrome', not 'Opening Chrome').\n"
-                                        "4. Zero Hallucination: NEVER invent speculative questions or text. Transcribe strictly the actual acoustic speech.\n"
-                                        "5. Output ONLY the finalized transcribed text for this audio segment."
+                                        "1. 100% Completeness & Deduplication: Transcribe spoken concepts completely into clear English. If greetings, clauses, or sentences are repeated (e.g. saying 'hello I am Sriniwas Awasthi' multiple times, or stutters), transcribe each intended thought ONCE and continue.\n"
+                                        "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting: When the speaker dictates structured points, steps, advantages, or lists, automatically format each distinct point on its own new line with a clean bullet point ('• ') and natural section headers.\n"
+                                        "3. Anti-Repetition Guarantee: NEVER repeat any phrase, word, or sentence in an infinite loop. Intelligently collapse false starts and restarts.\n"
+                                        "4. Strict Vocabulary & Verb Fidelity: NEVER substitute verbs or nouns with synonyms (transcribe 'analyze', not 'list'; transcribe 'localhost', not 'token').\n"
+                                        "5. Zero Hallucination & Proper Name Integrity: NEVER invent speculative text or output 'Vocal audio not in effect'. ONLY output proper names if explicitly spoken. Transcribe strictly the actual acoustic speech.\n"
+                                        "6. Output ONLY the finalized transcribed text for this audio segment directly."
                                     )
                                 },
                                 {
@@ -787,23 +786,30 @@ class GeminiEngine:
 
     @staticmethod
     def apply_dictionary(text: str, dictionary: List[Dict[str, str]]) -> str:
-        """Applies phonetic dictionary replacements with word-boundary awareness."""
+        """Applies phonetic dictionary replacements with punctuation-resilient word-boundary awareness."""
         if not text or not dictionary:
             return text
 
         result = text
-        for entry in dictionary:
+        # Sort entries by spoken length descending so longer phrases match before substrings
+        sorted_dict = sorted(dictionary, key=lambda e: len(e.get("spoken", "").strip()), reverse=True)
+        for entry in sorted_dict:
             spoken = entry.get("spoken", "").strip()
             replacement = entry.get("replacement", "").strip()
             if not spoken or not replacement:
                 continue
-            escaped = re.escape(spoken)
-            # Use word boundaries if spoken phrase is composed of word characters
-            if re.match(r'^\w+(?:\s+\w+)*$', spoken):
-                pattern = re.compile(r'\b' + escaped + r'\b', re.IGNORECASE)
-            else:
-                pattern = re.compile(escaped, re.IGNORECASE)
-            result = pattern.sub(replacement, result)
+
+            # Clean core token (stripping trailing/leading punctuation from entries like 'Srinivas Awasthi.')
+            core_spoken = re.sub(r'^[^\w]+|[^\w]+$', '', spoken)
+            core_replacement = re.sub(r'^[^\w]+|[^\w]+$', '', replacement)
+
+            if core_spoken and re.match(r'^\w+(?:\s+\w+)*$', core_spoken):
+                pat = re.compile(r'\b' + re.escape(core_spoken) + r'\b', re.IGNORECASE)
+                result = pat.sub(core_replacement, result)
+
+            if spoken != core_spoken:
+                pat_lit = re.compile(re.escape(spoken), re.IGNORECASE)
+                result = pat_lit.sub(replacement, result)
 
         return result
 
@@ -835,10 +841,13 @@ class GeminiEngine:
         """
         Cleans transcribed text:
         1. Strips markdown fences, surrounding quotes, and verbal disfluencies.
-        2. Completely detects and collapses autoregressive repetition loops of any length
-           (e.g., 'robust testing, robust testing...' or multi-word phrase loops).
-        3. Collapses word stutters and cleans dangling punctuation artifacts.
+        2. Completely strips hallucinated preambles (e.g. 'Vocal audio not in effect').
+        3. Collapses false-starts, sentence restarts, and multi-word phrase repetition loops via AI Brain.
+        4. Normalizes punctuation, spaces, and capitalization.
         """
+        if not raw_text or not raw_text.strip():
+            return ""
+
         text = raw_text.strip()
         if text.startswith("```") and text.endswith("```"):
             lines = text.split("\n")
@@ -847,45 +856,30 @@ class GeminiEngine:
         if text.startswith('"') and text.endswith('"') and "\n" not in text:
             text = text[1:-1].strip()
 
-        # 1. Deterministic hesitation & filler token cleanup
+        # 1. Remove conversational preambles
+        preambles = [
+            r'^(?:here is (?:the|your) (?:transcription|transcribed text|text):\s*)',
+            r'^(?:transcription:\s*)',
+            r'^(?:certainly!?\s*)',
+            r'^(?:sure!?\s*)',
+        ]
+        for p in preambles:
+            text = re.sub(p, '', text, flags=re.IGNORECASE).strip()
+
+        # 2. Completely eliminate hallucination markers anywhere in text
+        text = re.sub(r'\b(?:vocal\s+)?audio\s+not\s+in\s+effect\b[\.\?!]?', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\b(?:no\s+speech\s+detected|silence\s+detected)\b[\.\?!]?', '', text, flags=re.IGNORECASE)
+
+        # 3. Deterministic hesitation & filler token cleanup
         filler_pattern = re.compile(r'\b(uh|um|ah|er|eh|uhm|ahm|umm|ahh|uhh)\b[,;:]*', re.IGNORECASE)
         text = filler_pattern.sub('', text)
 
-        # 2. Multi-word phrase loop collapse (handles 'robust testing, robust testing...' repeated 2 to 500+ times)
-        # Check phrase lengths from 10 down to 1 words
-        for phrase_len in range(10, 0, -1):
-            pattern = r'\b((?:\w+[\s,;—\-]+){' + str(phrase_len) + r'})\1+'
-            prev = None
-            iters = 0
-            while prev != text and iters < 25:
-                prev = text
-                iters += 1
-                text = re.sub(pattern, r'\1', text, flags=re.IGNORECASE)
+        # 4. Multi-pass AI Brain false-start, re-take & repetition collapse
+        text = VocabEngine.collapse_repetitions_and_stutters(text)
 
-        # Collapses repeated lists/clauses like: 'phrase, phrase, phrase'
-        pattern_list = r'\b([A-Za-z0-9_\'\-]+(?:\s+[A-Za-z0-9_\'\-]+){0,8})(?:[\s,;—\-]+(?:\1\b))+'
-        prev = None
-        iters = 0
-        while prev != text and iters < 25:
-            prev = text
-            iters += 1
-            text = re.sub(pattern_list, r'\1', text, flags=re.IGNORECASE)
-
-        # 3. Single-word stutter collapse (e.g., '12, 12, 12', 'and and', 'if if')
-        prev = None
-        iters = 0
-        while prev != text and iters < 25:
-            prev = text
-            iters += 1
-            text = re.sub(r'\b(\w+)(?:[\s,;—\-]+)\1\b', r'\1', text, flags=re.IGNORECASE)
-
-        # 4. Normalize multiple spaces and cleanup dangling punctuation from removed repetitions/fillers
-        text = re.sub(r'[,;]\s*(na|ya)\s*([.?!]?)$', r'\2', text, flags=re.IGNORECASE)
-        text = re.sub(r'\s*,\s*,+', ',', text)
-        text = re.sub(r'\s*,\s*\.', '.', text)
-        text = re.sub(r'^\s*[,;:\.]\s*', '', text)  # leading punctuation
-        text = re.sub(r'\s+([,.:;?!])', r'\1', text)  # space before punctuation
-        text = re.sub(r'[ \t]{2,}', ' ', text).strip()
+        # 5. Check if output contains any actual words
+        if not re.search(r'\w', text):
+            return ""
 
         # Capitalize start if needed
         if text and text[0].islower() and not text.startswith("http"):

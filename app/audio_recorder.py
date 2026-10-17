@@ -357,14 +357,36 @@ class AudioRecorder:
             else:
                 self._tail_wav_bytes = None
 
-            # Optimization for long-form recordings: If rolling chunks were emitted and duration >= 50s,
-            # return the tail chunk as wav_bytes (saving 3-5s of WAV re-encoding latency!)
-            if self._rolling_sample_cursor > 0 and duration >= 50.0:
-                wav_bytes = self._tail_wav_bytes if self._tail_wav_bytes else self._samples_to_wav(audio_data[-min(len(audio_data), 16000 * 2):], trim_silence=False)
-            else:
-                wav_bytes = self._samples_to_wav(audio_data, trim_silence=False)
-            logger.info(f"Recorded audio ({duration:.2f}s). Rolling active: {self._rolling_sample_cursor > 0}, Tail bytes: {len(self._tail_wav_bytes) if self._tail_wav_bytes else 0}")
+            # Always return full session audio to guarantee zero data loss and enable full-recording fallbacks
+            wav_bytes = self._samples_to_wav(audio_data, trim_silence=False)
+            logger.info(f"Recorded audio ({duration:.2f}s, {len(wav_bytes)} bytes). Rolling active: {self._rolling_sample_cursor > 0}, Tail bytes: {len(self._tail_wav_bytes) if self._tail_wav_bytes else 0}")
             return wav_bytes, duration
         except Exception as e:
             logger.error(f"Error converting audio to WAV: {e}")
             return b"", duration
+
+    @staticmethod
+    def contains_speech(wav_bytes: bytes, threshold_rms: float = 0.0008, threshold_peak: float = 0.005) -> bool:
+        """
+        Determines whether the recorded audio buffer contains acoustic human speech.
+        Uses conservative thresholds to protect quiet speech, whispers, and soft syllables,
+        while safely rejecting true flat digital silence.
+        """
+        if not wav_bytes or len(wav_bytes) < 1000:
+            return False
+        try:
+            import wave
+            import io
+            import numpy as np
+            with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
+                nframes = wf.getnframes()
+                if nframes < 1600:  # Less than 0.1s
+                    return False
+                pcm = wf.readframes(nframes)
+            samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+            peak = float(np.max(np.abs(samples)))
+            rms = float(np.sqrt(np.mean(samples ** 2)))
+            return peak >= threshold_peak or rms >= threshold_rms
+        except Exception:
+            return True
+

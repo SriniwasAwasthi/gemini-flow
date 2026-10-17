@@ -24,6 +24,16 @@ class ModelMetadata:
 
 
 MODEL_REGISTRY: Dict[str, ModelMetadata] = {
+    "gemini-3-flash-preview": ModelMetadata(
+        model_name="gemini-3-flash-preview",
+        display_name="Gemini 3 Flash Preview (Ultra-Fast: ~1.1s)",
+        speed_rating=5,
+        typical_latency="~1.1s",
+        punctuation_style="Direct real-time speech transcription, low latency, active quota",
+        reasoning_capability="high",
+        technical_capability="expert",
+        recommended_tasks=["Instant dictation", "Speech transcription", "Coding voice"]
+    ),
     "gemini-3.5-transcribe": ModelMetadata(
         model_name="gemini-3.5-transcribe",
         display_name="Gemini 3.5 Transcribe (Dedicated Speech Model: < 1.5s)",
@@ -128,12 +138,12 @@ class RoutingResult:
 
 class ModelRouter:
     """Centralized routing layer tuned to Gemini 3.5 Flash Lite for ultra-low latency and zero-drop dictation."""
-    def __init__(self, default_model: str = "gemini-3.5-flash-lite"):
+    def __init__(self, default_model: str = "gemini-3.5-flash"):
         self.default_model = default_model
         self.model_registry = MODEL_REGISTRY
 
     def get_metadata(self, model_name: str) -> ModelMetadata:
-        return self.model_registry.get(model_name, self.model_registry["gemini-3.5-flash-lite"])
+        return self.model_registry.get(model_name, self.model_registry.get("gemini-3.5-flash", list(self.model_registry.values())[0]))
 
     @classmethod
     def route_model(
@@ -193,9 +203,9 @@ class ModelRouter:
         speech_meta = self.model_registry.get("gemini-3.5-transcribe", meta)
         flash_meta = self.model_registry.get("gemini-3.6-flash", meta)
 
-        # 2. Voice Audio Dictation Routing (High-fidelity transcription with < 1.2s latency)
+        # 2. Voice Audio Dictation Routing (High-speed transcription with < 1.6s latency)
         if task in ("DICTATE", "VOICE", "TRANSCRIPTION", "SPEECH", "AUDIO"):
-            # Use dedicated Gemini 3.5 Transcribe model for 100% speech fidelity and zero verb substitution
+            speech_meta = self.model_registry.get("gemini-3.5-transcribe", meta)
             return RoutingResult(
                 model_name="gemini-3.5-transcribe",
                 metadata=speech_meta,

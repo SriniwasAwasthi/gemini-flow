@@ -176,14 +176,17 @@ class TextInjector:
 
             logger.info("Text pasted successfully via Ctrl+V.")
 
-            # 4. Handle post-paste clipboard state
+            # 4. Handle post-paste clipboard state with dynamic delay scaled to transcript size
+            # Large texts (thousands of words) take Windows target apps longer to consume from clipboard
+            post_paste_delay = max(0.25, min(1.5, (len(text) / 20000.0) + 0.25))
+
             if leave_in_clipboard is not None:
                 # Allow target window time to process the Ctrl+V paste message
-                time.sleep(0.20)
+                time.sleep(post_paste_delay)
                 self._safe_set_clipboard(leave_in_clipboard)
                 logger.info("Clipboard updated with safeguard text (normal speech backup).")
             elif restore_clipboard and old_clipboard is not None:
-                time.sleep(0.5)
+                time.sleep(post_paste_delay + 0.15)
                 self._safe_set_clipboard(old_clipboard)
 
             return True

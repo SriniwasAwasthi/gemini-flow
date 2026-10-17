@@ -801,6 +801,12 @@ class GeminiFlowApp:
 
             self.gemini.set_api_key(api_key)
 
+            # Fast-path acoustic silence check: if audio is pure room noise/silence, exit in <5ms with zero hallucinations
+            if not AudioRecorder.contains_speech(wav_bytes):
+                logger.info(f"Acoustic check: Audio contains zero speech energy ({duration:.2f}s). Skipping AI call.")
+                self.signals.finished.emit(True, "", duration, self.config.get("mode_preset", "clean_dictation"), "General", "SilenceDetector", "")
+                return
+
             # 1. Resolve Application Context & Dynamic Profile
             target_hwnd = getattr(self.text_injector, "last_target_hwnd", None)
             app_context = AppIntelligenceManager.get_active_app_context(target_hwnd)
@@ -894,20 +900,32 @@ class GeminiFlowApp:
                                 if ok_r and txt_r and txt_r.strip():
                                     c["text"] = txt_r.strip()
                                     c["done"] = True
+                                    c["wav"] = None
                             except Exception:
                                 pass
 
                 with self._rolling_lock:
+                    # Detect if any chunk containing acoustic speech failed to transcribe
+                    unresolved_speech_chunks = [
+                        c for c in self._rolling_chunks
+                        if isinstance(c, dict) and not c.get("text") and c.get("wav") and AudioRecorder.contains_speech(c["wav"])
+                    ]
                     valid_chunks = [
                         (c["text"].strip() if isinstance(c, dict) else str(c).strip())
                         for c in self._rolling_chunks
                         if (isinstance(c, dict) and c.get("text") and c["text"].strip()) or (isinstance(c, str) and c.strip())
                     ]
 
-                if valid_chunks:
+                if not unresolved_speech_chunks and valid_chunks:
                     raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
                     success = True
                 else:
+                    if unresolved_speech_chunks:
+                        logger.warning(
+                            f"Rolling streaming had {len(unresolved_speech_chunks)} unresolved speech chunk(s). "
+                            "Triggering full-session audio fallback to prevent any loss of spoken content."
+                        )
+                    # Complete full-session fallback: transcribe entire session wav_bytes
                     success, raw_result = self.gemini.transcribe_audio(
                         wav_bytes=wav_bytes,
                         system_instruction=prompt,
@@ -916,6 +934,11 @@ class GeminiFlowApp:
                         auto_cost_mode=auto_cost_mode,
                         offline_fallback_enabled=offline_fallback_on
                     )
+                    # If full-audio fallback also failed, salvage whatever valid rolling chunks completed
+                    if not success and valid_chunks:
+                        logger.warning("Full-session audio fallback failed; salvaging completed rolling chunks to prevent total loss.")
+                        raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
+                        success = True
 
             if self._is_cancelled:
                 return
@@ -1326,10 +1349,30 @@ def start_app(show_window: bool = True):
                     time.sleep(0.1)
             os._exit(0)
         else:
-            if attempt < 2:
-                # Primary may still be initializing or starting up; give it time before assuming zombie
+            # Check if the process holding the PID is actually still running in Windows
+            is_old_alive = False
+            if PID_FILE.exists():
+                try:
+                    with open(PID_FILE, "r", encoding="utf-8") as f:
+                        old_pid = int(f.read().strip().split(":")[0])
+                    import ctypes
+                    # PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+                    h_proc = ctypes.windll.kernel32.OpenProcess(0x1000, False, old_pid)
+                    if h_proc:
+                        ctypes.windll.kernel32.CloseHandle(h_proc)
+                        is_old_alive = True
+                except Exception:
+                    pass
+
+            if is_old_alive and not is_force_restart and attempt < 3:
+                # Primary process is alive in Windows; do not kill it, give it another moment
+                time.sleep(0.6)
+                continue
+
+            if attempt < 2 and not is_force_restart:
                 time.sleep(0.5)
                 continue
+
             logger.warning(f"Named Mutex held by unresponsive instance (attempt {attempt+1}/4). Purging zombie processes...")
             terminate_other_gemini_flow_instances()
             release_app_mutex()

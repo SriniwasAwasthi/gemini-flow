@@ -35,10 +35,10 @@ def test_all():
     assert cleaned == "Hello World"
 
     # Test Dictionary Replacement
-    dict_rules = [{"spoken": "Srinivas Avasthi", "replacement": "Sri Srinivas Awasthi"}, {"spoken": "Wisper", "replacement": "Wispr"}]
+    dict_rules = [{"spoken": "Srinivas Avasthi", "replacement": "Sriniwas Awasthi"}, {"spoken": "Wisper", "replacement": "Wispr"}]
     test_text = "Hello, my name is Srinivas Avasthi and I use Wisper."
     replaced = GeminiEngine.apply_dictionary(test_text, dict_rules)
-    assert replaced == "Hello, my name is Sri Srinivas Awasthi and I use Wispr."
+    assert replaced == "Hello, my name is Sriniwas Awasthi and I use Wispr."
     print(f"  - Dictionary replacement verified: '{test_text}' -> '{replaced}'")
     print("[PASS] Dictionary Replacement Logic OK.")
 
