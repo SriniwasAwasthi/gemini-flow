@@ -199,6 +199,12 @@ DEFAULT_SAVED_PROMPTS = [
             "7. Output ONLY the finalized polished technical text or code directly without preamble, quotes, markdown code fences, or conversational remarks."
         ),
         "is_active": False
+    },
+    {
+        "id": "prompt_enhancer",
+        "title": "AI Prompt Enhancer",
+        "prompt": DEFAULT_PROMPTS["prompt_enhancer"],
+        "is_active": False
     }
 ]
 
@@ -606,6 +612,16 @@ class ConfigManager:
             prompts = [p.copy() for p in DEFAULT_SAVED_PROMPTS]
             self.config["saved_prompts"] = prompts
             self.save_config()
+        else:
+            existing_ids = {p.get("id") for p in prompts}
+            updated = False
+            for dp in DEFAULT_SAVED_PROMPTS:
+                if dp["id"] not in existing_ids:
+                    prompts.append(dp.copy())
+                    updated = True
+            if updated:
+                self.config["saved_prompts"] = prompts
+                self.save_config()
         return prompts
 
     def save_custom_prompt(self, title: str, prompt_text: str, prompt_id: str = None, set_active: bool = False) -> str:
@@ -683,26 +699,26 @@ class ConfigManager:
         return None
 
     def get_system_prompt(self, preset_override: str = None, app_context: Any = None, profile_id_override: str = None) -> str:
-        preset = preset_override or self.config.get("mode_preset", "clean_dictation")
-        custom_prompt = self.config.get("custom_prompt", "").strip()
-        if custom_prompt and not preset_override:
+        active_saved = self.get_active_saved_prompt()
+        custom_prompt = (active_saved.get("prompt") if active_saved else "") or self.config.get("custom_prompt", "").strip()
+
+        if preset_override and preset_override not in ("clean_dictation", self.config.get("mode_preset")):
+            base_prompt = DEFAULT_PROMPTS.get(preset_override, DEFAULT_PROMPTS["clean_dictation"])
+        elif custom_prompt:
             base_prompt = custom_prompt
         else:
+            preset = preset_override or self.config.get("mode_preset", "clean_dictation")
             base_prompt = DEFAULT_PROMPTS.get(preset, DEFAULT_PROMPTS["clean_dictation"])
 
         # 1. Inject Active Profile Directives (Dynamically adapted from active app or override)
         try:
             from app.profiles.profile_manager import ProfileManager
             pm = ProfileManager()
-            active_prof_id = profile_id_override or getattr(app_context, "profile_id", None) or self.config.get("active_profile", "casual")
+            active_prof_id = profile_id_override or self.config.get("active_profile") or getattr(app_context, "profile_id", None) or "casual"
             pm.set_active_profile(active_prof_id)
             prof = pm.get_active_profile()
             if prof and prof.system_prompt_addition:
-                # In clean dictation or verbatim mode, never inject coding/engineering persona directives that force code blocks
-                if preset in ("clean_dictation", "verbatim") and prof.id in ("coding", "engineering"):
-                    pass
-                else:
-                    base_prompt += f"\n\n[Profile Directive - {prof.name}]:\n{prof.system_prompt_addition}"
+                base_prompt += f"\n\n[Profile Directive - {prof.name}]:\n{prof.system_prompt_addition}"
         except Exception as e:
             logger.debug(f"Profile prompt injection note: {e}")
 

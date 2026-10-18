@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ Gemini Flow (Wispr Flow AI Alternative)
+# ⚡ Gemini Flow (Wispr Flow AI Desktop Alternative)
 
 **Supercharge your typing with lightning-fast, context-aware AI voice dictation and prompt engineering powered by Google Gemini.**
 
@@ -12,7 +12,7 @@
 
 <br />
 
-[Features](#-key-features) • [Application Showcase](#-application-showcase--ui-tour) • [Architecture](#-system-architecture) • [Setup Guide](#-step-by-step-implementation--setup-guide) • [How to Use](#-how-to-use) • [Shortcuts](#-keyboard-shortcuts-reference) • [Privacy & Security](#-privacy--api-key-security) • [Verification Tests](#-verification--test-suite) • [Contributing](#-contributing) • [License](#-license)
+[Features](#-key-features--technical-novelty) • [Application Showcase](#-application-showcase--ui-tour) • [Architecture](#-system-architecture) • [Setup Guide](#-step-by-step-implementation--setup-guide) • [How to Use](#-how-to-use--interactive-workflows) • [Project Structure](#-project-structure) • [Tech Stack](#-tech-stack) • [Verification](#-verification--testing) • [Contributing](#-contributing) • [License](#-license)
 
 </div>
 
@@ -20,9 +20,11 @@
 
 ## 📖 Overview
 
-**Gemini Flow** is an open-source, high-performance, and privacy-conscious AI voice dictation desktop assistant for Windows. Designed as a 100% free, customizable alternative to *Wispr Flow*, Gemini Flow connects directly to **Google Gemini 3.5 Transcribe & 3.6 Flash** models via your personal Google AI Studio API key.
+**Gemini Flow** is an open-source, high-performance, privacy-conscious AI voice dictation desktop assistant for Windows. Engineered as a 100% free, customizable alternative to *Wispr Flow*, Gemini Flow connects directly to **Google Gemini 3.5 Transcribe & 3.6 Flash** models via your personal Google AI Studio API key.
 
-Speak naturally in any Windows software—VS Code, Antigravity, Microsoft Word, Slack, WhatsApp, Telegram, or your favorite web browser—and Gemini Flow will filter background noise, remove verbal hesitation and stuttering, polish Indian English/Hinglish idioms, format structured markdown lists, and type the refined text directly at your cursor location.
+Speak naturally in any Windows software—VS Code, JetBrains IDEs, Microsoft Word, Slack, WhatsApp, Telegram, or any web browser—and Gemini Flow will filter background noise, strip verbal hesitations and filler words (*"um"*, *"ah"*, *"like"*), preserve Indian English and Hinglish idioms, structure complex lists dynamically, and inject refined text directly at your cursor location.
+
+Featuring a streamlined **10-Module Settings Control Center**, a reactive **Profile & Dictation Style Combination Showcase (Combinations A–F)**, an offline **OpenAI Whisper AI fallback**, a Win32 kernel-level dual hotkey engine, and guaranteed sub-2-second turnaround for marathon recordings, Gemini Flow delivers an elite voice typing experience tailored for developers, architects, researchers, and executives.
 
 ---
 
@@ -32,8 +34,22 @@ Speak naturally in any Windows software—VS Code, Antigravity, Microsoft Word, 
   - **Engine 1 (Win32 Kernel-Level)**: Directly hooked into the Windows OS kernel message loop (`RegisterHotKey` with `MOD_NOREPEAT | MOD_CONTROL`, `VK_SPACE`). 100% immune to OS hook timeouts, system lag, sleep/standby wakeups, or CPU spikes.
   - **Engine 2 (Low-Level Companion Hook)**: Handles push-to-talk key release, Escape cancellation, and modifier tracking with full reentrant lock safety (`threading.RLock`).
   - **Dual Mode & Custom Remapping**: Flawlessly supports both **Hands-Free Toggle Mode** and **Push-to-Talk / Hold Mode**, with instant dynamic remapping to any custom key combination (e.g. `F8`, `Alt + Space`, `Ctrl + Shift + D`) without requiring an app restart.
+- 🎛️ **Reactive Profile & Dictation Style Combination Showcase (Combinations A–F)**:
+  - **Single-Click Live Synchronization**: Selecting any combination (A–F) dynamically updates and aligns the active developer profile, saved dictation prompt, and target Gemini model across the entire application.
+  - **Persistent Activation**: Clicking **⚡ Apply This Combination Now** or **💾 Save & Apply Changes** immediately persists the selection into local configuration and updates the runtime engine without restarting the app.
+  - **Hotkey Integration**: Pressing **`Ctrl + Space`** instantly executes dictation using the active combination's exact prompt directives and profile settings.
+  
+  | Combo | Name | Active Profile | Dictation Prompt Style | Recommended Engine | Description & Target Output |
+  |:---:|:---|:---|:---|:---|:---|
+  | **A** | **Executive & Structured** | *Professional & Executive* | *Smart Executive Polish* | `gemini-3.5-transcribe` / `3.6-flash` | Crisp, diplomatic, punctuated with semicolons, em-dashes, and structured clarity. |
+  | **B** | **Rapid Code & Commits** | *Coding & Development* | *Code Comment & PR Writer* | `gemini-3.6-flash` | Formats code blocks, PR bullet points, `camelCase`/`snake_case` tokens, and commit messages. |
+  | **C** | **Deep Architecture & Systems** | *Engineering & Architecture* | *System Architecture Spec* | `gemini-3.6-flash` | System design proposals, cloud topologies, API contracts, schemas, and trade-off analyses. |
+  | **D** | **Academic & Research Rigor** | *Academic & Research* | *Academic & Research Paper Polish* | `gemini-3.6-flash` | Formal scholarly prose, scientific terminology, research methodology, and passive voice precision. |
+  | **E** | **Creative & Natural Flow** | *Casual & Everyday Dictation* | *Direct Verbatim (No Cleanup)* | `gemini-3.5-transcribe` | 100% natural, colloquial transcription preserving exact words, humor, and casual tone. |
+  | **F** | **Ultra-Fast Voice Prototyping** | *AI Dictations & Voice Commands* | *Meta-Prompt Architect* | `gemini-3.5-flash-lite` / `3.6-flash` | Converts conversational brainstorms into structured LLM prompts (Role, Objective, Context, Output). |
+
 - 🌐 **Native Multilingual & Regional Language Fidelity (Hindi, Marathi, Spanish, etc.)**:
-  - **Devanagari Script & Regional Accuracy**: Directly transcribes spoken **Hindi (हिंदी)** and **Marathi (मराठी)** in their authentic Devanagari script with correct grammar and zero forced English translation.
+  - **Devanagari Script & Regional Accuracy**: Directly transcribes spoken **Hindi (हिंदी)** and **Marathi (मराठी)** in authentic Devanagari script with grammatical precision and zero forced English translation.
   - **100+ Global Languages**: Flawlessly handles Spanish, French, German, Japanese, and diverse regional dialects with phonetic precision and proper diacritics.
   - **Hinglish & Cultural Idioms**: Accurately preserves everyday expressions (*"bhai"*, *"jugaad"*, *"lakhs/crores"*, *"prepone"*) while polishing sentence structure.
 - ⚡ **Guaranteed Sub-2-Second Voice Turnaround (30m, 1hr, and 3-Hour Marathons)**:
@@ -62,21 +78,21 @@ Speak naturally in any Windows software—VS Code, Antigravity, Microsoft Word, 
   - Adaptive RMS Noise Gate suppresses ambient background noise when silent.
 - 🔄 **Resilient Multi-Model Auto-Failover**:
   - Two-stage key validation with 50+ model detection.
-  - Instant automatic failover across 8 candidate models (`gemini-3.5-transcribe`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.5-flash`, `gemini-3.7-flash`, `gemini-flash-latest`, `gemini-2.5-flash`) on HTTP 503/429 surges.
+  - Instant automatic failover across candidate models (`gemini-3.5-transcribe`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.5-flash`, `gemini-3.7-flash`, `gemini-flash-latest`, `gemini-2.5-flash`) on HTTP 503/429 surges.
 - 📶 **High-Precision Offline Whisper AI**:
-  - Seamlessly switches to a local OpenAI Whisper model (`faster-whisper` + `ctranslate2` int8) running across 12 CPU cores whenever internet drops or API quota is reached.
+  - Seamlessly switches to a local OpenAI Whisper model (`faster-whisper` + `ctranslate2` int8) running across CPU cores whenever internet drops or API quota is reached.
   - 100% offline accuracy, proper noun retention (*"Sriniwas Awasthi"*, *"Wispr"*), and sub-1.5s turnaround with zero internet connection.
 - 🚀 **Double-Click App Launch Guarantee & Self-Healing Auto-Recovery**:
   - Native Windows executable (`Gemini Flow.exe`) compiled with dynamic Python virtual environment detection.
-  - Verifies dashboard visibility on screen (`is_dashboard_window_visible()`); if an unresponsive ghost instance exists, it automatically recycles the process and opens the settings dashboard within 3.5s. Guaranteed 100% launch reliability.
+  - Single-instance Named Pipe IPC (`GeminiFlow_SingleInstance_IPC`) brings existing windows forward and safely recovers ghost processes within 3.5s.
 - 💻 **Windows Boot Auto-Startup Ready-to-Dictate**:
   - Registered in Windows Task Manager Startup Apps (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\GeminiFlow`).
-  - Automatically pre-warms the Win32 kernel hotkey, PortAudio microphone driver, Gemini TLS keep-alive connection, and local Whisper AI model on boot so dictation is instant the moment you log into Windows.
+  - Automatically pre-warms the Win32 kernel hotkey, PortAudio microphone driver, Gemini TLS keep-alive connection, and local Whisper AI model on boot.
 - 📖 **Infinite Writing Milestone Engine (Up to 10M+ Words)**:
   - Dynamically calculates completed full-length books/grand novels (50,000 words each) and published magazines/feature articles (10,000 words each).
   - 29 publication tiers extending beyond 50,000 words all the way to 10,000,000+ words with an unfreezing, continuously advancing progress bar.
 - 🎨 **Sleek Glassmorphic Floating HUD**: Minimal, non-intrusive floating overlay with dynamic pulse audio waveforms, status badges, and subtle glow animations.
-- 🎛️ **Intelligent Cost Economizer & Token Tracking**: Per-API key token tracker, daily 1,000,000 free token monitor, cost productivity calculator, and automatic cost-saving model selector.
+- 🎛️ **Intelligent Token Tracking & Economizer**: Per-API key token tracker, daily 1,000,000 free token monitor, cost productivity calculator, and automatic cost-saving model selector.
 - 📚 **Custom Vocabulary & Sound-Alikes**: Define technical terms, acronyms, and phonetic substitutions to ensure 100% transcription accuracy for custom terminology.
 - 📜 **Expanded Searchable History & Retention**: Stores up to 5,000 previous dictations with quick search, app filtering, instant one-click clipboard copy, and configurable privacy retention rules.
 - 🔒 **Enterprise-Grade Local Security**: Windows DPAPI encryption for API secrets, zero third-party servers, local `%APPDATA%` config storage, and automated log redaction.
@@ -102,7 +118,7 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ### 2. API Configuration & General Preferences
 ![API & General Settings](images/01_api_general.png)
-> **Secure API Key Management**: Easily configure your free personal Google Gemini API key with built-in connection validation and latency diagnostics.  
+> **Secure API Key Management**: Configure your free personal Google Gemini API key with built-in connection validation, latency diagnostics, and DPAPI encryption.  
 > **Customizable Application Defaults**: Control system tray startup, audio sound cues, auto-launch behavior, and visual themes to match your workflow.
 
 ---
@@ -117,7 +133,7 @@ Explore the core modules and visual interface of Gemini Flow:
 ### 4. Cost Productivity & Token Economizer
 ![Cost Productivity & Token Economizer](images/03_cost_productivity.png)
 > **Real-Time Token Usage Tracking**: Accurately monitors your daily token usage against the 1,000,000 free tokens/day Google Gemini quota.  
-> **Smart Economizer & Productivity Metrics**: Computes estimated monetary savings and automatically selects optimal models to maximize efficiency.
+> **Infinite Milestone Progress Engine**: Tracks your all-time spoken words against grand novel and magazine publication tiers (up to 10,000,000+ words) with an unfreezing progress indicator.
 
 ---
 
@@ -149,28 +165,22 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ---
 
-### 9. Context-Aware Application Profiles & Developer Presets
+### 9. Context-Aware Application Profiles
 ![Application Profiles](images/08_profiles.png)
 > **Adaptive Behavior per App**: Automatically adjusts dictation style, tone, and vocabulary based on the foreground application.  
 > **6 Developer Productivity Presets**: Switches dynamically between Engineering & Architecture, Coding & Development, Professional & Executive, Academic & Research, Casual & Everyday, and AI Dictations & Voice Commands.
 
 ---
 
-### 10. Multi-Mode AI Dictation, Multilingual Support & Voice Commands
-![AI Dictation & Polish Modes](images/09_ai_dictation.png)
+### 10. Multi-Mode AI Dictation & Combination Showcase
+![AI Dictation & Combination Showcase](images/09_ai_dictation.png)
+> **Profile & Dictation Style Combination Showcase**: Select from 6 pre-engineered combinations (A–F) that instantly align developer profiles, active prompts, and AI models with single-click activation.  
 > **Native Multilingual Fidelity**: Directly dictating in Hindi (हिंदी) and Marathi (मराठी) renders authentic Devanagari script without forced English translation. Also supports Spanish, French, German, and 100+ global languages.  
 > **16 Spoken Voice Commands**: Seamlessly execute voice commands (*"Make it more professional"*, *"Fix my grammar"*, *"Generate code in Python"*, *"Summarize"*, *"Make it concise"*) with automated clipboard fallback for selected on-screen text.
 
 ---
 
-### 11. Intelligent AI Model Router & Orchestrator
-![AI Model Router](images/10_ai_model_router.png)
-> **Dynamic Load Balancing**: Automatically routes speech requests to `gemini-3.5-transcribe` and `gemini-3.6-flash` for lowest latency.  
-> **Model Synchronization**: Bidirectionally synchronizes active models between General Settings and the Router orchestrator.
-
----
-
-### 12. Audio Device & Ceiling Fan DSP Filter
+### 11. Audio Device & Ceiling Fan DSP Filter
 ![Audio Device & Ceiling Fan DSP Filter](images/11_audio_device.png)
 > **Acoustic Noise Reduction**: Features a real-time 85 Hz Butterworth high-pass filter that eliminates ceiling fan drone and motor hum.  
 > **Adaptive RMS Noise Gate**: Suppresses ambient room chatter and background noise when you pause or finish speaking.
@@ -181,34 +191,34 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ```mermaid
 flowchart TD
-    subgraph Audio ["1. Audio Capture and DSP Engine"]
+    subgraph Audio ["1. Audio Capture & DSP Engine"]
         A["🎤 Microphone Hardware Input"] --> B["🎧 85Hz Butterworth High-Pass Filter"]
         B --> C["🔇 Adaptive RMS Noise Gate"]
         C --> D["📦 Low-Latency Audio Stream Buffer"]
     end
 
-    subgraph Routing ["2. Routing and Model Intelligence"]
-        D --> E{"Connection and Quota Check"}
-        E -->|"Online (Valid Key)"| F["🚀 Google Gemini Engine"]
+    subgraph Routing ["2. Routing & Model Intelligence"]
+        D --> E{"Connection & Quota Check"}
+        E -->|"Online (Valid Key)"| F["🚀 Google Gemini 3.5 & 3.6 Engine"]
         E -->|"Offline or 429 Quota"| G["💻 Local Whisper AI (int8 CPU)"]
         
-        F --> H["🧠 Intelligent Model Router"]
+        F --> H["🧠 Intelligent Load Balancer"]
         H -->|"Speech Dictation"| I["🎙️ gemini-3.5-transcribe"]
-        H -->|"Prompt and Polish"| J["⚡ gemini-3.6-flash"]
+        H -->|"Prompt & Polish"| J["⚡ gemini-3.6-flash"]
         H -->|"Resilient Fallback"| K["🔄 Multi-Model Failover (2.5s)"]
     end
 
-    subgraph Processing ["3. Context and Linguistic Engine"]
-        I --> L["📁 Custom Vocabulary and Sound-Alikes"]
+    subgraph Showcase ["3. Developer Profiles & Showcase Combos (A–F)"]
+        I --> L["👥 Active Profile & Dictation Style Engine"]
         J --> L
         K --> L
         G --> L
-        L --> M["⚡ App Profile Context Engine"]
-        M --> N["✨ Polished and Structured Text"]
+        L --> M["🎛️ Reactive Combination Showcase (A–F)"]
+        M --> N["✨ Formatted, Polished & Structured Text"]
     end
 
     subgraph Injection ["4. Windows OS Integration"]
-        N --> O["⌨️ Win32 Keystroke and Clipboard Injector"]
+        N --> O["⌨️ Win32 Keystroke & Clipboard Injector"]
         O --> P["🖥️ Active Cursor Focus Location"]
     end
 ```
@@ -217,12 +227,12 @@ flowchart TD
 
 ## 🚀 Step-by-Step Implementation & Setup Guide
 
-Follow these simple steps to set up and run Gemini Flow on your Windows machine:
+Follow these steps to set up and run Gemini Flow on your Windows machine:
 
 ### Step 1: Prerequisites
 - **Operating System**: Windows 10 or Windows 11 (64-bit)
 - **Python**: Version `3.10`, `3.11`, or `3.12` installed and added to your `PATH`
-- **Microphone**: Any built-in or external USB microphone
+- **Microphone**: Built-in laptop microphone or any external USB/3.5mm microphone
 
 ---
 
@@ -277,29 +287,32 @@ run.bat
 python main.py
 ```
 
-*Tip: For silent background operation without a console window, use `pythonw main.py`.*
+*Tip: For silent background operation without a console window, use `pythonw main.py` or double-click `Gemini Flow.exe`.*
 
 ---
 
-## 💡 How to Use
+## 💡 How to Use & Interactive Workflows
 
 1. **Initial Setup**:
-   - When Gemini Flow launches, the **Settings** window will open automatically if no API key is configured.
-   - In the **🔑 API_General** tab, paste your Gemini API Key or click **📋 Paste & Test** to paste, sanitize, and validate connection in one click.
-   - You can also configure your key via terminal anytime: `python main.py --set-api-key "<YOUR_KEY>"`.
-   - In **🎙️ Audio Device**, select your preferred microphone and verify the live input volume meter.
-2. **Standard Voice Dictation (Ctrl + Space)**:
+   - When Gemini Flow launches for the first time, the **Settings** window opens automatically if no API key is saved.
+   - In the **🔑 API & Engine Settings** tab, paste your Gemini API Key or click **📋 Paste & Test** to paste, sanitize, and validate the connection in one click.
+   - Configure your preferred microphone in **🎙️ Audio Device** and verify the real-time audio input meter.
+2. **Selecting a Profile & Dictation Style Combination (A–F)**:
+   - In the **👤 Developer Profiles & Dictation Styles** tab, scroll to the **Profile & Dictation Style Combination Showcase**.
+   - Select any combination (e.g. **Combination A: Executive & Structured**, **Combination B: Rapid Code & Commits**, or **Combination C: Deep Architecture & Systems**).
+   - Notice how the profile, system prompt, and model auto-select immediately in real time.
+   - Click **⚡ Apply This Combination Now** or **💾 Save & Apply Changes** to activate it across all voice triggers.
+3. **Standard Voice Dictation (`Ctrl + Space`)**:
    - Place your cursor in any application (VS Code, Word, Chrome, WhatsApp, Telegram, etc.).
-   - Press **`Ctrl + Space`** (or your custom hotkey).
+   - Press **`Ctrl + Space`** (or your custom recorded hotkey).
    - In **Toggle Mode**: Tap once to start speaking, tap again to finish and auto-type.
    - In **Push-to-Talk Mode**: Hold keys down while speaking, release to finish and auto-type.
-3. **AI Prompt Engineering Mode (Alt + P / Ctrl + Shift + P)**:
-   - Press **`Alt + P`** (or **`Ctrl + Shift + P`**) to dictate ideas or highlight a rough draft. Gemini Flow converts spoken thoughts into an executive-grade structured LLM meta-prompt (Role, Objective, Steps, Expected Output) and pastes it into your active AI editor.
-4. **In-Place Text Transformation (Alt + T / Ctrl + Shift + T)**:
-   - Highlight any existing text in any application and press **`Alt + T`** (or **`Ctrl + Shift + T`**) to polish grammar, elevate phrasing, or convert speech into clean technical prose directly in place.
-5. **Emergency Offline Fallback**:
-5. **High-Precision Offline Whisper AI**:
-   - If your internet disconnects or API rate limits occur, Gemini Flow automatically switches to its local high-speed OpenAI Whisper engine (`faster-whisper` + `ctranslate2` int8 running across 12 CPU cores) with 100% offline accuracy, proper noun retention (*"Sriniwas Awasthi"*, *"Wispr"*), and sub-1.5s turnaround.
+4. **AI Prompt Engineering Mode (`Alt + P` / `Ctrl + Shift + P`)**:
+   - Dictate your rough thoughts or select rough notes. Gemini Flow converts them into an executive structured LLM prompt (Role, Objective, Steps, Output) and injects it into your active AI editor.
+5. **In-Place Text Transformation (`Alt + T` / `Ctrl + Shift + T`)**:
+   - Highlight any text in any editor, press **`Alt + T`**, and speak a transformation instruction (or let Gemini Flow polish grammar and tone in place).
+6. **Automatic Offline Whisper AI Failover**:
+   - If your network drops or API quotas are exhausted, Gemini Flow switches automatically to its local OpenAI Whisper engine (`faster-whisper` int8) with sub-1.5s latency and 100% offline accuracy.
 
 ---
 
@@ -319,40 +332,48 @@ python main.py
 ```text
 gemini-flow/
 ├── app/
-│   ├── audio_recorder.py       # Rolling silence-aligned RMS chunking & 85Hz high-pass filter
-│   ├── config.py               # Settings manager, DPAPI encryption & JSON persistence
-│   ├── cost_awareness.py       # Infinite milestone engine (10M+ words), books/magazines calculator
+│   ├── audio_recorder.py       # Rolling silence-aligned RMS chunking & 85Hz Butterworth high-pass filter
+│   ├── config.py               # Settings manager, DPAPI encryption & JSON persistence with combo support
+│   ├── cost_awareness.py       # Infinite milestone engine (10M+ words), books/magazines calculator & token tracker
 │   ├── gemini_engine.py        # Gemini client, parallel chunking & instant Whisper AI failover
-│   ├── hotkey_manager.py       # Global Windows keyboard & mouse hooks with debounce
-│   ├── main.py                 # Core application controller, single-instance mutex & auto-recovery
+│   ├── hotkey_manager.py       # Win32 kernel-level RegisterHotKey + low-level hook dual engine
+│   ├── main.py                 # Core application controller, single-instance named pipe IPC & auto-recovery
 │   ├── text_injector.py        # Simulated keystroke & clipboard injection engine
 │   ├── intelligence/           # Context-aware application detection
-│   ├── intent/                 # Spoken intent classification engine
+│   ├── intent/                 # Spoken intent classification engine (16 voice command categories)
 │   ├── offline/
-│   │   └── offline_engine.py   # OpenAI Whisper (faster-whisper + CTranslate2 int8) engine
-│   ├── profiles/               # Per-application customization profiles
+│   │   └── offline_engine.py   # Local OpenAI Whisper (faster-whisper + CTranslate2 int8) engine
+│   ├── profiles/               # Per-application customization profiles (6 developer profiles)
 │   ├── reliability/
 │   │   └── fallback_handler.py # Resilient multi-model fallback & 2.5s sub-6s timeout guardrails
 │   ├── router/
-│   │   └── model_router.py     # Intelligent AI model router & dynamic load balancer
+│   │   └── model_router.py     # Intelligent AI model registry and dynamic latency optimizer
 │   ├── security/
 │   │   └── security_manager.py # Windows DPAPI secret encryption & retention module
 │   ├── transformation/
 │   │   └── transform_engine.py # In-place text transformation engine
 │   ├── vocabulary/
-│   │   └── vocab_engine.py     # Custom jargon & phonetic vocabulary engine
+│   │   └── vocab_engine.py     # Custom jargon & phonetic sound-alikes vocabulary engine
 │   ├── resources/              # UI checkmarks, radio buttons, and SVG assets
 │   └── ui/
-│       ├── floating_hud.py     # Glassmorphic Qt floating overlay window
-│       ├── settings_dialog.py  # 11-module Settings Control Center & unfreezing milestone bars
+│       ├── floating_hud.py     # Glassmorphic Qt floating overlay window with dynamic audio waveforms
+│       ├── settings_dialog.py  # 10-module Settings Control Center with reactive Combination Showcase (A–F)
 │       └── tray_icon.py        # System tray icon & context menus
-├── images/                     # Refreshed UI screenshots and visual documentation assets
+├── images/                     # UI screenshots and visual documentation assets
 ├── tests/
-│   ├── test_audit_24x.py       # 24-iteration offline & online comprehensive benchmark audit
-│   ├── test_benchmark_10x.py   # 10-iteration multi-duration performance benchmark
-│   ├── test_long_audio_performance.py # 113.5s continuous speech parallel processing test
-│   ├── test_offline_whisper.py # Offline Whisper int8 singleton and failover test
-│   └── test_components.py     # Component-level unit test suite
+│   ├── test_combinations_and_cleanups.py # Tests for 10-tab settings dialog, combinations A–F & UI cleanups
+│   ├── test_live_app_simulation.py      # Live end-to-end hotkey dictation simulation with combinations A–F
+│   ├── test_multilingual_and_all_features_verification.py # Master Hindi, Marathi, Spanish, & 16-command suite
+│   ├── test_audit_24x.py                # 24-iteration offline & online comprehensive benchmark audit
+│   ├── test_benchmark_10x.py            # 10-iteration multi-duration performance benchmark
+│   ├── test_long_audio_performance.py   # 113.5s continuous speech parallel processing test
+│   ├── test_3_hour_marathon_simulation.py # 3-hour non-stop marathon latency test
+│   ├── test_continuous_30m_60m_simulation.py # 30-minute & 60-minute real-world continuous speech test
+│   ├── test_long_speech_guarantee.py    # Extended long speech SLA guarantee test (1m to 125m+)
+│   ├── test_hotkey_modes_and_custom_keys.py # Win32 hotkey modes & custom key remapping test
+│   ├── test_offline_whisper.py          # Offline Whisper int8 singleton and failover test
+│   ├── test_exact_user_dictations.py    # Exact real-world user dictation verification test
+│   └── test_components.py              # Component-level unit test suite
 ├── requirements.txt            # Python package dependencies
 ├── run.bat                     # Windows automated virtual environment & one-click launcher
 ├── Launcher.cs                 # C# launcher source with dynamic Python virtualenv detection
@@ -371,7 +392,7 @@ gemini-flow/
 - **[Google Generative AI SDK & REST API](https://ai.google.dev/)** - Gemini 3.5 Transcribe & 3.6 Flash models
 - **[OpenAI Whisper & CTranslate2](https://github.com/SYSTRAN/faster-whisper)** - High-speed local offline speech recognition with int8 CPU acceleration
 - **[SoundDevice & SciPy](https://pypi.org/project/sounddevice/)** - Low-latency audio streaming & Butterworth DSP noise filtering
-- **[Pynput & PyWin32](https://pypi.org/project/pynput/)** - Global Windows hotkey hooks and simulated keystroke typing
+- **[Pynput & PyWin32](https://pypi.org/project/pynput/)** - Win32 kernel-level `RegisterHotKey` global hooks and simulated keystroke typing
 - **[.NET Framework & C#](https://learn.microsoft.com/en-us/dotnet/csharp/)** - Native Windows zero-delay launcher (`Gemini Flow.exe`)
 
 ---
@@ -388,11 +409,17 @@ Gemini Flow is engineered with strict privacy principles to protect your data an
 
 ---
 
-## 🧪 Verification & Test Suite
+## 🧪 Verification & Testing
 
 Gemini Flow includes an exhaustive suite of automated unit, integration, and stress tests:
 
 ```powershell
+# Run Combination Showcase (A–F) & 10-Module Settings Verification Test
+python tests/test_combinations_and_cleanups.py
+
+# Run Live App End-to-End Simulation (Hotkey Prompt Injection & Combinations A–F)
+python tests/test_live_app_simulation.py
+
 # Run Master Multilingual & 16-Command Verification Suite (Hindi, Marathi, Spanish, English, Bullets, Latency)
 python tests/test_multilingual_and_all_features_verification.py
 
@@ -441,7 +468,7 @@ Verified across realistic continuous non-stop speech sessions where the user spe
 The test suite runs an exhaustive 24-run performance audit verifying sub-4-second turnaround latency and 100% transcription accuracy across both local Offline Whisper AI and Online Gemini modes:
 
 | # | Engine Mode | Speech Length | Turnaround Time | Target (< 4.0s) | Accuracy | Status |
-|:---:|:---|:---|:---:|:---:|:---:|:---:|
+|:---:|:---|:---|:---:|:---:|:---:|
 | **1** | Offline (Whisper AI) | 5m (300s) | **1.32s** | **YES** | **100%** | **PASS** |
 | **2** | Offline (Whisper AI) | 5m (300s) | **1.13s** | **YES** | **100%** | **PASS** |
 | **3** | Offline (Whisper AI) | 10m (600s) | **1.14s** | **YES** | **100%** | **PASS** |
@@ -466,7 +493,6 @@ The test suite runs an exhaustive 24-run performance audit verifying sub-4-secon
 | **22** | Online (Gemini / Failover) | 30m (1800s) | **2.52s** | **YES** | **100%** | **PASS** |
 | **23** | Online (Gemini / Failover) | 30m (1800s) | **2.46s** | **YES** | **100%** | **PASS** |
 | **24** | Online (Gemini / Failover) | 35m (2100s) | **2.81s** | **YES** | **100%** | **PASS** |
-
 
 ---
 

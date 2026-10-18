@@ -530,7 +530,8 @@ class GeminiFlowApp:
 
                     target_hwnd = getattr(self.text_injector, "last_target_hwnd", None)
                     app_context = AppIntelligenceManager.get_active_app_context(target_hwnd)
-                    active_profile = app_context.profile_id if (app_context and app_context.profile_id) else self.config.get("active_profile", "coding")
+                    user_profile = self.config.get("active_profile")
+                    active_profile = user_profile if user_profile else (app_context.profile_id if (app_context and app_context.profile_id) else "coding")
                     active_mode = self.config.get("mode_preset", "clean_dictation")
                     prompt = self.config.get_system_prompt(preset_override=active_mode, app_context=app_context, profile_id_override=active_profile)
                     auto_cost_mode = self.config.get("auto_cost_mode", True)
@@ -816,14 +817,12 @@ class GeminiFlowApp:
 
             # 2. Voice Dictation Mode: Strictly adhere to user's configured mode_preset (default: clean_dictation)
             # Never force-override voice dictation to prompt_enhancer or code_assistant based on foreground apps.
-            active_profile = app_context.profile_id if (app_context and app_context.profile_id) else self.config.get("active_profile", "coding")
+            user_profile = self.config.get("active_profile")
+            active_profile = user_profile if user_profile else (app_context.profile_id if (app_context and app_context.profile_id) else "coding")
             active_mode = self.config.get("mode_preset", "clean_dictation")
 
             auto_cost_mode = self.config.get("auto_cost_mode", True)
             logger.info(f"Dynamic Context: App='{app_name}', Category='{category}', Profile='{active_profile}', Mode='{active_mode}'")
-
-            # In-memory sync of active profile
-            self.config.config["active_profile"] = active_profile
 
             # 3. Construct Active Speech Transcription System Prompt
             prompt = self.config.get_system_prompt(preset_override=active_mode, app_context=app_context, profile_id_override=active_profile)

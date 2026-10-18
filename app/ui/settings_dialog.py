@@ -1243,7 +1243,6 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(self._create_history_tab(), "📜 History")
         self.tabs.addTab(self._create_profiles_tab(), "⚡ Profiles")
         self.tabs.addTab(self._create_ai_tab(), "🧠 AI Dictation")
-        self.tabs.addTab(self._create_router_tab(), "🎯 AI Model Router")
         self.tabs.addTab(self._create_audio_tab(), "🎙️ Audio Device")
         layout.addWidget(self.tabs)
 
@@ -2798,8 +2797,19 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(showcase_card)
 
-        # Trigger initial showcase population
-        self._on_showcase_combo_changed(0)
+        # Determine initial showcase index matching current config
+        init_idx = 0
+        curr_prof = self.config.get("active_profile", "")
+        curr_p = self.config.get_active_saved_prompt()
+        curr_pid = curr_p.get("id", "") if curr_p else ""
+        for idx, item in enumerate(COMBINATION_SHOWCASE_DATA):
+            if item["profile_id"] == curr_prof and item["prompt_id"] == curr_pid:
+                init_idx = idx
+                break
+        self.showcase_combo.blockSignals(True)
+        self.showcase_combo.setCurrentIndex(init_idx)
+        self.showcase_combo.blockSignals(False)
+        self._update_showcase_preview_display(init_idx)
 
         layout.addStretch()
 
@@ -3472,234 +3482,13 @@ class SettingsDialog(QDialog):
         ac_layout.addWidget(self.cb_auto_cost_mode)
 
         layout.addWidget(auto_cost_card)
-
-        # 4. Interactive Voice AI Cost & ROI Predictor
-        predictor_card = QFrame(self)
-        predictor_card.setStyleSheet("""
-            QFrame {
-                background-color: #0F172A;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 12px;
-            }
-        """)
-        pred_layout = QVBoxLayout(predictor_card)
-        pred_layout.setContentsMargins(12, 12, 12, 12)
-        pred_layout.setSpacing(10)
-
-        pred_title = QLabel("🧮 Interactive Voice AI Cost & Productivity Predictor", predictor_card)
-        pred_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #38BDF8; border: none;")
-        pred_layout.addWidget(pred_title)
-
-        pred_desc = QLabel(
-            "Adjust your estimated daily voice usage below to see projected monthly word output, time saved, and API cost comparison:",
-            predictor_card
-        )
-        pred_desc.setStyleSheet("color: #94A3B8; font-size: 12px; border: none;")
-        pred_layout.addWidget(pred_desc)
-
-        pred_control_row = QHBoxLayout()
-        pred_control_row.addWidget(QLabel("Select Daily Dictation Volume:", predictor_card))
-        self.pred_volume_combo = QComboBox(predictor_card)
-        self.pred_volume_combo.addItem("15 Mins / day — Casual Notes & Quick Searches (~2,250 words/day)", 15)
-        self.pred_volume_combo.addItem("30 Mins / day — Active Developer & Emails (~4,500 words/day)", 30)
-        self.pred_volume_combo.addItem("1 Hour / day — Heavy Dictation & Coding (~9,000 words/day)", 60)
-        self.pred_volume_combo.addItem("2 Hours / day — Full Workflow / Articles (~18,000 words/day)", 120)
-        self.pred_volume_combo.addItem("4 Hours / day — Professional Author / Transcriber (~36,000 words/day)", 240)
-        self.pred_volume_combo.setCurrentIndex(1)  # Default 30 mins
-        self.pred_volume_combo.currentIndexChanged.connect(self._update_cost_prediction)
-        self.pred_volume_combo.activated.connect(self._update_cost_prediction)
-        pred_control_row.addWidget(self.pred_volume_combo, stretch=2)
-        pred_layout.addLayout(pred_control_row)
-
-        # 4 Projection Output Tiles in a row
-        pred_tiles_row = QHBoxLayout()
-        pred_tiles_row.setSpacing(8)
-
-        def create_pred_tile(title: str, accent_color: str):
-            tile = QFrame(predictor_card)
-            tile.setStyleSheet(f"""
-                QFrame {{
-                    background-color: #070D19;
-                    border: 1px solid #1E293B;
-                    border-radius: 6px;
-                    padding: 8px;
-                }}
-            """)
-            tl = QVBoxLayout(tile)
-            tl.setContentsMargins(8, 8, 8, 8)
-            tl.setSpacing(4)
-            t_lbl = QLabel(title, tile)
-            t_lbl.setStyleSheet("color: #94A3B8; font-size: 11px; border: none;")
-            tl.addWidget(t_lbl)
-            v_lbl = QLabel("...", tile)
-            v_lbl.setStyleSheet(f"color: {accent_color}; font-size: 13px; font-weight: bold; border: none;")
-            v_lbl.setWordWrap(True)
-            tl.addWidget(v_lbl)
-            return tile, v_lbl
-
-        t1, self.pred_lbl_words = create_pred_tile("📝 Monthly Words Output", "#38BDF8")
-        t2, self.pred_lbl_time = create_pred_tile("⚡ Monthly Time Saved", "#10B981")
-        t3, self.pred_lbl_cost = create_pred_tile("💲 Est. Gemini API Cost / Mo", "#F59E0B")
-        t4, self.pred_lbl_savings = create_pred_tile("💰 Annual Savings vs Paid Tools", "#EC4899")
-
-        pred_tiles_row.addWidget(t1)
-        pred_tiles_row.addWidget(t2)
-        pred_tiles_row.addWidget(t3)
-        pred_tiles_row.addWidget(t4)
-        pred_layout.addLayout(pred_tiles_row)
-
-        layout.addWidget(predictor_card)
-
-        # 5. Official Google Gemini Pricing Matrix (Crystal Clear Table)
-        pricing_card = QFrame(self)
-        pricing_card.setStyleSheet("""
-            QFrame {
-                background-color: #0F172A;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 12px;
-            }
-        """)
-        p_layout = QVBoxLayout(pricing_card)
-        p_layout.setContentsMargins(12, 12, 12, 12)
-        p_layout.setSpacing(8)
-
-        p_title = QLabel("🏷️ Google Gemini Official API Pricing Matrix", pricing_card)
-        p_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #38BDF8; border: none;")
-        p_layout.addWidget(p_title)
-
-        p_subtitle = QLabel("Official pay-as-you-go developer rates directly from Google Cloud AI. No monthly subscriptions required.", pricing_card)
-        p_subtitle.setStyleSheet("color: #94A3B8; font-size: 12px; border: none;")
-        p_layout.addWidget(p_subtitle)
-
-        self.pricing_table = QTableWidget(self)
-        self.pricing_table.setColumnCount(5)
-        self.pricing_table.setHorizontalHeaderLabels([
-            "AI Model",
-            "Audio Dictation Rate",
-            "Input / 1M Tokens",
-            "Output / 1M Tokens",
-            "Latency & Cost Tier"
-        ])
-        self.pricing_table.setStyleSheet("""
-            QTableWidget {
-                background-color: #0B1120;
-                color: #F8FAFC;
-                gridline-color: #1E293B;
-                border: 1px solid #334155;
-                border-radius: 6px;
-                font-size: 12px;
-                outline: none;
-            }
-            QHeaderView::section {
-                background-color: #1E293B;
-                color: #38BDF8;
-                font-weight: bold;
-                font-size: 12px;
-                padding: 8px 10px;
-                border: none;
-                border-bottom: 2px solid #38BDF8;
-                border-right: 1px solid #334155;
-            }
-            QTableWidget::item {
-                padding: 6px 10px;
-                border-bottom: 1px solid #1E293B;
-            }
-            QTableWidget::item:selected {
-                background-color: #1E293B;
-                color: #38BDF8;
-            }
-        """)
-        self.pricing_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        self.pricing_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        self.pricing_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-        self.pricing_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        self.pricing_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-        self.pricing_table.setColumnWidth(0, 180)
-        self.pricing_table.setColumnWidth(1, 150)
-        self.pricing_table.setColumnWidth(2, 130)
-        self.pricing_table.setColumnWidth(3, 130)
-        self.pricing_table.verticalHeader().setVisible(False)
-        self.pricing_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.pricing_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.pricing_table.setMinimumHeight(240)
-
-        p_row = 0
-        for m_id, p_info in MODEL_PRICING.items():
-            self.pricing_table.insertRow(p_row)
-            self.pricing_table.setRowHeight(p_row, 34)
-
-            # Model item
-            item_model = QTableWidgetItem(f"⚡ {p_info['display_name']}")
-            item_model.setForeground(QColor("#38BDF8"))
-            item_model.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-            self.pricing_table.setItem(p_row, 0, item_model)
-
-            # Audio Rate
-            audio_rate_str = f"${p_info['audio_per_sec'] * 60:.4f} / min"
-            item_audio = QTableWidgetItem(audio_rate_str)
-            item_audio.setForeground(QColor("#10B981"))
-            item_audio.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-            item_audio.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.pricing_table.setItem(p_row, 1, item_audio)
-
-            # Input Tokens
-            item_input = QTableWidgetItem(f"${p_info['input_per_m']:.3f}")
-            item_input.setForeground(QColor("#CBD5E1"))
-            item_input.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.pricing_table.setItem(p_row, 2, item_input)
-
-            # Output Tokens
-            item_output = QTableWidgetItem(f"${p_info['output_per_m']:.2f}")
-            item_output.setForeground(QColor("#CBD5E1"))
-            item_output.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.pricing_table.setItem(p_row, 3, item_output)
-
-            # Tier & Latency
-            item_tier = QTableWidgetItem(p_info["tier"])
-            item_tier.setForeground(QColor("#94A3B8"))
-            self.pricing_table.setItem(p_row, 4, item_tier)
-
-            p_row += 1
-
-        p_layout.addWidget(self.pricing_table)
-        layout.addWidget(pricing_card)
-
-        # Trigger initial prediction calculation
-        self._update_cost_prediction()
-
         layout.addStretch()
         scroll.setWidget(tab)
         return scroll
 
     def _update_cost_prediction(self, *args):
-        """Calculates interactive monthly voice output, time savings, and API cost projections."""
-        if not hasattr(self, 'pred_volume_combo') or not hasattr(self, 'pred_lbl_words'):
-            return
-        daily_mins = self.pred_volume_combo.currentData() or 30
-        days_per_month = 30
-        monthly_mins = daily_mins * days_per_month
-
-        # Average speaking speed: ~150 words/min
-        monthly_words = monthly_mins * 150
-
-        # Typing duration at 40 WPM:
-        typing_mins = monthly_words / 40.0
-        time_saved_hours = max(0.0, (typing_mins - monthly_mins) / 60.0)
-
-        # Gemini Flash-Lite pricing: $0.0012/min audio
-        flash_lite_cost = monthly_mins * (0.000020 * 60)
-        # Commercial voice AI tool baseline: ~$20.00 / month ($240 / year)
-        annual_saved = (20.0 - flash_lite_cost) * 12.0
-
-        # Books equivalent
-        books_eq = monthly_words / 50000.0
-
-        self.pred_lbl_words.setText(f"{monthly_words:,} words\n(~{books_eq:.1f} Full Books)")
-        self.pred_lbl_time.setText(f"~{time_saved_hours:.1f} Hours Saved\n({time_saved_hours/8.0:.1f} full work days)")
-        self.pred_lbl_cost.setText(f"~${flash_lite_cost:.2f} / mo\n(Virtually Free!)")
-        self.pred_lbl_savings.setText(f"Save ~${annual_saved:.2f}/yr\n(99.5% Savings vs $20/mo)")
+        """No-op stub (interactive voice cost predictor and pricing matrix cards removed)."""
+        pass
 
     def _on_auto_cost_toggled(self, checked: bool):
         if hasattr(self, 'auto_cost_badge') and self.auto_cost_badge:
@@ -4001,14 +3790,10 @@ class SettingsDialog(QDialog):
         self.prompt_status_label.setStyleSheet("color: #10B981; font-weight: bold; font-size: 12px; border: none;")
         self.settings_applied.emit()
 
-    def _on_showcase_combo_changed(self, index: int = 0):
-        if not hasattr(self, "showcase_combo") or not self.showcase_combo:
-            return
-        idx = self.showcase_combo.currentIndex()
+    def _update_showcase_preview_display(self, idx: int = 0):
         if idx < 0 or idx >= len(COMBINATION_SHOWCASE_DATA):
             idx = 0
         item = COMBINATION_SHOWCASE_DATA[idx]
-
         if hasattr(self, "showcase_profile_badge"):
             self.showcase_profile_badge.setText(f"⚡ Profile: {item['profile_name']}")
         if hasattr(self, "showcase_prompt_badge"):
@@ -4019,8 +3804,51 @@ class SettingsDialog(QDialog):
             self.showcase_purpose_label.setText(f"🎯 Recommended For: {item['purpose']}")
         if hasattr(self, "showcase_output_edit"):
             self.showcase_output_edit.setPlainText(item["formatted_output"])
+
+    def _on_showcase_combo_changed(self, index: int = 0):
+        if not hasattr(self, "showcase_combo") or not self.showcase_combo:
+            return
+        idx = self.showcase_combo.currentIndex()
+        if idx < 0 or idx >= len(COMBINATION_SHOWCASE_DATA):
+            idx = 0
+        item = COMBINATION_SHOWCASE_DATA[idx]
+
+        # 1. Update showcase preview badges and sample output
+        self._update_showcase_preview_display(idx)
+
+        # 2. Automatically select Profile in Profiles tab
+        prof_id = item["profile_id"]
+        if hasattr(self, "profile_combo") and self.profile_combo:
+            c_idx = self.profile_combo.findData(prof_id)
+            if c_idx >= 0 and self.profile_combo.currentIndex() != c_idx:
+                self.profile_combo.blockSignals(True)
+                self.profile_combo.setCurrentIndex(c_idx)
+                self.profile_combo.blockSignals(False)
+                self._on_profile_combo_changed()
+
+        # 3. Automatically select Prompt / Dictation Style in AI Dictation tab
+        prompt_id = item["prompt_id"]
+        if hasattr(self, "saved_prompts_combo") and self.saved_prompts_combo:
+            p_idx = self.saved_prompts_combo.findData(prompt_id)
+            if p_idx >= 0 and self.saved_prompts_combo.currentIndex() != p_idx:
+                self.saved_prompts_combo.blockSignals(True)
+                self.saved_prompts_combo.setCurrentIndex(p_idx)
+                self.saved_prompts_combo.blockSignals(False)
+                self._on_saved_prompt_selected()
+
+        # 4. Automatically select Model if specified
+        model_id = item.get("model_id")
+        if model_id and hasattr(self, "model_combo") and self.model_combo:
+            m_idx = self.model_combo.findData(model_id)
+            if m_idx >= 0 and self.model_combo.currentIndex() != m_idx:
+                self.model_combo.blockSignals(True)
+                self.model_combo.setCurrentIndex(m_idx)
+                self.model_combo.blockSignals(False)
+
         if hasattr(self, "showcase_status_label"):
-            self.showcase_status_label.setText("")
+            combo_letter = item["title"].split(":")[0].strip()
+            self.showcase_status_label.setText(f"✓ Automatically selected {combo_letter}! Click 'Save & Apply Changes' or 'Apply This Combination Now'.")
+            self.showcase_status_label.setStyleSheet("color: #38BDF8; font-size: 12px; font-weight: 600; border: none;")
 
     def _on_apply_showcase_combination(self):
         if not hasattr(self, "showcase_combo") or not self.showcase_combo:
@@ -4044,6 +3872,15 @@ class SettingsDialog(QDialog):
         # 2. Update and activate Prompt / Dictation Style
         prompt_id = item["prompt_id"]
         self.config.set_active_saved_prompt(prompt_id)
+        id_to_preset = {
+            "clean_dictation_custom": "clean_dictation",
+            "smart_polish_custom": "smart_polish",
+            "code_dev_custom": "code_assistant",
+            "prompt_enhancer": "prompt_enhancer"
+        }
+        if prompt_id in id_to_preset:
+            self.config.set("mode_preset", id_to_preset[prompt_id])
+
         if hasattr(self, "saved_prompts_combo") and self.saved_prompts_combo:
             p_idx = self.saved_prompts_combo.findData(prompt_id)
             if p_idx >= 0:
@@ -4053,7 +3890,7 @@ class SettingsDialog(QDialog):
                 self._on_saved_prompt_selected()
 
         # 3. Update Model if specified
-        model_id = item["model_id"]
+        model_id = item.get("model_id")
         if model_id and model_id != "auto":
             self.config.set("model_name", model_id)
             if hasattr(self, "model_combo") and self.model_combo:
@@ -4065,8 +3902,8 @@ class SettingsDialog(QDialog):
                 if rm_idx >= 0:
                     self.router_model_combo.setCurrentIndex(rm_idx)
 
-        self.config.save_config()
-        self.settings_applied.emit()
+        # 4. Perform full settings save and live broadcast
+        self._save_settings()
 
         if hasattr(self, "showcase_status_label"):
             self.showcase_status_label.setText(f"✓ Applied! Active Profile set to '{item['profile_name']}' & Style set to '{item['prompt_name']}'.")
@@ -5210,6 +5047,20 @@ class SettingsDialog(QDialog):
 
         # Custom Prompt & Saved Prompts
         target_p_id = getattr(self, '_editing_prompt_id', None)
+        if hasattr(self, 'saved_prompts_combo') and self.saved_prompts_combo:
+            c_data = self.saved_prompts_combo.currentData()
+            if c_data:
+                target_p_id = c_data
+                self.config.set_active_saved_prompt(c_data)
+                id_to_preset = {
+                    "clean_dictation_custom": "clean_dictation",
+                    "smart_polish_custom": "smart_polish",
+                    "code_dev_custom": "code_assistant",
+                    "prompt_enhancer": "prompt_enhancer"
+                }
+                if c_data in id_to_preset:
+                    preset = id_to_preset[c_data]
+
         p_title = self.prompt_title_input.text().strip()
         custom_prompt = self.custom_prompt_edit.toPlainText().strip()
         if p_title and custom_prompt:
@@ -5217,7 +5068,12 @@ class SettingsDialog(QDialog):
             self._editing_prompt_id = saved_id
 
         self.config.set("mode_preset", preset)
-        self.config.set("custom_prompt", custom_prompt)
+        if custom_prompt:
+            self.config.set("custom_prompt", custom_prompt)
+        elif target_p_id:
+            active_p = self.config.get_active_saved_prompt()
+            if active_p and active_p.get("prompt"):
+                self.config.set("custom_prompt", active_p["prompt"])
         self.config.set("custom_vocabulary", vocab)
         self.config.set("auto_paste", self.cb_auto_paste.isChecked())
         self.config.set("play_sounds", self.cb_sounds.isChecked())
