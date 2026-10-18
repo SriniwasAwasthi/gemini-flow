@@ -468,7 +468,7 @@ Verified across realistic continuous non-stop speech sessions where the user spe
 The test suite runs an exhaustive 24-run performance audit verifying sub-4-second turnaround latency and 100% transcription accuracy across both local Offline Whisper AI and Online Gemini modes:
 
 | # | Engine Mode | Speech Length | Turnaround Time | Target (< 4.0s) | Accuracy | Status |
-|:---:|:---|:---|:---:|:---:|:---:|
+|:---:|:---|:---:|:---:|:---:|:---:|:---:|
 | **1** | Offline (Whisper AI) | 5m (300s) | **1.32s** | **YES** | **100%** | **PASS** |
 | **2** | Offline (Whisper AI) | 5m (300s) | **1.13s** | **YES** | **100%** | **PASS** |
 | **3** | Offline (Whisper AI) | 10m (600s) | **1.14s** | **YES** | **100%** | **PASS** |
