@@ -380,6 +380,8 @@ gemini-flow/
 ├── run.bat                     # Windows automated virtual environment & one-click launcher
 ├── Launcher.cs                 # C# launcher source with dynamic Python virtualenv detection
 ├── Gemini Flow.exe             # Precompiled native Windows zero-delay double-click executable
+├── app_icon.ico                # High-resolution application icon (256x256 multi-layer Windows icon)
+├── test_audio_sample.wav       # Benchmark reference audio sample for test suite execution
 ├── main.py                     # Root application entry point
 ├── main_standalone.py          # Standalone background runner with crash dialogs
 ├── LICENSE                     # MIT License

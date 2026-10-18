@@ -15,6 +15,7 @@ dist/
 
 # Compiled binaries and local debug logs (Keeps git repo clean and lightweight)
 *.exe
+!Gemini Flow.exe
 *.dll
 *.log
 launcher_debug.log
@@ -27,7 +28,6 @@ htmlcov/
 !Launcher.cs
 app/resources/*_preview.png
 app/resources/checkbox_test.png
-app_icon.ico
 app_icon.png
 
 # Local credentials, test media and machine secrets (Never commit personal API keys or recordings)
@@ -36,6 +36,7 @@ config.local.json
 config.json
 .credentials.bin
 *.wav
+!test_audio_sample.wav
 *.mp3
 *.m4a
 *.ogg
