@@ -86,8 +86,8 @@ BUILTIN_PROFILES: Dict[str, Profile] = {
         description="Tailored for executive memos, business emails, project updates, and proposals.",
         preferred_model="gemini-2.5-flash",
         system_prompt_addition=(
-            "Adopt an articulate, executive, and diplomatic tone. Structure communications with clear "
-            "bullet points, proper punctuation (semicolons, colons, em-dashes), concise executive summaries, and eliminate all colloquialisms."
+            "Adopt an articulate, executive, and diplomatic tone. When listing items or points, format them with clean "
+            "bullet points, proper punctuation (semicolons, colons, em-dashes), and concise summaries. For continuous narrative, preserve clean paragraphs. Eliminate all colloquialisms."
         ),
         vocabulary_categories=["Business", "Executive", "Management"],
         temperature=0.3,
@@ -121,6 +121,21 @@ BUILTIN_PROFILES: Dict[str, Profile] = {
         temperature=0.3,
         is_builtin=True,
         icon="☕"
+    ),
+    "ai_dictations": Profile(
+        id="ai_dictations",
+        name="AI Dictations & Voice Commands",
+        description="Optimized for voice commands, prompt engineering, code generation requests, and AI workflows.",
+        preferred_model="gemini-3.5-flash-lite",
+        system_prompt_addition=(
+            "You are an elite AI Dictation and Voice Command specialist. Execute user commands "
+            "(e.g., 'generate code', 'fix my grammar', 'make it professional', 'summarize') with 100% precision. "
+            "Preserve all facts, technical terms, and intended logic without omission or hallucination."
+        ),
+        vocabulary_categories=["Commands", "AI", "Prompts", "Programming"],
+        temperature=0.1,
+        is_builtin=True,
+        icon="🤖"
     )
 }
 
@@ -131,6 +146,7 @@ class BuiltinProfiles:
     PROFESSIONAL = "professional"
     ACADEMIC = "academic"
     CASUAL = "casual"
+    AI_DICTATIONS = "ai_dictations"
 
 
 class ProfileManager:

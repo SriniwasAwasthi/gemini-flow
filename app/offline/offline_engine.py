@@ -183,7 +183,7 @@ class OfflineSpeechEngine:
         if model is None:
             return False, "Whisper model unavailable"
 
-        default_prompt = "Clean verbatim speech dictation, articulate English grammar, proper punctuation."
+        default_prompt = "Clean verbatim speech dictation, accurate grammar, proper punctuation."
         prompt = initial_prompt if initial_prompt else default_prompt
 
         # Estimate duration in seconds

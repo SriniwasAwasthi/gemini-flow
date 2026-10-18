@@ -63,10 +63,11 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Fix Grammar & Spelling",
         description="Correct all punctuation, grammar, and typos with zero semantic distortion.",
         system_instruction=(
-            "Proofread the following text. Correct all spelling, punctuation, capitalization, and "
-            "grammatical errors. Do not alter intentional vocabulary or tone. Output ONLY the corrected text."
+            "Proofread the following text. Correct all spelling, punctuation, capitalization, subject-verb agreement, "
+            "double negatives, and grammatical errors. Preserve intentional vocabulary and style without altering the intended meaning. "
+            "Output ONLY the corrected text without any explanations, conversational filler, or enclosing quotation marks."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.1,
         icon="✅"
     ),
@@ -75,10 +76,12 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Make Professional",
         description="Transform informal drafts into polished, high-impact executive prose.",
         system_instruction=(
-            "Rewrite the following text in a polished, professional, and authoritative business tone. "
-            "Eliminate slang, casual filler, and emotional vagueness. Output ONLY the rewritten text."
+            "Rewrite the following text in a polished, articulate, and professional style suitable for business or professional communication. "
+            "Crucially, preserve the author's original voice, perspective, and intent (e.g. if written in first-person 'I', keep it in first-person). "
+            "Elevate vocabulary, refine sentence flow, and remove colloquial fillers while keeping the genuine human message intact. "
+            "Never convert personal speech into third-person telemetry, software execution logs, or robotic status reports. Output ONLY the rewritten text."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.3,
         icon="👔"
     ),
@@ -144,13 +147,13 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
     ),
     TransformType.TECHNICAL: TransformPreset(
         type=TransformType.TECHNICAL,
-        title="Technical Standard",
-        description="Refine text using rigorous engineering and technical terminology.",
+        title="Technical & Code",
+        description="Write clean code or refine text using rigorous engineering standards.",
         system_instruction=(
-            "Rewrite the following text adhering to rigorous software engineering and technical "
-            "documentation standards. Use accurate terminology and clear specifications. Output ONLY the text."
+            "Write clean, robust, idiomatic, and production-grade code or technical specifications according to best practices. "
+            "Include concise comments and proper type annotations where applicable. Output ONLY the code or technical content without conversational filler."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.2,
         icon="⚙️"
     ),
@@ -269,13 +272,18 @@ class TransformEngine:
         custom_instruction: str = ""
     ) -> str:
         if custom_instruction and custom_instruction.strip():
-            instruction = f"{custom_instruction.strip()}\n\nOutput ONLY the final transformed text."
+            instruction = f"{custom_instruction.strip()}\n\nOutput ONLY the final transformed text without commentary or preamble."
         else:
             preset = cls.get_preset(transform_type)
             instruction = preset.system_instruction
 
-        if app_context and app_context.system_prompt_addition:
-            instruction += f"\n\nContext Directive for {app_context.app_name} ({app_context.category}):\n{app_context.system_prompt_addition}"
+        # Application context for text transformations:
+        # Provide destination awareness only for messaging/email/writing apps.
+        # NEVER leak dev IDE speech transcription directives (e.g. camelCase/snake_case)
+        # into text transformations, which previously caused personal speech to be converted
+        # into robotic system telemetry or execution logs.
+        if app_context and getattr(app_context, "category", "") in ("email", "communication", "browser", "writing"):
+            instruction += f"\n\nDestination Context: Active application is {app_context.app_name}."
 
         return instruction
 

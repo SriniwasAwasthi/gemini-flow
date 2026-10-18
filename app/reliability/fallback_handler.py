@@ -58,14 +58,14 @@ AUDIO_FALLBACK_CHAINS = {
 }
 
 TEXT_FALLBACK_CHAINS = {
-    "gemini-3.6-flash": ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"],
-    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"],
-    "gemini-3.5-flash": ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"],
-    "gemini-3.7-flash": ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"],
-    "gemini-flash-latest": ["gemini-flash-latest", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"],
-    "gemini-flash-lite-latest": ["gemini-flash-lite-latest", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"],
-    "gemini-2.5-flash": ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"],
-    "gemini-3.5-transcribe": ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"]
+    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"],
+    "gemini-2.5-flash": ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"],
+    "gemini-3.6-flash": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"],
+    "gemini-3.5-flash": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"],
+    "gemini-3.7-flash": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest"],
+    "gemini-flash-latest": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash"],
+    "gemini-flash-lite-latest": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-flash-latest"],
+    "gemini-3.5-transcribe": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-3.5-flash"]
 }
 
 MODEL_FALLBACK_CHAINS = AUDIO_FALLBACK_CHAINS

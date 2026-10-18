@@ -216,7 +216,7 @@ class GeminiEngine:
                 self.last_model_used = "Offline Local Speech (Whisper AI)"
                 self.last_fallback = not is_explicit_offline
                 t_off_start = time.time()
-                prompt_ctx = "Clean speech dictation, articulate English grammar, proper punctuation."
+                prompt_ctx = "Clean speech dictation, accurate grammar, proper punctuation."
                 offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx)
                 self.last_latency = time.time() - t_off_start
                 if offline_ok:
@@ -267,7 +267,7 @@ class GeminiEngine:
                 logger.info("Online Gemini execution did not succeed. Fast fallback to local offline Whisper AI...")
                 try:
                     t_off_start = time.time()
-                    prompt_ctx = "Clean speech dictation, articulate English grammar, proper punctuation."
+                    prompt_ctx = "Clean speech dictation, accurate grammar, proper punctuation."
                     offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx)
                     if offline_ok:
                         if offline_text:
@@ -462,11 +462,11 @@ class GeminiEngine:
                                 "text": (
                                     f"{system_instruction}\n\n"
                                     "CRITICAL SPEECH-TO-TEXT RULES:\n"
-                                    "1. High-Speed Verbatim Transcription & False-Start Deduplication: Transcribe what the speaker intended into clear, articulate English. If the speaker stutters, restarts sentences, or repeats greetings/phrases/clauses mistakenly (e.g. saying 'hello I am Sriniwas Awasthi' 2-3 times, or 'analyze this PDF... analyze this PDF'), transcribe the finalized thought strictly ONCE with correct grammar and punctuation. Never invent or hallucinate words.\n"
-                                    "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting (Wispr Flow Intelligence): Intelligently detect if the speaker is dictating structured points, advantages/disadvantages, sequential items ('first, second', 'one, two', 'points are', 'tasks are'), or lists. If so, automatically break lines, insert natural section headers where appropriate (e.g. 'Advantages:', 'Key Points:'), and format each distinct point on its own new line with a clean bullet point ('• '). For continuous narrative, use clean paragraphs.\n"
-                                    "3. Anti-Hallucination: If the audio contains only silence, breathing, or room noise, return an empty string. NEVER generate conversational responses, questions, or commentary (e.g. NEVER output 'Vocal audio not in effect', 'Critical', or greetings).\n"
-                                    "4. Clean Grammar Polish: Seamlessly polish grammar, punctuation (periods, commas, question marks, semicolons), and remove verbal fillers ('uh', 'um', 'ah', 'like', 'means', 'basically') while keeping the exact vocabulary.\n"
-                                    "5. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names or greetings that were not uttered in this audio.\n"
+                                    "1. Intelligent Dictation & Multilingual Speech Fidelity: Accurately transcribe what the speaker said in their spoken language (including English, Hindi, Marathi, and all global/regional languages). Faithfully preserve the original spoken language and authentic script (e.g. Devanagari script for Hindi/Marathi, Latin script for English/European languages) unless explicitly instructed to translate. If the speaker stutters, restarts sentences, or repeats greetings/phrases/clauses mistakenly (e.g. saying 'hello everyone' 2-3 times, or 'analyze this document... analyze this document'), or corrects a word (e.g. 'many living organisms, many wild living organisms' -> 'many wild living organisms'), transcribe the finalized thought strictly ONCE with correct grammar and punctuation. Never invent or hallucinate words. Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
+                                    "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting: Intelligently detect if the speaker is dictating structured points, advantages/disadvantages, sequential items ('first, second', 'one, two', 'points are', 'tasks are'), or lists. If so, automatically break lines, insert natural section headers where appropriate (e.g. 'Advantages:', 'Key Points:'), and format each distinct point on its own new line with a clean bullet point ('• '). For continuous narrative, explanations, or general speech, preserve clean paragraphs and NEVER force bullet points.\n"
+                                    "3. Anti-Hallucination & Zero-Imagination Guarantee: Transcribe ONLY the acoustic speech actually uttered. If the audio contains only silence, breathing, background noise, or room sound, return an empty string. NEVER generate conversational responses, imaginary sentences, hallucinated facts, questions, commentary, or status words (e.g. NEVER output 'Vocal audio not in effect', 'Critical', or greetings).\n"
+                                    "4. Clean Grammar Polish: Seamlessly polish grammar, punctuation (periods, commas, question marks, semicolons), and remove verbal fillers ('uh', 'um', 'ah', 'like', 'means', 'basically') while keeping 100% of the exact vocabulary and original language.\n"
+                                    "5. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or sign-offs) that were not uttered in this audio.\n"
                                     "6. Output Format: Output ONLY the finalized transcribed text directly without preamble, commentary, or markdown blocks."
                                 )
                             },
@@ -567,11 +567,11 @@ class GeminiEngine:
                                         f"{system_instruction}\n\n"
                                         f"Task: Transcribe part {c_idx+1} of {len(chunks)} of the user's continuous speech.\n"
                                         "CRITICAL TRANSCRIPTION DIRECTIVES:\n"
-                                        "1. 100% Completeness & Deduplication: Transcribe spoken concepts completely into clear English. If greetings, clauses, or sentences are repeated (e.g. saying 'hello I am Sriniwas Awasthi' multiple times, or stutters), transcribe each intended thought ONCE and continue.\n"
-                                        "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting: When the speaker dictates structured points, steps, advantages, or lists, automatically format each distinct point on its own new line with a clean bullet point ('• ') and natural section headers.\n"
+                                        "1. 100% Completeness & Multilingual Fidelity: Accurately transcribe spoken concepts completely in the language spoken (English, Hindi, Marathi, and all global/regional languages), preserving native vocabulary and script (Devanagari, Latin, etc.). If greetings, clauses, or sentences are repeated (e.g. saying 'hello everyone' multiple times, or stutters), or if a word is corrected, transcribe each intended finalized thought ONCE and continue. Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
+                                        "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting: When the speaker dictates structured points, steps, advantages, or lists, automatically format each distinct point on its own new line with a clean bullet point ('• ') and natural section headers. For continuous narrative, preserve clean paragraphs and NEVER force bullet points.\n"
                                         "3. Anti-Repetition Guarantee: NEVER repeat any phrase, word, or sentence in an infinite loop. Intelligently collapse false starts and restarts.\n"
                                         "4. Strict Vocabulary & Verb Fidelity: NEVER substitute verbs or nouns with synonyms (transcribe 'analyze', not 'list'; transcribe 'localhost', not 'token').\n"
-                                        "5. Zero Hallucination & Proper Name Integrity: NEVER invent speculative text or output 'Vocal audio not in effect'. ONLY output proper names if explicitly spoken. Transcribe strictly the actual acoustic speech.\n"
+                                        "5. Zero Hallucination & Proper Name Integrity: NEVER invent speculative text or output 'Vocal audio not in effect'. ONLY output proper names if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or sign-offs) that were not uttered in this audio. Transcribe strictly the actual acoustic speech.\n"
                                         "6. Output ONLY the finalized transcribed text for this audio segment directly."
                                     )
                                 },
@@ -685,8 +685,9 @@ class GeminiEngine:
             custom_instruction=custom_instruction
         )
 
-        # 2. Resolve Primary Model for text transformations
-        primary_model = self.model_name if (self.model_name and self.model_name not in ("auto", "gemini-3.5-transcribe")) else "gemini-3.6-flash"
+        # 2. Resolve Primary Model for text transformations (default to gemini-3.5-flash-lite for instant sub-second quota-available execution)
+        primary_model = self.model_name if (self.model_name and self.model_name not in ("auto", "gemini-3.5-transcribe")) else "gemini-3.5-flash-lite"
+        is_code = (transform_type == TransformType.TECHNICAL or "code" in (custom_instruction or "").lower() or "function" in (custom_instruction or "").lower())
 
         # 3. Model execution function
         def call_model(model: str) -> Tuple[bool, str]:
@@ -729,7 +730,7 @@ class GeminiEngine:
                     if candidates:
                         parts = candidates[0].get("content", {}).get("parts", [])
                         res_text = "".join([self._extract_part_text(p) for p in parts])
-                        cleaned = self._clean_output(res_text)
+                        cleaned = self._clean_output(res_text, is_code=is_code)
                         if cleaned:
                             return True, cleaned
                         return False, "Empty text returned by model."
@@ -753,10 +754,11 @@ class GeminiEngine:
 
         # 5. Vocabulary Normalization & Metrics
         if exec_res.success and exec_res.text:
-            try:
-                exec_res.text = VocabEngine.normalize_text(exec_res.text)
-            except Exception:
-                pass
+            if not is_code and transform_type not in (TransformType.TECHNICAL, TransformType.CUSTOM):
+                try:
+                    exec_res.text = VocabEngine.normalize_text(exec_res.text)
+                except Exception:
+                    pass
 
         words_count = len(exec_res.text.split()) if exec_res.success else 0
         app_str = app_context.app_name if app_context else "General"
@@ -837,23 +839,39 @@ class GeminiEngine:
 
         return text
 
-    def _clean_output(self, raw_text: str) -> str:
+    def _clean_output(self, raw_text: str, is_code: bool = False) -> str:
         """
         Cleans transcribed text:
         1. Strips markdown fences, surrounding quotes, and verbal disfluencies.
         2. Completely strips hallucinated preambles (e.g. 'Vocal audio not in effect').
-        3. Collapses false-starts, sentence restarts, and multi-word phrase repetition loops via AI Brain.
-        4. Normalizes punctuation, spaces, and capitalization.
+        3. Collapses false-starts, sentence restarts, and multi-word phrase repetition loops via AI Brain (for speech).
+        4. Normalizes punctuation, spaces, and capitalization (for speech, preserves code).
         """
         if not raw_text or not raw_text.strip():
             return ""
 
         text = raw_text.strip()
+
+        # If code, strip outer code fence ticks if present and conversational intro, but NEVER mangle syntax or casing!
+        if is_code:
+            if text.startswith("```") and text.endswith("```"):
+                lines = text.split("\n")
+                if len(lines) >= 2:
+                    text = "\n".join(lines[1:-1]).strip()
+            # Remove any AI conversational preamble
+            text = re.sub(
+                r'^(?:(?:here(?:\s+is|\'s)?(?:\s+the)?\s+(?:code|python\s+code|solution|function|implementation|script)?[:\n\s]*)|(?:sure!?[,\s]*))\s*',
+                '',
+                text,
+                flags=re.IGNORECASE
+            )
+            return text
+
         if text.startswith("```") and text.endswith("```"):
             lines = text.split("\n")
             if len(lines) >= 2:
                 text = "\n".join(lines[1:-1]).strip()
-        if text.startswith('"') and text.endswith('"') and "\n" not in text:
+        if text.startswith(('"', "'", "“", "”", "«")) and text.endswith(('"', "'", "“", "”", "»")) and "\n" not in text:
             text = text[1:-1].strip()
 
         # 1. Remove conversational preambles
@@ -886,3 +904,63 @@ class GeminiEngine:
             text = text[0].upper() + text[1:]
 
         return text
+
+    def structure_bullet_points(self, text: str) -> str:
+        """
+        Wispr Flow Intelligence: Intelligently transforms point-wise or sequential dictations
+        (advantages, benefits, key points, steps, features) into a clean introductory sentence
+        followed by bullet points ('• ').
+        """
+        if not text or not text.strip():
+            return text
+
+        if "•" in text or "\n* " in text or "\n- " in text:
+            return text
+
+        # Check for genuine list indicators / sequential points
+        has_points = bool(re.search(
+            r'\b(?:bullet\s+points?|bulleted|numbered\s+list|pros\s+and\s+cons|firstly|secondly|thirdly|'
+            r'point\s+one|point\s+two|item\s+one|item\s+two|'
+            r'advantages?\s+(?:of|about|are|include)|disadvantages?\s+(?:of|about|are|include)|'
+            r'benefits?\s+(?:of|about|are|include)|key\s+points?\s*(?:are|:|include)|'
+            r'the\s+following\s+points?|here\s+are\s+the\s+points|'
+            r'points\s+are\s*(?:as|:|include)|steps?\s+(?:are|to|include))\b',
+            text,
+            re.IGNORECASE
+        ))
+        if not has_points:
+            return text
+
+        # 1. High-speed Gemini AI structuring pass if API key available (<1.5s)
+        if self.api_key:
+            try:
+                struct_prompt = (
+                    "You are Gemini Flow's Wispr Flow Adaptive Dictation Formatter.\n"
+                    "Determine if the speaker intended a point-wise or sequential list (advantages, benefits, key points, steps, features, action items, or explicit numbered/bulleted points), OR continuous narrative paragraphs.\n"
+                    "- If the speaker dictated sequential points, steps, action items, or a multi-point list, format the speech into an introductory sentence followed by clean bullet points ('• ') on separate lines.\n"
+                    "- If the speaker dictated continuous narrative prose, explanations, questions, or paragraphs, DO NOT use bullet points; format as natural, fluent English paragraphs.\n"
+                    "- Preserve 100% of all spoken concepts and facts without omission. Eliminate stutters and speech restarts.\n"
+                    "- Output ONLY the finalized text directly without conversational commentary."
+                )
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.api_key}"
+                payload = {
+                    "contents": [{"parts": [{"text": f"{struct_prompt}\n\nSpoken Text:\n{text}"}]}],
+                    "generationConfig": {
+                        "temperature": 0.0,
+                        "thinkingConfig": {"thinkingBudget": 0}
+                    }
+                }
+                resp = self.session.post(url, json=payload, timeout=(2.0, 3.5))
+                if resp.status_code == 200:
+                    data = resp.json()
+                    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                    out = "".join([p.get("text", "") for p in parts]).strip()
+                    if out and ("•" in out or "* " in out or "- " in out):
+                        out = re.sub(r'^[ \t]*[\*\-][ \t]+', '• ', out, flags=re.MULTILINE)
+                        return out
+            except Exception as e:
+                logger.debug(f"AI adaptive structuring note: {e}")
+
+        # 2. Deterministic rule-based fallback
+        return VocabEngine.adaptive_bullet_format(text)
+

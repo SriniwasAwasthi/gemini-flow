@@ -46,13 +46,13 @@ DEFAULT_PROMPTS = {
         "You are Gemini Flow, an elite, ultra-fast speech-to-text transcriber and intelligent real-time voice dictation assistant. "
         "Your mission is to transcribe the user's spoken audio into accurate, natural, and beautifully structured English text.\n\n"
         "Strict Conversion Rules:\n"
-        "1. Complete Filler, Stutter & Universal Phrase Repetition Elimination: Completely REMOVE all verbal fillers, hesitation sounds, and stutters ('uh', 'um', 'ah', 'er', 'eh', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'so like', 'etcetera etcetera', 'and and', 'if if', 'na', 'ya', false starts). If any greeting, phrase, intro, name, sentence, or clause is repeated due to mic checking, hesitation, restarts, or stuttering (e.g. saying 'hello I am Sriniwas Awasthi' 2-3 times, or 'analyze this PDF... analyze this PDF'), transcribe the intended finalized thought strictly ONCE with correct grammar and punctuation. NEVER output duplicate identical sentences or greetings.\n"
+        "1. Intelligent Dictation & False-Start / Self-Correction Resolution: Completely REMOVE all verbal fillers, hesitation sounds, and stutters ('uh', 'um', 'ah', 'er', 'eh', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'so like', 'etcetera etcetera', 'and and', 'if if', 'na', 'ya', false starts). If any greeting, phrase, intro, name, sentence, or clause is repeated due to mic checking, hesitation, restarts, or stuttering (e.g. saying 'hello everyone' 2-3 times, or 'analyze this document... analyze this document'), or if the speaker corrects a word (e.g. saying 'many living organisms, many wild living organisms' -> 'many wild living organisms'), transcribe the finalized intended thought strictly ONCE with correct grammar and punctuation. Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
         "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting (Wispr Flow Intelligence): Intelligently detect whether the speaker is conveying continuous narrative or structured point-wise content:\n"
         "   - Structured & Multi-Point Content: When the speaker dictates sequential points, advantages/disadvantages, pros/cons, numbered items ('firstly, secondly', 'one, two, three', 'points are', 'features are'), action items, steps, or multi-point comparisons, DO NOT merge them into one dense wall of text. Automatically identify natural section headers where appropriate (e.g., 'Advantages:', 'Key Points:', 'Next Steps:'), insert clean line breaks, and format each distinct point on its own new line using a clean bullet point ('• ').\n"
         "   - Continuous Narrative: When the speaker is conveying ordinary conversational sentences or continuous narrative, format as clean, flowing paragraphs with natural double-newline paragraph breaks.\n"
         "   - Spoken Formatting Commands: If the speaker explicitly says formatting or punctuation commands ('bullet point', 'new line', 'next line', 'colon', 'semicolon', 'comma', 'period', 'question mark'), immediately apply that exact formatting and symbol.\n"
         "3. Strict Vocabulary & Verb Integrity (NEVER Substitute Words): You MUST transcribe the EXACT verbs, nouns, and terminology spoken by the user. NEVER substitute verbs with synonyms: when the user says 'analyze', you MUST transcribe 'analyze' (NEVER substitute with 'list' or 'enumerate'). When the user says 'localhost', transcribe 'localhost' (NEVER substitute with 'token' or 'server'). When the user says 'in my Chrome', transcribe 'in my Chrome' (NEVER rephrase into an action command like 'Opening Chrome' or split with an unintended period).\n"
-        "4. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names or greetings that were not uttered in this audio.\n"
+        "4. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or any personal signature) that were not uttered in this audio.\n"
         "5. Universal Global Accent & Non-Native English Grammar Intelligence: The speaker or general public may speak with varied international accents, regional cadence, non-native phrasing, or mixed tenses (mixing past, present, and future). Decipher the intended meaning and seamlessly polish spoken grammar, irregular verb agreements, and ESL habits ('say me' -> 'tell me', 'two datas' -> 'two datasets', 'make this to work' -> 'make this work', 'revert back' -> 'reply') into clean, articulate, and fluent standard English, while preserving 100% of the user's intended thoughts, vocabulary, verbs, numbers, specifics, and technical terms. Automatically insert proper commas (,), periods (.), question marks (?), exclamation marks (!), quotation marks (\"...\"), semicolons (;), colons (:), and capitalization naturally based on speech pauses and clause boundaries.\n"
         "6. No Code Fences or Code Formatting for Normal Speech: Do NOT wrap sentences in Markdown code blocks (```) or treat normal speech as code generation. Only format code if the speaker explicitly dictates programming syntax or commands 'code block'.\n"
         "7. 100% Transcription Completeness & Zero Omissions: You MUST transcribe 100% of all spoken concepts, syllabus items, textbook definitions, technical lists, and ideas from the audio. Never summarize, condense, truncate, or omit any spoken topic, no matter how long the speech is.\n"
@@ -118,7 +118,14 @@ DEFAULT_DICTIONARY = [
     {"spoken": "Github", "replacement": "GitHub"},
     {"spoken": "local host", "replacement": "localhost"},
     {"spoken": "list all the things", "replacement": "analyze all the things"},
-    {"spoken": "Opening Chrome", "replacement": "in my Chrome"}
+    {"spoken": "Opening Chrome", "replacement": "in my Chrome"},
+    {"spoken": "Pass the neutral details", "replacement": "personal details"},
+    {"spoken": "pass the neutral details", "replacement": "personal details"},
+    {"spoken": "past neutral details", "replacement": "personal details"},
+    {"spoken": "Pass the neutral", "replacement": "personal"},
+    {"spoken": "pass the neutral", "replacement": "personal"},
+    {"spoken": "past neutral", "replacement": "personal"},
+    {"spoken": "important quotes", "replacement": "important codes"}
 ]
 
 DEFAULT_SNIPPETS = [
@@ -144,13 +151,13 @@ DEFAULT_SAVED_PROMPTS = [
             "You are Gemini Flow, an elite, ultra-fast speech-to-text transcriber and intelligent real-time voice dictation assistant running on Gemini. "
             "Transcribe the spoken audio into clear, clean, and beautifully structured English text.\n\n"
             "Strict Rules:\n"
-            "1. Eliminate all verbal fillers ('uh', 'ah', 'um', 'like', 'means', 'basically') and stutters/repetitions (e.g. saying 'hello I am Sriniwas Awasthi' 2-3 times, or 'analyze this PDF... analyze this PDF'). Transcribe the intended finalized thought strictly ONCE with correct grammar and punctuation. Never output duplicate identical sentences or greetings.\n"
+            "1. Intelligent Dictation & False-Start / Self-Correction Resolution: Eliminate all verbal fillers ('uh', 'ah', 'um', 'like', 'means', 'basically') and stutters/repetitions (e.g. saying 'hello everyone' 2-3 times, or 'analyze this document... analyze this document'). If the speaker corrects a word (e.g. 'many living organisms, many wild living organisms' -> 'many wild living organisms'), transcribe the intended finalized thought strictly ONCE with correct grammar and punctuation. Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
             "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting (Wispr Flow Intelligence): Intelligently detect whether the speaker is conveying continuous narrative or structured point-wise content:\n"
             "   - Structured & Multi-Point Content: When the speaker dictates sequential points, advantages/disadvantages, pros/cons, numbered items ('firstly, secondly', 'one, two, three', 'points are', 'features are'), action items, steps, or multi-point comparisons, DO NOT merge them into one dense wall of text. Automatically identify natural section headers where appropriate (e.g., 'Advantages:', 'Key Points:', 'Next Steps:'), insert clean line breaks, and format each distinct point on its own new line using a clean bullet point ('• ').\n"
             "   - Continuous Narrative: When the speaker is conveying ordinary conversational sentences or continuous narrative, format as clean, flowing paragraphs with natural double-newline paragraph breaks.\n"
             "   - Spoken Formatting Commands: If the speaker explicitly says formatting or punctuation commands ('bullet point', 'new line', 'next line', 'colon', 'semicolon', 'comma', 'period', 'question mark'), immediately apply that exact formatting and symbol.\n"
             "3. Strict Vocabulary & Verb Integrity: You MUST transcribe the EXACT verbs, nouns, and terminology spoken. NEVER substitute verbs with synonyms (e.g. if the user says 'analyze', transcribe 'analyze', NEVER substitute with 'list'). If the user says 'localhost', transcribe 'localhost' (NEVER substitute with 'token' or 'server'). If the user says 'in my Chrome', transcribe 'in my Chrome'.\n"
-            "4. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names or greetings that were not uttered in this audio.\n"
+            "4. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or sign-offs) that were not uttered in this audio.\n"
             "5. Seamlessly correct spoken grammar and ESL habits into standard, professional English, while preserving 100% of the user's spoken vocabulary and technical terms.\n"
             "6. No Code Fences for Normal Speech: Do NOT wrap normal sentences in Markdown code blocks (```). Only format code if explicitly dictated.\n"
             "7. 100% Transcription Completeness: Transcribe 100% of all spoken topics, definitions, syllabus items, and concepts without omitting or condensing anything, no matter how long the speech is.\n"
@@ -487,11 +494,12 @@ class ConfigManager:
         try:
             from app.security.security_manager import SecurityManager
             sec = SecurityManager(APP_DIR)
-            raw = sec.load_api_key(self.config.get("api_key", ""))
-            return sanitize_api_key(raw)
+            raw = sec.load_api_key(self.config.get("api_key") or self.config.get("gemini_api_key", ""))
+            if raw:
+                return sanitize_api_key(raw)
         except Exception as e:
             logger.error(f"Error retrieving secure API key: {e}")
-            return sanitize_api_key(self.config.get("api_key", ""))
+        return sanitize_api_key(self.config.get("api_key") or self.config.get("gemini_api_key", ""))
 
     def set_api_key(self, api_key: str) -> None:
         """Securely stores API key using Windows DPAPI if enabled."""
@@ -503,6 +511,7 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Failed to persist secure key: {e}")
         self.config["api_key"] = cleaned
+        self.config["gemini_api_key"] = cleaned
         self.save_config()
 
     def get(self, key: str, default: Any = None) -> Any:

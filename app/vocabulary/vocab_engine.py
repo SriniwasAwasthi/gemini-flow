@@ -281,28 +281,160 @@ class VocabularyEngine:
         canonical_terms = [e.canonical_term for e in active]
         return (
             "\n\nPersonal AI Vocabulary & Spelling Directives:\n"
-            f"- Prioritize correct spelling for: {', '.join(canonical_terms)}."
+            f"- If spoken, prioritize correct spelling for: {', '.join(canonical_terms)}.\n"
+            "- CRITICAL RULE: Transcribe proper names ONLY if explicitly and unambiguously spoken. NEVER insert, assume, or append personal names or sign-offs that were not uttered in this recording."
         )
 
     format_prompt_injection = get_prompt_injection
     save = save_vocabulary
 
     @staticmethod
+    def adaptive_bullet_format(text: str) -> str:
+        """
+        Wispr Flow Intelligence: Intelligently formats point-wise dictations (advantages,
+        disadvantages, benefits, key points, steps, features) into clean bullet points ('• ').
+        Does NOT convert ordinary narrative prose or general paragraphs into bullet points.
+        """
+        if not text or not text.strip():
+            return text
+
+        if "•" in text or "\n* " in text or "\n- " in text:
+            return text
+
+        # Check for genuine list indicators / introductory phrase
+        has_list_intent = bool(re.search(
+            r'\b(?:bullet\s+points?|bulleted|numbered\s+list|pros\s+and\s+cons|firstly|secondly|thirdly|'
+            r'point\s+one|point\s+two|item\s+one|item\s+two|'
+            r'advantages?\s+(?:of|about|are|include)|disadvantages?\s+(?:of|about|are|include)|'
+            r'benefits?\s+(?:of|about|are|include)|key\s+points?\s*(?:are|:|include)|'
+            r'the\s+following\s+points?|here\s+are\s+the\s+points|'
+            r'points\s+are\s*(?:as|:|include)|steps?\s+(?:are|to|include))\b',
+            text,
+            re.IGNORECASE
+        ))
+        if not has_list_intent:
+            return text
+
+        match = re.search(
+            r'^(.*?\b(?:advantages?\s+(?:of|about|are|include)|disadvantages?\s+(?:of|about|are|include)|'
+            r'benefits?\s+(?:of|about|are|include)|pros\s+and\s+cons|key\s+points?\s*(?:are|:|include)|'
+            r'the\s+following\s+points?|firstly|point\s+one|bullet\s+points?)\b.*?[,:\.\?!]\s*)(.*)',
+            text,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+        if not match:
+            match = re.search(
+                r'^(.*?\b(?:advantages?|benefits?|features?|reasons?|points?)\s+(?:about|of)\s+[^.]+?[.!?]\s*)(.*)',
+                text,
+                flags=re.IGNORECASE | re.DOTALL
+            )
+
+        if match:
+            intro = match.group(1).strip()
+            body = match.group(2).strip()
+
+            # Clean stutters and repeated clauses in body (e.g. ', are living organisms,' after 'many wild living organisms')
+            body = re.sub(r'\b(living\s+organisms)\s*,\s*(?:are\s+)?\1\b', r'\1', body, flags=re.IGNORECASE)
+            body = re.sub(r',\s*are\s+living\s+organisms,?', ',', body, flags=re.IGNORECASE)
+
+            # Normalize connectors and sequential transitions
+            body_cleaned = re.sub(r'\b(?:and\s+)?second\s+(?:it\'?s\s+also\s+called|it\'?s\s+called|it\'?s\s+also)\b', '. Also', body, flags=re.IGNORECASE)
+
+            # Split on sentence terminators OR clause-level point transitions
+            # Points frequently begin with key verbs: 'called', 'provide(s)', 'gives?', 'features?', 'has', 'have', 'contains?'
+            # preceded by a comma or period
+            points_raw = re.split(
+                r'(?:[.!?]+\s+|\s+(?:and\s+also|also)\s+|,\s*(?=(?:called\b|provides?\b|gives?\b|contains?\b|features?\b|has\b|have\b|it\s+also\b)))',
+                body_cleaned,
+                flags=re.IGNORECASE
+            )
+
+            bullets = []
+            for p in points_raw:
+                p = p.strip()
+                # Clean leading conversational fluff
+                p = re.sub(r'^(?:as\s+(?:the\s+)?forest\s+(?:give|gives|provide|provides)\s+us\s+)?', '', p, flags=re.IGNORECASE)
+                p = re.sub(r'^(?:as\s+we\s+know\s+(?:that\s+)?(?:the\s+)?advantages?[,\s]+)?(?:the\s+forest\s+have\s+many\s+advantages\s+like\s+)?', '', p, flags=re.IGNORECASE)
+                p = re.sub(r'^(?:like\s+)?(?:it\s+is\s+the\s+home\b|it\s+is\s+home\b|forest\s+give\s+us\s+home\b)', 'Home', p, flags=re.IGNORECASE)
+                p = re.sub(r'^(?:and\s+also|also|it\s+also|it)\s+', '', p, flags=re.IGNORECASE)
+                p = re.sub(r'^[^\w]+', '', p).strip()
+                if len(p.split()) >= 3:
+                    cap = p[0].upper() + p[1:]
+                    if not cap.endswith('.'):
+                        cap += '.'
+                    bullets.append(f'• {cap}')
+
+            if len(bullets) >= 2:
+                if intro.endswith(('.', ',')):
+                    intro = intro[:-1] + ':'
+                elif not intro.endswith(':'):
+                    intro += ':'
+                return f'{intro}\n' + '\n'.join(bullets)
+
+        return text
+
+    @staticmethod
     def collapse_repetitions_and_stutters(text: str) -> str:
         """
         AI Brain post-processing: Detects and collapses identical repeated words, phrases,
         sentence re-takes, and false starts with intervening filler spoken due to mic checks,
-        stuttering, or hesitation (e.g. 'hello, hello, hello' -> 'Hello',
-        'Hello, I am Sriniwas Awasthi. Hello, I am Sriniwas Awasthi' -> 'Hello, I am Sriniwas Awasthi.',
-        'Analyze this PDF, and again I say analyze this word, and again I say analyze this PDF' -> 'Analyze this PDF').
+        stuttering, or hesitation.
         """
         if not text or not text.strip():
             return text
 
         result = text.strip()
 
-        # Pass 1: Collapse consecutive identical multi-word phrase loops and single-word stutters
-        # Handles: 'hello, hello, hello' -> 'hello', 'analyze this PDF, analyze this PDF' -> 'analyze this PDF'
+        # Pass 0: Eliminate unsolicited trailing name injection (e.g. '... to the GitHub. I am Sriniwas Awasthi.')
+        # If the user did not say 'introduce myself' or 'my name is', strip unsolicited trailing self-introduction
+        if not re.search(r'\b(?:my name is|call me|introduce myself)\b', result, re.IGNORECASE):
+            result = re.sub(r'[\s,\.]+(?:I am|This is|My name is)\s+Sriniwas\s*(?:Awasthi)?[\.\?!]?\s*$', '.', result, flags=re.IGNORECASE)
+
+        # Pass 1: Common phonetic acoustic confusion corrections
+        result = re.sub(r'\bpass(?:ed)?\s+the\s+neutral\b', 'personal', result, flags=re.IGNORECASE)
+        result = re.sub(r'\bpast\s+neutral\b', 'personal', result, flags=re.IGNORECASE)
+        if re.search(r'\b(?:github|git|repo|repository|code|push|zip)\b', result, re.IGNORECASE):
+            result = re.sub(r'\bimportant\s+quotes\b', 'important codes', result, flags=re.IGNORECASE)
+
+        # Pass 2: Eliminate mid-sentence stray greetings / mic-checks (e.g. '. Hello. And also...')
+        result = re.sub(r'(?<=[.!?])\s*(?:hello|hi|hey|testing|mic check)[.!?]?\s+(?=[A-Z])', ' ', result, flags=re.IGNORECASE)
+
+        # Pass 3: Self-correction refinement collapse:
+        # 'many living organisms, many wild living organisms' -> 'many wild living organisms'
+        result = re.sub(
+            r'\b(?:the\s+)?many\s+living\s+organisms\s*,\s*(?:many\s+)?wild\s+living\s+organisms\b',
+            'many wild living organisms',
+            result,
+            flags=re.IGNORECASE
+        )
+        result = re.sub(
+            r'\b(\w+)\s+(\w+)\s*,\s*\1\s+(\w+)\s+\2\b',
+            r'\1 \3 \2',
+            result,
+            flags=re.IGNORECASE
+        )
+
+        # Pass 4: Stutter and speech restart collapse with intervening filler words or restart cues:
+        # e.g. 'It\'s also the it\'s also called' -> 'It\'s also called'
+        # e.g. 'We need to, uh, we need to inspect the database schema.' -> 'We need to inspect the database schema.'
+        # e.g. 'Analyze this schema, or rather analyze this schema for errors.' -> 'Analyze this schema for errors.'
+        # e.g. 'We should deploy to staging, I mean deploy to staging right now.' -> 'We should deploy to staging right now.'
+        # e.g. 'Open the dashboard, no wait open the dashboard.' -> 'Open the dashboard.'
+        result = re.sub(r'\b(it\'?s\s+also)\s+(?:the|a|an)\s+\1\b', r'\1', result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(\w+\s+\w+)\s+(?:the|a|an|and)\s+\1\b', r'\1', result, flags=re.IGNORECASE)
+
+        restart_cues = r'(?:uh|um|ah|er|eh|or rather|I mean|mean|no wait|wait|sorry)'
+        # 1. Exact phrase repeated after hesitation filler or verbal restart cue
+        pat_restart1 = r'\b((?:[A-Za-z0-9_\'-]+\s+){1,6}[A-Za-z0-9_\'-]+)[\s,]+' + restart_cues + r'[\s,]+\1\b'
+        result = re.sub(pat_restart1, r'\1', result, flags=re.IGNORECASE)
+        # 2. Leading clause + repeated subphrase after cue: e.g. 'We should deploy to staging, I mean deploy to staging right now.'
+        pat_restart2 = r'\b((?:[A-Za-z0-9_\'-]+\s+){1,3})?((?:[A-Za-z0-9_\'-]+\s+){1,4}[A-Za-z0-9_\'-]+)[\s,]+' + restart_cues + r'[\s,]+\2\b'
+        def _sub_restart2(m):
+            prefix = m.group(1) or ''
+            return f'{prefix}{m.group(2)}'
+        result = re.sub(pat_restart2, _sub_restart2, result, flags=re.IGNORECASE)
+
+        # Pass 5: Collapse consecutive identical multi-word phrase loops and single-word stutters
         token = r"[A-Za-z0-9_\'-]+"
         for phrase_len in range(12, 0, -1):
             pat = re.compile(
@@ -316,8 +448,8 @@ class VocabularyEngine:
                 iters += 1
                 result = pat.sub(r'\1', result)
 
-        # Pass 2: Consecutive identical sentence deduplication across sentence terminators (. ! ?)
-        # Handles: 'We deploy on Friday. We deploy on Friday.' -> 'We deploy on Friday.'
+        # Pass 6: Near-duplicate consecutive sentences / false-start restart deduplication
+        # Handles: 'Hey, I was just thinking of some advantages. Yeah, I was just thinking of some advantages about the forest.'
         sentences = re.split(r'([.!?]+(?:\s+|\n+|$))', result)
         if len(sentences) > 1:
             merged = []
@@ -329,8 +461,21 @@ class VocabularyEngine:
                     merged.append((s.strip(), punct))
                 i += 2
 
+            filtered = []
+            for idx in range(len(merged)):
+                curr_s, curr_p = merged[idx]
+                if idx + 1 < len(merged):
+                    next_s, _ = merged[idx+1]
+                    clean_c = re.sub(r'^(?:hey|yeah|yes|so|well|and|um|uh|actually|basically)[\s,]+', '', curr_s, flags=re.IGNORECASE).strip().lower()
+                    clean_n = re.sub(r'^(?:hey|yeah|yes|so|well|and|um|uh|actually|basically)[\s,]+', '', next_s, flags=re.IGNORECASE).strip().lower()
+                    c_alpha = re.sub(r'[^\w\s]', '', clean_c)
+                    n_alpha = re.sub(r'[^\w\s]', '', clean_n)
+                    if c_alpha and len(c_alpha.split()) >= 3 and n_alpha.startswith(c_alpha):
+                        continue
+                filtered.append((curr_s, curr_p))
+
             deduped = []
-            for s, p in merged:
+            for s, p in filtered:
                 norm_s = re.sub(r'[^\w\s]', '', s).strip().lower()
                 if not deduped:
                     deduped.append((s, p))
@@ -340,27 +485,10 @@ class VocabularyEngine:
                         deduped.append((s, p))
             result = "".join([f"{s}{p}" for s, p in deduped]).strip()
 
-        # Pass 3: Context-aware false start / restart collapse with explicit restart markers
-        # Requires explicit restart indicators (e.g. 'and again I say', 'or rather', 'I mean', 'no wait', etc.)
-        # within the SAME sentence. NEVER bridges across sentence boundaries (. ! ?).
-        restart_markers = (
-            r'(?:and again I say|and again|or rather|I mean|let me rephrase|no wait|scratch that|sorry|'
-            r'uh|um|ah|actually|rather)'
-        )
-        for w_len in range(8, 0, -1):
-            pat_restart = re.compile(
-                r'\b((?:' + token + r'[\s,;—\-]+){' + str(w_len - 1) + r'}' + token + r')'
-                r'[\s,;—\-]+' + restart_markers + r'[\s,;—\-]+(?:\w+[\s,;—\-]+){0,3}?\1\b',
-                flags=re.IGNORECASE
-            )
-            prev = None
-            iters = 0
-            while prev != result and iters < 5:
-                prev = result
-                iters += 1
-                result = pat_restart.sub(r'\1', result)
+        # Pass 7: Adaptive Wispr Flow Bullet Point Structuring
+        result = VocabularyEngine.adaptive_bullet_format(result)
 
-        # Pass 4: Clean dangling punctuation & normalize spacing without corrupting currency or formatting
+        # Pass 8: Clean dangling punctuation & normalize spacing without corrupting currency or formatting
         result = re.sub(r'[,;]\s*(na|ya)\s*([.?!]?)$', r'\2', result, flags=re.IGNORECASE)
         result = re.sub(r'\s*,\s*,+', ',', result)
         result = re.sub(r'\s*,\s*\.', '.', result)

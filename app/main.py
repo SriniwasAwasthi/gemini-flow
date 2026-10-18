@@ -299,6 +299,7 @@ def is_already_running() -> bool:
 
 from .config import ConfigManager, ensure_desktop_shortcuts, setup_windows_startup
 from .gemini_engine import GeminiEngine
+from .vocabulary.vocab_engine import VocabEngine
 from .audio_recorder import AudioRecorder
 from .text_injector import TextInjector
 from .hotkey_manager import HotkeyManager
@@ -828,10 +829,10 @@ class GeminiFlowApp:
             prompt = self.config.get_system_prompt(preset_override=active_mode, app_context=app_context, profile_id_override=active_profile)
 
             # 4. Transcribe with Gemini / Whisper
-            # For all recordings under 50s, ALWAYS transcribe the complete audio in a single pass.
-            # This preserves 100% sentence context, eliminates mid-sentence slice hallucinations, and avoids split-word seam errors.
+            # If rolling background streaming emitted slices, assemble in real-time for < 2.0s stop-to-text turnaround.
+            # Otherwise for short recordings (< 22s), transcribe complete audio directly in a single pass (< 1.2s).
             has_rolling = self.recorder.rolling_chunks_were_emitted()
-            if duration < 50.0 or not has_rolling:
+            if not has_rolling or duration < 22.0:
                 success, raw_result = self.gemini.transcribe_audio(
                     wav_bytes=wav_bytes,
                     system_instruction=prompt,
@@ -918,6 +919,7 @@ class GeminiFlowApp:
 
                 if not unresolved_speech_chunks and valid_chunks:
                     raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
+                    raw_result = self.gemini._clean_output(raw_result)
                     success = True
                 else:
                     if unresolved_speech_chunks:
@@ -938,6 +940,7 @@ class GeminiFlowApp:
                     if not success and valid_chunks:
                         logger.warning("Full-session audio fallback failed; salvaging completed rolling chunks to prevent total loss.")
                         raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
+                        raw_result = self.gemini._clean_output(raw_result)
                         success = True
 
             if self._is_cancelled:
@@ -952,8 +955,50 @@ class GeminiFlowApp:
                 self.signals.finished.emit(True, "", duration, active_mode, app_name, self.gemini.last_model_used, "")
                 return
 
-            # 5. Apply Custom Dictionary, Snippets & Vocabulary to transcribe speech accurately
-            final_text = GeminiEngine.apply_dictionary(raw_result, self.config.get_dictionary())
+            # 5. Voice Intent & Spoken Command Routing (All 16 Built-in Voice Command Modes)
+            clipboard_text = ""
+            try:
+                clipboard_text = self.text_injector.get_selected_text() or pyperclip.paste() or ""
+            except Exception:
+                pass
+
+            intent_res = IntentClassifier.classify(raw_result, clipboard_fallback=clipboard_text)
+            if intent_res.intent != IntentCategory.DICTATE:
+                logger.info(f"Voice Command Triggered: {intent_res.intent.value} (Trigger: '{intent_res.command_trigger}', Payload: '{intent_res.payload[:60]}...')")
+                payload = intent_res.payload.strip() if intent_res.payload else ""
+                if not payload and clipboard_text and clipboard_text.strip():
+                    payload = clipboard_text.strip()
+                payload = payload.strip().strip('"\'“”«»').strip()
+
+                if payload:
+                    trans_type = INTENT_TO_TRANSFORM_MAP.get(intent_res.intent, TransformType.IMPROVE)
+                    custom_inst = intent_res.system_instruction if (intent_res.intent in (IntentCategory.TRANSLATE, IntentCategory.FORMAT_TEXT, IntentCategory.GENERATE_CODE, IntentCategory.CREATE_PROMPT, IntentCategory.CREATE_TASK)) else ""
+                    
+                    cmd_label = intent_res.intent.value.replace("_", " ").title()
+                    exec_res = self.gemini.transform_text(
+                        raw_text=payload,
+                        transform_type=trans_type,
+                        app_context=app_context,
+                        custom_instruction=custom_inst,
+                        profile_id=active_profile
+                    )
+                    if exec_res.success and exec_res.text:
+                        final_transformed = exec_res.text
+                        if trans_type != TransformType.TECHNICAL and intent_res.intent != IntentCategory.GENERATE_CODE:
+                            final_transformed = GeminiEngine.apply_dictionary(final_transformed, self.config.get_dictionary())
+                            final_transformed = GeminiEngine.apply_snippets(final_transformed, self.config.get_snippets())
+                        
+                        model_used = exec_res.model_used or self.gemini.last_model_used or "gemini-3.5-flash-lite"
+                        self.signals.finished.emit(True, final_transformed, duration, f"Command: {cmd_label}", app_name, model_used, raw_result)
+                        return
+                    else:
+                        logger.warning(f"Voice command transformation failed ({exec_res.error_message}). Continuing with normalized dictation.")
+
+            # 6. Apply AI Brain Normalization (Deduplication, False-Starts, Stray Greetings, Adaptive Bullets)
+            normalized_text = VocabEngine.normalize_text(raw_result)
+            if "•" not in normalized_text and active_mode in ("clean_dictation", "smart_polish"):
+                normalized_text = self.gemini.structure_bullet_points(normalized_text)
+            final_text = GeminiEngine.apply_dictionary(normalized_text, self.config.get_dictionary())
             final_text = GeminiEngine.apply_snippets(final_text, self.config.get_snippets())
             raw_spoken_text = final_text
 
@@ -1021,8 +1066,9 @@ class GeminiFlowApp:
                 active_prof = self.config.get("active_profile", "coding")
                 self.settings_dialog.sync_active_profile(active_prof)
 
-            # 3. AI Prompt Pasting & Safeguard Normal Speech Clipboard Management:
+            # 3. AI Prompt Pasting, Voice Command Pasting & Normal Speech Clipboard Management:
             is_prompt_mode = (mode == "prompt_generation" and raw_spoken_text and raw_spoken_text.strip() != text_or_error.strip())
+            is_command_mode = mode.startswith("Command:")
             is_offline_mode = "offline" in (model_used or "").lower()
 
             if self.config.get("auto_paste", True):
@@ -1033,6 +1079,15 @@ class GeminiFlowApp:
                     else:
                         pyperclip.copy(raw_spoken_text)
                         self.hud.show_state(FloatingHUD.STATE_COPIED, "Normal Speech Copied (Backup) 📋")
+                elif is_command_mode:
+                    paste_ok = self.text_injector.paste_text(text_or_error, leave_in_clipboard=raw_spoken_text if raw_spoken_text else None)
+                    cmd_name = mode.replace("Command:", "").strip()
+                    if paste_ok:
+                        self.hud.show_state(FloatingHUD.STATE_PASTED, f"{cmd_name} Pasted! ✨")
+                    else:
+                        if raw_spoken_text:
+                            pyperclip.copy(raw_spoken_text)
+                        self.hud.show_state(FloatingHUD.STATE_COPIED, f"{cmd_name} Copied! 📋")
                 elif is_offline_mode:
                     paste_ok = self.text_injector.paste_text(text_or_error)
                     if paste_ok:
@@ -1054,6 +1109,10 @@ class GeminiFlowApp:
                     except Exception:
                         pyperclip.copy(raw_spoken_text)
                     self.hud.show_state(FloatingHUD.STATE_COPIED, "Normal Speech Copied (Backup) 📋")
+                elif is_command_mode:
+                    cmd_name = mode.replace("Command:", "").strip()
+                    pyperclip.copy(text_or_error)
+                    self.hud.show_state(FloatingHUD.STATE_COPIED, f"{cmd_name} Copied! 📋")
                 elif is_offline_mode:
                     pyperclip.copy(text_or_error)
                     self.hud.show_state(FloatingHUD.STATE_OFFLINE, "Offline Speech Copied! 🎙️")

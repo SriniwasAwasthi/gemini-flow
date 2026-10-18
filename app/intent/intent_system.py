@@ -52,7 +52,7 @@ INTENT_TO_TRANSFORM_MAP: Dict[IntentCategory, TransformType] = {
     IntentCategory.CREATE_GITHUB_PR: TransformType.CONVERT_GITHUB_PR,
     IntentCategory.CREATE_TASK: TransformType.CONVERT_NOTES,
     IntentCategory.GENERATE_CODE: TransformType.TECHNICAL,
-    IntentCategory.FORMAT_TEXT: TransformType.IMPROVE,
+    IntentCategory.FORMAT_TEXT: TransformType.CUSTOM,
     IntentCategory.QUICK_TEXT: TransformType.IMPROVE,
 }
 
@@ -68,119 +68,127 @@ class IntentResult:
     target_language: str = ""
 
 
-# Intent trigger patterns and prompt mappings
+DELIM = r'(?:\s*[:,\-—\.\?!]+\s*|\s+that\s+|\s+)'
+
+# Intent trigger patterns and prompt mappings for all 16 command categories
 INTENT_PATTERNS = [
     # 1. Professionalize
     (
-        r'^(?:please\s+)?(?:make\s+this\s+professional|professionalize\s+this|make\s+it\s+formal|formalize\s+this)(?:\s*[:,\-—]\s*|\s+that\s+|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:make\s+(?:this|it)\s+(?:more\s+)?professional|make\s+(?:more\s+)?professional|professionalize(?:\s+this)?|make\s+(?:this|it)\s+(?:more\s+)?formal|formalize(?:\s+this)?|executive\s+tone|professional\s+tone|make\s+(?:this|it)\s+sound\s+professional|professional\s+rewrite){DELIM}?(.*)$',
         IntentCategory.PROFESSIONALIZE,
-        "Transform the input into clear, articulate, and polished executive professional writing. Maintain the core message without colloquialisms or filler.",
-        "gemini-2.5-flash"
+        "Rewrite the following text in a polished, articulate, and professional style suitable for business or professional communication. Crucially, preserve the author's original voice, perspective, and intent (e.g. if written in first-person 'I', keep it in first-person). Elevate vocabulary, refine sentence flow, and remove colloquial fillers while keeping the genuine human message intact. Never convert personal speech into third-person telemetry, software execution logs, or robotic status reports. Output ONLY the rewritten text.",
+        "gemini-3.5-flash-lite"
     ),
     # 2. Make Casual
     (
-        r'^(?:please\s+)?(?:make\s+this\s+casual|make\s+it\s+casual|make\s+it\s+friendly|friendly\s+tone)(?:\s*[:,\-—]\s*|\s+that\s+|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:make\s+(?:this|it)\s+(?:more\s+)?casual|make\s+(?:more\s+)?casual|make\s+(?:this|it)\s+(?:more\s+)?friendly|make\s+(?:this|it)\s+(?:more\s+)?informal|friendly\s+tone|casual\s+tone|informal\s+tone){DELIM}?(.*)$',
         IntentCategory.MAKE_CASUAL,
-        "Rephrase the input in a friendly, conversational, and natural casual tone while preserving the essential facts.",
-        "gemini-2.5-flash"
+        "Rephrase the input in a friendly, conversational, and natural casual tone while preserving the essential facts and author perspective. Output ONLY the rewritten text.",
+        "gemini-3.5-flash-lite"
     ),
     # 3. Create Prompt
     (
-        r'^(?:please\s+)?(?:turn\s+this\s+into\s+a\s+prompt|create\s+a\s+prompt\s+from\s+this|prompt\s+enhancer|make\s+this\s+a\s+prompt)(?:\s*[:,\-—]\s*|\s+that\s+|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:turn\s+this\s+into\s+(?:an?\s+)?(?:ai\s+)?prompt|create\s+(?:an?\s+)?(?:ai\s+)?prompt(?:\s+(?:from|for)\s+this)?|generate\s+(?:an?\s+)?(?:ai\s+)?prompt|make\s+this\s+(?:an?\s+)?(?:ai\s+)?prompt|convert\s+(?:this\s+)?to\s+(?:an?\s+)?(?:ai\s+)?prompt|prompt\s+enhancer|(?:ai\s+)?prompt\s*[:\-—]){DELIM}?(.*)$',
         IntentCategory.CREATE_PROMPT,
-        "You are an expert AI Prompt Engineer. Transform the user's raw notes into a structured, high-impact AI Prompt with Objective, Context, Step-by-Step Instructions, and Output Format.",
-        "gemini-2.5-flash"
+        "You are an expert AI Prompt Engineer. Transform the user's raw notes into a structured, high-impact AI Prompt with Objective, Context, Step-by-Step Instructions, and Output Format. Output ONLY the finalized prompt.",
+        "gemini-3.5-flash-lite"
     ),
     # 4. Summarize
     (
-        r'^(?:please\s+)?(?:summarize\s+this|give\s+me\s+a\s+summary|tldr|brief\s+summary\s+of)(?:\s*[:,\-—]\s*|\s+that\s+|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:summarize(?:\s+this)?|summarise(?:\s+this)?|give\s+me\s+a\s+summary(?:\s+of)?|give\s+a\s+summary(?:\s+of)?|quick\s+summary(?:\s+of)?|brief\s+summary(?:\s+of)?|bullet\s+summary(?:\s+of)?|tldr|tl;dr){DELIM}?(.*)$',
         IntentCategory.SUMMARIZE,
-        "Summarize the provided content into clear, digestible bullet points highlighting key takeaways, action items, and conclusions.",
-        "gemini-2.5-flash"
+        "Summarize the provided content into clear, digestible bullet points highlighting key takeaways, action items, and conclusions. Output ONLY the summary bullet points.",
+        "gemini-3.5-flash-lite"
     ),
     # 5. Grammar Fix
     (
-        r'^(?:please\s+)?(?:fix\s+the\s+grammar|fix\s+grammar|correct\s+grammar|proofread\s+this)(?:\s*[:,\-—]\s*|\s+that\s+|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:fix\s+(?:the|my)\s+grammar|fix\s+grammar|correct\s+(?:the|my)\s+grammar|correct\s+grammar|proofread(?:\s+(?:this|my\s+text))?|check\s+(?:the|my)\s+grammar|check\s+grammar|grammar\s+fix|grammar\s+check|fix\s+grammar\s+and\s+spelling|fix\s+spelling\s+and\s+grammar|fix\s+spelling|correct\s+spelling|fix\s+typos){DELIM}?(.*)$',
         IntentCategory.GRAMMAR_FIX,
-        "Proofread and correct all grammar, spelling, punctuation, and typographical slips in the provided text. Output ONLY the corrected text.",
-        "gemini-2.5-flash"
+        "Proofread and correct all grammar, spelling, punctuation, capitalization, subject-verb agreement, and typographical slips in the provided text. Output ONLY the corrected text without explanations or quotes.",
+        "gemini-3.5-flash-lite"
     ),
     # 6. Shorten / Concise
     (
-        r'^(?:please\s+)?(?:make\s+this\s+shorter|shorten\s+this|make\s+it\s+concise|trim\s+this)(?:\s*[:,\-—]\s*|\s+that\s+|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:make\s+(?:this|it)\s+(?:more\s+)?shorter|shorten(?:\s+this)?|make\s+(?:this|it)\s+(?:more\s+)?concise|make\s+concise|trim(?:\s+this)?|condense(?:\s+this)?|cut\s+(?:the\s+)?fluff){DELIM}?(.*)$',
         IntentCategory.SHORTEN,
-        "Condense the input text into a concise, punchy version without losing vital context or key points.",
-        "gemini-2.5-flash"
+        "Condense the input text into a concise, punchy version without losing vital context or key points. Output ONLY the concise text.",
+        "gemini-3.5-flash-lite"
     ),
     # 7. Expand
     (
-        r'^(?:please\s+)?(?:expand\s+this|elaborate\s+on\s+this|add\s+more\s+detail\s+to)(?:\s*[:,\-—]\s*|\s+that\s+|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:expand(?:\s+on)?(?:\s+this)?|elaborate(?:\s+on)?(?:\s+this)?|add\s+more\s+details?(?:\s+to)?){DELIM}?(.*)$',
         IntentCategory.EXPAND,
-        "Expand upon the thoughts and concepts provided, providing thorough elaboration, context, and clear explanatory prose.",
-        "gemini-2.5-flash"
+        "Expand upon the thoughts and concepts provided, providing thorough elaboration, context, and clear explanatory prose. Output ONLY the expanded content.",
+        "gemini-3.5-flash-lite"
     ),
     # 8. Explain
     (
-        r'^(?:please\s+)?(?:explain\s+this|what\s+does\s+this\s+mean|break\s+down\s+this)(?:\s*[:,\-—]\s*|\s+that\s+|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:explain(?:\s+this)?|what\s+does\s+this\s+mean|break\s+down(?:\s+this)?|explain\s+what\s+this\s+means|explain\s+to\s+me){DELIM}?(.*)$',
         IntentCategory.EXPLAIN,
-        "Explain the provided concept, code, or text in clear, step-by-step educational language with intuitive analogies.",
-        "gemini-2.5-flash"
+        "Explain the provided concept, code, or text in clear, step-by-step educational language with intuitive analogies. Output ONLY the explanation.",
+        "gemini-3.5-flash-lite"
     ),
     # 9. Translate
     (
-        r'^(?:please\s+)?(?:translate\s+this\s+to\s+([A-Za-z]+)|translate\s+to\s+([A-Za-z]+))(?:\s*[:,\-—]\s*|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:translate\s+(?:this\s+)?(?:in|to|into)\s+([A-Za-z]+)|([A-Za-z]+)\s+translation(?:\s+of)?){DELIM}?(.*)$',
         IntentCategory.TRANSLATE,
-        "Accurately translate the provided text into the target language, preserving natural idioms and cultural nuances.",
-        "gemini-2.5-flash"
+        "Accurately translate the provided text into the target language, preserving natural idioms and cultural nuances. Output ONLY the translation.",
+        "gemini-3.5-flash-lite"
     ),
     # 10. Create Email
     (
-        r'^(?:please\s+)?(?:create\s+(?:an\s+)?email|draft\s+(?:an\s+)?email|write\s+(?:an\s+)?email\s+(?:to|about)?)(?:\s*[:,\-—]\s*|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:create\s+(?:an\s+)?email|draft\s+(?:an\s+)?email|write\s+(?:an\s+)?email|compose\s+(?:an\s+)?email|email\s+draft)(?:\s+(?:to|about))?{DELIM}?(.*)$',
         IntentCategory.CREATE_EMAIL,
-        "Draft a complete, well-structured email with a concise Subject line, professional salutation, clear body paragraphs, and courteous sign-off.",
-        "gemini-2.5-flash"
+        "Draft a complete, well-structured email with a concise Subject line, professional salutation, clear body paragraphs, and courteous sign-off. Output ONLY the email.",
+        "gemini-3.5-flash-lite"
     ),
     # 11. Create GitHub Issue
     (
-        r'^(?:please\s+)?(?:create\s+(?:a\s+)?github\s+issue|new\s+github\s+issue|bug\s+report\s+for)(?:\s*[:,\-—]\s*|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:create\s+(?:a\s+)?(?:github\s+)?issue|new\s+github\s+issue|bug\s+report(?:\s+for)?|file\s+(?:a\s+)?bug(?:\s+report)?){DELIM}?(.*)$',
         IntentCategory.CREATE_GITHUB_ISSUE,
-        "Format the input into a professional GitHub Issue description with Title, Description, Reproduction Steps, Expected vs Actual Behavior, and Environment.",
-        "gemini-2.5-flash"
+        "Format the input into a professional GitHub Issue description with Title, Description, Reproduction Steps, Expected vs Actual Behavior, and Environment. Output ONLY the markdown issue.",
+        "gemini-3.5-flash-lite"
     ),
     # 12. Create GitHub PR Description
     (
-        r'^(?:please\s+)?(?:create\s+(?:a\s+)?(?:github\s+)?pr|create\s+pull\s+request|pr\s+description\s+for)(?:\s*[:,\-—]\s*|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:create\s+(?:a\s+)?(?:github\s+)?pr|create\s+(?:a\s+)?pull\s+request|pr\s+description(?:\s+for)?|pull\s+request\s+description(?:\s+for)?){DELIM}?(.*)$',
         IntentCategory.CREATE_GITHUB_PR,
-        "Draft an exemplary GitHub Pull Request description featuring Summary of Changes, Motivation & Context, Testing Verification, and Checklist.",
-        "gemini-2.5-flash"
+        "Draft an exemplary GitHub Pull Request description featuring Summary of Changes, Motivation & Context, Testing Verification, and Checklist. Output ONLY the markdown PR description.",
+        "gemini-3.5-flash-lite"
     ),
     # 13. Create Task List
     (
-        r'^(?:please\s+)?(?:create\s+task\s+list|create\s+action\s+items|generate\s+todo\s+list|action\s+items\s+from)(?:\s*[:,\-—]\s*|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:create\s+(?:a\s+)?task\s+list|create\s+action\s+items|generate\s+(?:a\s+)?(?:todo|to-do)\s+list|make\s+(?:a\s+)?(?:todo|to-do)\s+list|(?:todo|to-do)\s+list|create\s+(?:a\s+)?checklist){DELIM}?(.*)$',
         IntentCategory.CREATE_TASK,
-        "Extract and organize all implied and explicit action items into a prioritized, actionable markdown checklist with clear ownership and deliverables.",
-        "gemini-2.5-flash"
+        "Extract and organize all implied and explicit action items into a prioritized, actionable markdown checklist with clear ownership and deliverables. Output ONLY the checklist.",
+        "gemini-3.5-flash-lite"
     ),
     # 14. Generate Code
     (
-        r'^(?:please\s+)?(?:generate\s+code|write\s+code|code\s+in\s+([A-Za-z0-9#+]+)|write\s+a\s+(?:python|javascript|typescript|c\+\+|sql|rust|html|css)\s+(?:script|function|class)\s+to)(?:\s*[:,\-—]\s*|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:'
+        rf'(?:generate|write|create|give\s+me)\s+(?:an?\s+)?([A-Za-z0-9#+]+)\s+(?:script|function|class|method|code)(?:\s+(?:to|that|for))?|'
+        rf'(?:generate|write|create|give\s+me)\s+code\s+in\s+([A-Za-z0-9#+]+)(?:\s+(?:to|that|for))?|'
+        rf'([A-Za-z0-9#+]+)\s+code\s*[:\-—]\s*|'
+        rf'code\s+(?:this\s+)?in\s+([A-Za-z0-9#+]+)|'
+        rf'(?:generate|write|create)\s+(?:an?\s+)?(?:script|function|class|method|code)(?:\s+(?:to|that|for))?'
+        rf'){DELIM}?(.*)$',
         IntentCategory.GENERATE_CODE,
-        "Write clean, robust, and idiomatic code adhering to modern best practices. Include concise explanatory comments.",
-        "gemini-2.5-flash"
+        "Write clean, robust, and idiomatic code adhering to modern best practices. Include concise explanatory comments and proper type annotations. Output ONLY the code.",
+        "gemini-3.5-flash-lite"
     ),
-    # 15. Format Text / Markdown
+    # 15. Format Text / Table
     (
-        r'^(?:please\s+)?(?:format\s+this|format\s+as\s+(?:a\s+)?markdown\s+table|format\s+into\s+table)(?:\s*[:,\-—]\s*|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:format\s+(?:this\s+)?(?:into|as)\s+(?:a\s+)?(?:markdown\s+)?table|format\s+into\s+table|format\s+as\s+table|create\s+(?:a\s+)?table(?:\s+from\s+this)?|convert\s+(?:this\s+)?to\s+(?:a\s+)?table|format\s+this){DELIM}?(.*)$',
         IntentCategory.FORMAT_TEXT,
-        "Format the provided data or text cleanly into a structured markdown table or outline according to the user's intent.",
-        "gemini-2.5-flash"
+        "Format the provided data or text cleanly into a structured markdown table according to the user's intent. Output ONLY the markdown table.",
+        "gemini-3.5-flash-lite"
     ),
     # 16. Rewrite
     (
-        r'^(?:please\s+)?(?:rewrite\s+this|rephrase\s+this|polish\s+this)(?:\s*[:,\-—]\s*|\s+that\s+|\s+)?(.*)$',
+        rf'^(?:please\s+)?(?:rewrite(?:\s+this)?|rephrase(?:\s+this)?|polish(?:\s+this)?|improve\s+this|clean\s+up\s+this){DELIM}?(.*)$',
         IntentCategory.REWRITE,
-        "Rewrite the text to maximize clarity, elegance, and readability while faithfully preserving the original meaning.",
-        "gemini-2.5-flash"
+        "Rewrite the text to maximize clarity, elegance, and readability while faithfully preserving the original meaning and author perspective. Output ONLY the rewritten text.",
+        "gemini-3.5-flash-lite"
     )
 ]
 
@@ -196,35 +204,65 @@ class IntentClassifier:
                 intent=IntentCategory.DICTATE,
                 payload="",
                 system_instruction="Transcribe spoken words accurately.",
-                target_model="gemini-2.5-flash"
+                target_model="gemini-3.5-flash-lite"
             )
 
         # Check regex patterns
         for pattern_str, intent, instruction, target_model in INTENT_PATTERNS:
             match = re.search(pattern_str, cleaned, re.IGNORECASE)
             if match:
-                groups = match.groups()
-                # Find payload group (usually the last group)
+                groups = [g for g in match.groups() if g is not None]
                 payload = groups[-1].strip() if groups else ""
+                # Strip leading punctuation or whitespace from payload
+                payload = re.sub(r'^[ :,.\-—\?!]+', '', payload).strip()
+
                 target_lang = ""
 
                 # Handle language translation group
-                if intent == IntentCategory.TRANSLATE and len(groups) >= 2:
-                    target_lang = groups[0] or groups[1] or "English"
-                    instruction = f"Accurately translate the provided text into {target_lang}."
+                if intent == IntentCategory.TRANSLATE:
+                    if len(groups) >= 2:
+                        target_lang = groups[0] or "English"
+                    instruction = f"Accurately translate the provided text into {target_lang or 'English'}. Output ONLY the translated text without commentary."
 
-                # If user said only the command (e.g. "make this professional") with no payload,
-                # use the active clipboard text as payload!
+                # Handle generate code language group
+                elif intent == IntentCategory.GENERATE_CODE:
+                    if len(groups) >= 2 and groups[0]:
+                        target_lang = groups[0]
+                    # Also detect language from payload if not in prefix: e.g. "in Python" or "using Python"
+                    if not target_lang:
+                        lang_m = re.search(r'\b(?:in|using)\s+([A-Za-z0-9#+]+)\b', payload, re.IGNORECASE)
+                        if lang_m:
+                            target_lang = lang_m.group(1)
+
+                    if target_lang:
+                        instruction = (
+                            f"Generate clean, runnable, idiomatic {target_lang} code adhering to modern best practices. "
+                            "Include concise comments and proper type annotations. Output ONLY the code."
+                        )
+                    else:
+                        instruction = (
+                            "Generate clean, runnable, idiomatic code adhering to modern best practices. "
+                            "Detect or choose the appropriate programming language from context. "
+                            "Include concise comments and proper type annotations. Output ONLY the code."
+                        )
+
+                # Clean enclosing quotes from payload (e.g. user dictated: Fix my grammar: "...")
+                if (payload.startswith(('"', "'", "“", "”", "«")) and payload.endswith(('"', "'", "“", "”", "»"))) and len(payload) > 1:
+                    payload = payload[1:-1].strip()
+
+                # If user said only the command (e.g. "make it professional") with no payload,
+                # use the active selected or clipboard text as payload!
                 if not payload and clipboard_fallback:
                     payload = clipboard_fallback.strip()
 
-                logger.info(f"Intent classified: {intent.value} (Payload length: {len(payload)})")
+                trigger_matched = cleaned[:len(cleaned) - len(payload)].strip(' :,.-—!?')
+                logger.info(f"Intent classified: {intent.value} (Trigger: '{trigger_matched}', Payload len: {len(payload)})")
                 return IntentResult(
                     intent=intent,
                     payload=payload,
                     system_instruction=instruction,
                     target_model=target_model,
-                    command_trigger=match.group(0).split()[0],
+                    command_trigger=trigger_matched,
                     target_language=target_lang
                 )
 
@@ -233,7 +271,7 @@ class IntentClassifier:
             intent=IntentCategory.DICTATE,
             payload=cleaned,
             system_instruction="Transcribe the spoken audio into clear, clean, and grammatically accurate text.",
-            target_model="gemini-2.5-flash"
+            target_model="gemini-3.5-flash-lite"
         )
 
 
