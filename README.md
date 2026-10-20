@@ -198,9 +198,6 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ## 🏗️ System Architecture
 
-![Gemini Flow System Architecture Blueprint](Gemini%20Flow%20AI%20Workspace%20Poster.png)
-> **Full High-Resolution Architecture Blueprint**: End-to-end multi-tiered topography covering real-time PortAudio driver capture, 85Hz Butterworth DSP fan filtering, dual-engine Win32 kernel hotkeys, dynamic model load-balancing, 210+ multilingual prompt conditioning, and synthetic keystroke injection.
-
 ```mermaid
 flowchart TD
     subgraph Audio ["1. Audio Capture and DSP Engine"]
@@ -240,6 +237,13 @@ flowchart TD
         S --> T["🖥️ Active Cursor Focus Location (Sub-2s Turnaround)"]
     end
 ```
+
+Gemini Flow's modular architecture operates across four synchronized execution tiers:
+
+- **1. Audio Capture & DSP Engine**: Captures raw 16kHz microphone audio through low-latency PortAudio streams, strips motor hum and ceiling fan drone via an 85 Hz Butterworth high-pass filter, and intercepts pauses in under 5ms using an adaptive RMS noise gate before streaming into 22s background rolling slices.
+- **2. Routing & Model Intelligence**: Maintains pre-warmed keep-alive TLS sessions to Google Gemini (`gemini-3.5-flash-lite` for sub-1.5s speech dictation and `gemini-3.6-flash` for prompts), backed by 2.5s multi-model failover and local offline OpenAI Whisper (int8 CPU) fallback.
+- **3. Multilingual Intelligence & Showcase Combos (A–F)**: Dynamically conditions prompts against 210+ world languages to guarantee authentic native scripts or fluent English translations with zero Romanized transliteration, integrated with custom vocabulary, phonetic sound-alikes, and reactive profile directives.
+- **4. Windows OS Integration**: Injects formatted, polished text directly to the active cursor location in any Windows application via Win32 synthetic keystroke simulation or clipboard injection with under 0.20s stop-to-text turnaround.
 
 ---
 
