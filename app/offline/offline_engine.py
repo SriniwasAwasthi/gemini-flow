@@ -106,7 +106,7 @@ class OfflineSpeechEngine:
         warmup_thread.start()
 
     @classmethod
-    def transcribe_wav(cls, wav_bytes: bytes, initial_prompt: Optional[str] = None) -> Tuple[bool, str]:
+    def transcribe_wav(cls, wav_bytes: bytes, initial_prompt: Optional[str] = None, language: Optional[str] = None) -> Tuple[bool, str]:
         """
         Transcribes WAV audio bytes in offline mode.
         Tries Whisper AI first. Falls back to Windows SAPI and SpeechRecognition if needed.
@@ -117,7 +117,7 @@ class OfflineSpeechEngine:
 
         # 1. Primary: High-accuracy OpenAI Whisper (faster-whisper)
         try:
-            success, text = cls._transcribe_with_whisper(wav_bytes, initial_prompt=initial_prompt)
+            success, text = cls._transcribe_with_whisper(wav_bytes, initial_prompt=initial_prompt, language=language)
             if success:
                 logger.info(f"Local Whisper AI offline recognition succeeded ({len(text)} chars): {text[:60]}...")
                 return True, text
@@ -178,13 +178,25 @@ class OfflineSpeechEngine:
             return [wav_bytes]
 
     @classmethod
-    def _transcribe_with_whisper(cls, wav_bytes: bytes, initial_prompt: Optional[str] = None) -> Tuple[bool, str]:
+    def _transcribe_with_whisper(cls, wav_bytes: bytes, initial_prompt: Optional[str] = None, language: Optional[str] = None) -> Tuple[bool, str]:
         model = cls.get_whisper_model()
         if model is None:
             return False, "Whisper model unavailable"
 
         default_prompt = "Clean verbatim speech dictation, accurate grammar, proper punctuation."
         prompt = initial_prompt if initial_prompt else default_prompt
+
+        is_multilingual = getattr(getattr(model, "model", None), "is_multilingual", False)
+        kwargs: dict = {
+            "beam_size": 3,
+            "condition_on_previous_text": False,
+            "temperature": 0.0,
+            "vad_filter": True,
+            "vad_parameters": dict(min_silence_duration_ms=450, speech_pad_ms=300),
+            "initial_prompt": prompt
+        }
+        if is_multilingual and language:
+            kwargs["language"] = language
 
         # Estimate duration in seconds
         approx_sec = len(wav_bytes) / 32000.0
@@ -197,15 +209,7 @@ class OfflineSpeechEngine:
                 def _worker(pair):
                     idx, b = pair
                     c_stream = io.BytesIO(b)
-                    segs, _ = model.transcribe(
-                        c_stream,
-                        beam_size=3,
-                        condition_on_previous_text=False,
-                        temperature=0.0,
-                        vad_filter=True,
-                        vad_parameters=dict(min_silence_duration_ms=450, speech_pad_ms=300),
-                        initial_prompt=prompt
-                    )
+                    segs, _ = model.transcribe(c_stream, **kwargs)
                     return idx, " ".join([s.text.strip() for s in segs if s.text.strip()])
 
                 max_w = min(4, len(chunks))
@@ -218,15 +222,7 @@ class OfflineSpeechEngine:
         # Standard direct high-accuracy transcription (<= 28s)
         audio_stream = io.BytesIO(wav_bytes)
         t0 = time.time()
-        segments, info = model.transcribe(
-            audio_stream,
-            beam_size=3,
-            condition_on_previous_text=False,
-            temperature=0.0,
-            vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=450, speech_pad_ms=300),
-            initial_prompt=prompt
-        )
+        segments, info = model.transcribe(audio_stream, **kwargs)
 
         phrases = [seg.text.strip() for seg in segments if seg.text.strip()]
         final_text = " ".join(phrases).strip()

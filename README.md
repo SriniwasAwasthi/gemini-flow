@@ -48,10 +48,15 @@ Featuring a streamlined **10-Module Settings Control Center**, a reactive **Prof
   | **E** | **Creative & Natural Flow** | *Casual & Everyday Dictation* | *Direct Verbatim (No Cleanup)* | `gemini-3.5-transcribe` | 100% natural, colloquial transcription preserving exact words, humor, and casual tone. |
   | **F** | **Ultra-Fast Voice Prototyping** | *AI Dictations & Voice Commands* | *Meta-Prompt Architect* | `gemini-3.5-flash-lite` / `3.6-flash` | Converts conversational brainstorms into structured LLM prompts (Role, Objective, Context, Output). |
 
-- 🌐 **Native Multilingual & Regional Language Fidelity (Hindi, Marathi, Spanish, etc.)**:
-  - **Devanagari Script & Regional Accuracy**: Directly transcribes spoken **Hindi (हिंदी)** and **Marathi (मराठी)** in authentic Devanagari script with grammatical precision and zero forced English translation.
-  - **100+ Global Languages**: Flawlessly handles Spanish, French, German, Japanese, and diverse regional dialects with phonetic precision and proper diacritics.
-  - **Hinglish & Cultural Idioms**: Accurately preserves everyday expressions (*"bhai"*, *"jugaad"*, *"lakhs/crores"*, *"prepone"*) while polishing sentence structure.
+- 🌐 **Comprehensive 210+ World Languages Intelligence & Selection Engine**:
+  - **7 Global Geographic Regions**: Full coverage across Indian & South Asian (39 languages including Marathi, Hindi, Sanskrit, Gujarati, Tamil, Telugu, Kannada, Malayalam, Bengali, Punjabi, Bhojpuri, Maithili, Odia, etc.), Major European (62 languages including German, Spanish, Mexican Spanish, Italian, French, Portuguese, Russian, Dutch, Polish, Greek, Swedish, etc.), East & Southeast Asian (34 languages including Japanese, Mandarin Chinese, Cantonese, Korean, Vietnamese, Thai, Indonesian, etc.), Middle Eastern & Central Asian (27 languages including Arabic, Persian, Turkish, Hebrew, Uzbek, Kazakh, etc.), African (33 languages including Swahili, Yoruba, Zulu, Amharic, Hausa, Somali, etc.), and Americas & Indigenous languages.
+  - **Dual Mode Precision (Automatic English Translation vs. Native Script)**:
+    - *Mode 1: English Only (Default / Zero Selected)*: Automatically and intelligently translates any spoken non-English language (Gujarati, German, Mexican Spanish, Italian, Hindi, Russian, etc.) directly into natural, articulate English sentences without awkward phonetic transliteration.
+    - *Mode 2: Selected Spoken Languages*: Transcribes spoken words faithfully into that language's authentic native script and typography (`ગુજરાતી`, `Deutsch`, `Español`, `Italiano`, `हिन्दी`, `मराठी`, `संस्कृतम्`, `Русский`, `日本語`, `中文`, `العربية`, etc.) with correct grammatical markers and diacritics. Unselected languages are translated into English.
+    - *Mode 3: Universal Multilingual Mode*: Seamlessly transcribes every global language in its authentic script without manual switching.
+  - **Absolute Prohibition on Romanized Transliteration**: Strictly prevents broken phonetic Latin transliterations (`"majama"`, `"kem cho"`, `"kya chal raha hai"`, `"wie gehts"`, `"como estas"`), guaranteeing genuine native script or meaningful English translations every single time.
+  - **Live Typo-Tolerant Fuzzy Search & Regional Suggestions**: Search bar with real-time Levenshtein distance, phonetic alias mapping, and prefix matching (e.g. typing `"marathi"`, `"latn"`, `"romance"`, `"idish"`, or `"deutsch"` instantly highlights suggestions and filters the catalog).
+  - **Quick Action Controls & Active Language Tag Chips**: One-click buttons for *Select All (Universal Mode)*, *English Only (Default)*, and *Clear All*, alongside interactive tag chips with single-click remove buttons (`×`).
 - ⚡ **Guaranteed Sub-2-Second Voice Turnaround (30m, 1hr, and 3-Hour Marathons)**:
   - **Real-Time Rolling Slices**: Automatically splits and transcribes 22s audio chunks concurrently in the background as you speak, keeping ~98% of transcription pre-computed.
   - **Zero-Latency Stop (0.04s - 0.20s)**: When recording stops, only the residual sub-5s tail chunk is processed, delivering a blistering turnaround latency of **0.04s to 0.20s** even for marathon 3-hour continuous dictations.
@@ -180,10 +185,12 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ---
 
-### 11. Audio Device & Ceiling Fan DSP Filter
-![Audio Device & Ceiling Fan DSP Filter](images/11_audio_device.png)
-> **Acoustic Noise Reduction**: Features a real-time 85 Hz Butterworth high-pass filter that eliminates ceiling fan drone and motor hum.  
-> **Adaptive RMS Noise Gate**: Suppresses ambient room chatter and background noise when you pause or finish speaking.
+### 11. Audio Device, Ceiling Fan DSP & Multilingual Intelligence
+![Audio Device & Multilingual Catalog](images/11_audio_device.png)
+> **210+ World Languages Catalog & Real-Time Fuzzy Search**: Select any subset of 210+ global languages or activate English Only (default). Features instant phonetic and fuzzy search (e.g. typing *"marathi"*, *"latn"*, or *"romance"* immediately finds the match), 7 regional tabs (Indian & South Asian, Major European, East Asian, Middle Eastern, African, Americas), quick selection actions (*Select All / Universal Mode*, *English Only*, *Clear All*), and active language tag chips with one-click removal.  
+> **Dual Recognition & Zero Romanization Guarantee**: If speaking in selected languages, transcribes directly in authentic native script (Gujarati script `ગુજરાતી`, German with umlauts, Spanish with inverted punctuation `¿`/`¡`, Italian, Devanagari for Hindi/Marathi). If speaking unselected languages or in English-only mode, intelligently translates the spoken thought directly into English prose, completely forbidding broken Romanized transliterations (e.g. zero `"majama"`, `"kem cho"`, or `"kya chal raha hai"`).  
+> **Acoustic Noise Reduction & Ceiling Fan Gate**: Features a real-time 85 Hz Butterworth high-pass filter that eliminates ceiling fan drone and motor hum, coupled with an adaptive RMS Noise Gate (<5ms silence interception).  
+> **Local Offline Speech Recognition Fallback (Whisper AI)**: Built-in faster-whisper CTranslate2 int8 engine that auto-activates when offline or when cloud API quotas are exhausted, providing 100% private on-device transcription.
 
 ---
 
@@ -200,28 +207,32 @@ flowchart TD
 
     subgraph Routing ["2. Routing & Model Intelligence"]
         E --> F{"Connection & Quota Check"}
-        F -->|"Online (Keep-Alive TLS)"| G["🚀 Google Gemini 3.5 & 3.6 Engine"]
-        F -->|"Offline or 429 Quota"| H["💻 Local Whisper AI (int8 CPU)"]
+        F -->|"Online (Keep-Alive TLS)"| G["🚀 Google Gemini Engine (3.5 Lite / 3.6 Flash)"]
+        F -->|"Offline or 429 Quota"| H["💻 Local Whisper AI (int8 CPU Fallback)"]
         
         G --> I["🧠 Intelligent Load Balancer"]
-        I -->|"Fast Speech Dictation (<1.5s)"| J["🎙️ gemini-3.5-flash-lite / 3.5-transcribe"]
+        I -->|"Fast Speech Dictation (<1.5s)"| J["🎙️ gemini-3.5-flash-lite"]
         I -->|"Prompt & Polish"| K["⚡ gemini-3.6-flash"]
         I -->|"Resilient Auto-Failover"| L["🔄 Multi-Model Failover (2.5s)"]
     end
 
-    subgraph Intelligence ["3. Linguistic Intelligence & Showcase Combos (A–F)"]
-        J --> M["👥 Active Profile & Dictation Style Engine"]
+    subgraph Intelligence ["3. Multilingual Intelligence & Showcase Combos (A–F)"]
+        J --> M["🌐 210+ World Languages Selection Engine"]
         K --> M
         L --> M
         H --> M
-        M --> N["📚 Custom Vocabulary & Phonetic Sound-Alikes"]
-        N --> O["🎛️ Reactive Combination Showcase (A–F)"]
-        O --> P["✨ Formatted, Polished & Structured Text"]
+        M --> N{"Active Language Mode"}
+        N -->|"English Only (Default)"| O1["🇺🇸 Intelligent English Translation\n(Zero Romanization Guarantee)"]
+        N -->|"Selected Regional Languages"| O2["✍️ Authentic Native Script Transcription\n(Gujarati, Devanagari, German, Spanish, etc.)"]
+        O1 --> P["📚 Custom Vocabulary & Phonetic Sound-Alikes"]
+        O2 --> P
+        P --> Q["🎛️ Reactive Combination Showcase (A–F)"]
+        Q --> R["✨ Formatted, Polished & Structured Text"]
     end
 
     subgraph Injection ["4. Windows OS Integration"]
-        P --> Q["⌨️ Win32 Keystroke & Clipboard Injector"]
-        Q --> R["🖥️ Active Cursor Focus Location (Sub-2s Turnaround)"]
+        R --> S["⌨️ Win32 Keystroke & Clipboard Injector"]
+        S --> T["🖥️ Active Cursor Focus Location (Sub-2s Turnaround)"]
     end
 ```
 
@@ -247,13 +258,19 @@ Follow these steps to set up and run Gemini Flow on your Windows machine:
 
 ---
 
-### Step 3: Clone the Repository
-Open PowerShell or Command Prompt:
+### Step 3: Clone or Download the Repository
 
+#### Option A: Clone via Git
+Open PowerShell or Command Prompt:
 ```bash
 git clone https://github.com/SriniwasAwasthi/gemini-flow.git
 cd gemini-flow
 ```
+
+#### Option B: Download ZIP (No Git Required)
+1. On the GitHub repository page, click the green **Code** button and select **Download ZIP**.
+2. Extract the downloaded `gemini-flow-main.zip` folder to any location on your PC (e.g. `C:\GeminiFlow` or your Desktop).
+3. Open PowerShell or Command Prompt inside the extracted folder.
 
 ---
 
@@ -276,7 +293,7 @@ pip install -r requirements.txt
 
 ### Step 6: Launch Gemini Flow
 
-You can start the application using either method:
+You can start the application using any of the following methods:
 
 #### Option A: Quick-Launch Script (Easiest)
 Double-click `run.bat` or run in terminal:
@@ -284,12 +301,15 @@ Double-click `run.bat` or run in terminal:
 run.bat
 ```
 
-#### Option B: Standard Python Command
+#### Option B: Standalone Native Windows Executable
+Double-click `Gemini Flow.exe` directly from the folder. It dynamically detects your Python virtual environment and launches silently into the system tray with zero console windows.
+
+#### Option C: Standard Python Command
 ```powershell
 python main.py
 ```
 
-*Tip: For silent background operation without a console window, use `pythonw main.py` or double-click `Gemini Flow.exe`.*
+*Tip: For silent background operation without a console window, run `pythonw main.py` or double-click `Gemini Flow.exe`.*
 
 ---
 
@@ -309,11 +329,17 @@ python main.py
    - Press **`Ctrl + Space`** (or your custom recorded hotkey).
    - In **Toggle Mode**: Tap once to start speaking, tap again to finish and auto-type.
    - In **Push-to-Talk Mode**: Hold keys down while speaking, release to finish and auto-type.
-4. **AI Prompt Engineering Mode (`Alt + P` / `Ctrl + Shift + P`)**:
+4. **Multilingual Spoken Language Customization (210+ World Languages)**:
+   - Open **Settings** $\rightarrow$ **🎙️ Audio Device** tab.
+   - In the **Multilingual Spoken Languages** section, search for any language (e.g. Gujarati, German, Mexican Spanish, Italian, Marathi, Hindi, Sanskrit, Russian, etc.) or filter by the 7 geographical region tabs.
+   - **Mode 1 (English Only)**: Click **English Only (Default)**. Any spoken non-English language will be translated into natural English prose with zero phonetic Romanized transliterations.
+   - **Mode 2 (Selected Languages)**: Check your desired languages. When you speak in those languages, Gemini Flow renders them in their authentic native script (`ગુજરાતી`, `Deutsch`, `Español`, `Italiano`, `हिन्दी`, `मराठी`, etc.).
+   - Click **💾 Save & Apply Changes** to activate immediately.
+5. **AI Prompt Engineering Mode (`Alt + P` / `Ctrl + Shift + P`)**:
    - Dictate your rough thoughts or select rough notes. Gemini Flow converts them into an executive structured LLM prompt (Role, Objective, Steps, Output) and injects it into your active AI editor.
-5. **In-Place Text Transformation (`Alt + T` / `Ctrl + Shift + T`)**:
+6. **In-Place Text Transformation (`Alt + T` / `Ctrl + Shift + T`)**:
    - Highlight any text in any editor, press **`Alt + T`**, and speak a transformation instruction (or let Gemini Flow polish grammar and tone in place).
-6. **Automatic Offline Whisper AI Failover**:
+7. **Automatic Offline Whisper AI Failover**:
    - If your network drops or API quotas are exhausted, Gemini Flow switches automatically to its local OpenAI Whisper engine (`faster-whisper` int8) with sub-1.5s latency and 100% offline accuracy.
 
 ---
@@ -339,6 +365,7 @@ gemini-flow/
 │   ├── cost_awareness.py       # Infinite milestone engine (10M+ words), books/magazines calculator & token tracker
 │   ├── gemini_engine.py        # Gemini client, parallel chunking & instant Whisper AI failover
 │   ├── hotkey_manager.py       # Win32 kernel-level RegisterHotKey + low-level hook dual engine
+│   ├── languages.py            # 210+ World languages catalog, 7 regional filters, fuzzy search & prompt conditioning
 │   ├── main.py                 # Core application controller, single-instance named pipe IPC & auto-recovery
 │   ├── text_injector.py        # Simulated keystroke & clipboard injection engine
 │   ├── intelligence/           # Context-aware application detection
@@ -363,6 +390,7 @@ gemini-flow/
 │       └── tray_icon.py        # System tray icon & context menus
 ├── images/                     # UI screenshots and visual documentation assets
 ├── tests/
+│   ├── test_multilingual_languages_catalog.py # 210+ World languages catalog, fuzzy search & prompt modes test
 │   ├── test_combinations_and_cleanups.py # Tests for 10-tab settings dialog, combinations A–F & UI cleanups
 │   ├── test_live_app_simulation.py      # Live end-to-end hotkey dictation simulation with combinations A–F
 │   ├── test_multilingual_and_all_features_verification.py # Master Hindi, Marathi, Spanish, & 16-command suite
@@ -418,6 +446,9 @@ Gemini Flow is engineered with strict privacy principles to protect your data an
 Gemini Flow includes an exhaustive suite of automated unit, integration, and stress tests:
 
 ```powershell
+# Run 210+ World Languages Catalog, Regional Filters & Fuzzy Search Test Suite
+python tests/test_multilingual_languages_catalog.py
+
 # Run Combination Showcase (A–F) & 10-Module Settings Verification Test
 python tests/test_combinations_and_cleanups.py
 

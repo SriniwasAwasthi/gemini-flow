@@ -90,7 +90,7 @@ INTENT_PATTERNS = [
     (
         rf'^(?:please\s+)?(?:turn\s+this\s+into\s+(?:an?\s+)?(?:ai\s+)?prompt|create\s+(?:an?\s+)?(?:ai\s+)?prompt(?:\s+(?:from|for)\s+this)?|generate\s+(?:an?\s+)?(?:ai\s+)?prompt|make\s+this\s+(?:an?\s+)?(?:ai\s+)?prompt|convert\s+(?:this\s+)?to\s+(?:an?\s+)?(?:ai\s+)?prompt|prompt\s+enhancer|(?:ai\s+)?prompt\s*[:\-—]){DELIM}?(.*)$',
         IntentCategory.CREATE_PROMPT,
-        "You are an expert AI Prompt Engineer. Transform the user's raw notes into a structured, high-impact AI Prompt with Objective, Context, Step-by-Step Instructions, and Output Format. Output ONLY the finalized prompt.",
+        "You are an elite, world-class AI Prompt Architect. Transform the provided text into a comprehensive, production-grade AI Prompt with Role & Objective, Context & Background, Detailed Requirements & Scope, Step-by-Step Instructions, and Expected Output Format. Preserve 100% of all information and technical details without omitting anything. Never inject unrelated names or rules. Output ONLY the finalized prompt directly.",
         "gemini-3.5-flash-lite"
     ),
     # 4. Summarize

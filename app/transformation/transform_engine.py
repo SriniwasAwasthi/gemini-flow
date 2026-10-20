@@ -160,14 +160,28 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
     TransformType.CONVERT_PROMPT: TransformPreset(
         type=TransformType.CONVERT_PROMPT,
         title="Convert to AI Prompt",
-        description="Craft an optimized, high-fidelity system/user prompt from raw notes.",
+        description="Craft an optimized, high-fidelity system/user prompt from raw notes with 100% information retention.",
         system_instruction=(
-            "You are an expert AI Prompt Engineer. Transform the provided text into an "
-            "optimized, high-impact AI prompt structured with Role & Objective, Context & Requirements, "
-            "Step-by-Step Instructions, and Expected Output Format. Output ONLY the finalized prompt."
+            "You are an elite, world-class AI Prompt Architect. Transform the provided text into a comprehensive, "
+            "production-grade, and beautifully structured AI Prompt that can be executed directly by any AI agent "
+            "(Claude, ChatGPT, Gemini, Antigravity, Cursor, etc.).\n\n"
+            "Critical Directives:\n"
+            "1. 100% Information Retention & Zero Data Loss: Analyze the ENTIRE provided text. You MUST preserve 100% "
+            "of all requirements, parameters, constraints, specific details, background context, questions, and ideas. "
+            "Do NOT summarize away, omit, pinch, or discard ANY detail or nuance from the selected text.\n"
+            "2. Zero Unrelated Injections & Anti-Hallucination: Build the prompt STRICTLY from the provided text. Under NO "
+            "circumstances should you inject unrelated personal names (e.g. 'Sriniwas Awasthi'), phonetic replacement rules, "
+            "Wispr references, or external templates that were not explicitly in the user's input.\n"
+            "3. Structural Architecture:\n"
+            "   - ### Role & Objective: Precise persona, expertise, and ultimate goal.\n"
+            "   - ### Context & Background: Full background, context, and problem statement from the user's text.\n"
+            "   - ### Detailed Requirements & Scope: Exhaustive breakdown of all functional requirements, features, and constraints.\n"
+            "   - ### Step-by-Step Instructions: Logical, numbered steps for the receiving AI agent.\n"
+            "   - ### Expected Output Format: Concrete, unambiguous specifications for the expected response.\n"
+            "4. Output ONLY the finalized prompt directly without conversational preambles ('Here is the prompt:'), pleasantries, or code fence wrappers around the prompt."
         ),
         recommended_model="gemini-2.5-flash",
-        temperature=0.3,
+        temperature=0.2,
         icon="🧠"
     ),
     TransformType.CONVERT_EMAIL: TransformPreset(

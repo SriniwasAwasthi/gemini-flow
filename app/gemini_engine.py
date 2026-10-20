@@ -196,7 +196,8 @@ class GeminiEngine:
         profile_id: str = "coding",
         task: str = "dictate",
         auto_cost_mode: bool = False,
-        offline_fallback_enabled: bool = True
+        offline_fallback_enabled: bool = True,
+        offline_language: Optional[str] = None
     ) -> Tuple[bool, str]:
         """
         Sends WAV audio directly to Gemini with intelligent model routing,
@@ -217,7 +218,7 @@ class GeminiEngine:
                 self.last_fallback = not is_explicit_offline
                 t_off_start = time.time()
                 prompt_ctx = "Clean speech dictation, accurate grammar, proper punctuation."
-                offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx)
+                offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx, language=offline_language)
                 self.last_latency = time.time() - t_off_start
                 if offline_ok:
                     if offline_text:
@@ -268,7 +269,7 @@ class GeminiEngine:
                 try:
                     t_off_start = time.time()
                     prompt_ctx = "Clean speech dictation, accurate grammar, proper punctuation."
-                    offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx)
+                    offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx, language=offline_language)
                     if offline_ok:
                         if offline_text:
                             try:
@@ -461,13 +462,12 @@ class GeminiEngine:
                             {
                                 "text": (
                                     f"{system_instruction}\n\n"
-                                    "CRITICAL SPEECH-TO-TEXT RULES:\n"
-                                    "1. Intelligent Dictation & Multilingual Speech Fidelity: Accurately transcribe what the speaker said in their spoken language (including English, Hindi, Marathi, and all global/regional languages). Faithfully preserve the original spoken language and authentic script (e.g. Devanagari script for Hindi/Marathi, Latin script for English/European languages) unless explicitly instructed to translate. If the speaker stutters, restarts sentences, or repeats greetings/phrases/clauses mistakenly (e.g. saying 'hello everyone' 2-3 times, or 'analyze this document... analyze this document'), or corrects a word (e.g. 'many living organisms, many wild living organisms' -> 'many wild living organisms'), transcribe the finalized thought strictly ONCE with correct grammar and punctuation. Never invent or hallucinate words. Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
-                                    "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting: Intelligently detect if the speaker is dictating structured points, advantages/disadvantages, sequential items ('first, second', 'one, two', 'points are', 'tasks are'), or lists. If so, automatically break lines, insert natural section headers where appropriate (e.g. 'Advantages:', 'Key Points:'), and format each distinct point on its own new line with a clean bullet point ('• '). For continuous narrative, explanations, or general speech, preserve clean paragraphs and NEVER force bullet points.\n"
-                                    "3. Anti-Hallucination & Zero-Imagination Guarantee: Transcribe ONLY the acoustic speech actually uttered. If the audio contains only silence, breathing, background noise, or room sound, return an empty string. NEVER generate conversational responses, imaginary sentences, hallucinated facts, questions, commentary, or status words (e.g. NEVER output 'Vocal audio not in effect', 'Critical', or greetings).\n"
-                                    "4. Clean Grammar Polish: Seamlessly polish grammar, punctuation (periods, commas, question marks, semicolons), and remove verbal fillers ('uh', 'um', 'ah', 'like', 'means', 'basically') while keeping 100% of the exact vocabulary and original language.\n"
-                                    "5. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or sign-offs) that were not uttered in this audio.\n"
-                                    "6. Output Format: Output ONLY the finalized transcribed text directly without preamble, commentary, or markdown blocks."
+                                    "EXECUTION DIRECTIVES:\n"
+                                    "1. Process the attached audio in strict accordance with the Active Spoken Language Constraints specified above.\n"
+                                    "2. Anti-Hallucination & Silence Detection: Transcribe ONLY the acoustic speech actually uttered. If the audio contains only silence, breathing, background noise, or room sound, return an empty string. NEVER generate conversational responses, imaginary sentences, hallucinated facts, or status words.\n"
+                                    "3. Formatting & Structure: If structured points, lists, or steps are dictated, format cleanly with bullet points ('• ') and natural section headers; otherwise format flowing narrative in clean paragraphs.\n"
+                                    "4. Proper Name Integrity: Transcribe proper nouns and names accurately ONLY if explicitly spoken. NEVER inject unuttered personal names or sign-offs.\n"
+                                    "5. Output Format: Output ONLY the finalized text directly without preamble, commentary, or markdown code fences."
                                 )
                             },
                             {
@@ -565,14 +565,9 @@ class GeminiEngine:
                                 {
                                     "text": (
                                         f"{system_instruction}\n\n"
-                                        f"Task: Transcribe part {c_idx+1} of {len(chunks)} of the user's continuous speech.\n"
-                                        "CRITICAL TRANSCRIPTION DIRECTIVES:\n"
-                                        "1. 100% Completeness & Multilingual Fidelity: Accurately transcribe spoken concepts completely in the language spoken (English, Hindi, Marathi, and all global/regional languages), preserving native vocabulary and script (Devanagari, Latin, etc.). If greetings, clauses, or sentences are repeated (e.g. saying 'hello everyone' multiple times, or stutters), or if a word is corrected, transcribe each intended finalized thought ONCE and continue. Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
-                                        "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting: When the speaker dictates structured points, steps, advantages, or lists, automatically format each distinct point on its own new line with a clean bullet point ('• ') and natural section headers. For continuous narrative, preserve clean paragraphs and NEVER force bullet points.\n"
-                                        "3. Anti-Repetition Guarantee: NEVER repeat any phrase, word, or sentence in an infinite loop. Intelligently collapse false starts and restarts.\n"
-                                        "4. Strict Vocabulary & Verb Fidelity: NEVER substitute verbs or nouns with synonyms (transcribe 'analyze', not 'list'; transcribe 'localhost', not 'token').\n"
-                                        "5. Zero Hallucination & Proper Name Integrity: NEVER invent speculative text or output 'Vocal audio not in effect'. ONLY output proper names if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or sign-offs) that were not uttered in this audio. Transcribe strictly the actual acoustic speech.\n"
-                                        "6. Output ONLY the finalized transcribed text for this audio segment directly."
+                                        f"Task: Process part {c_idx+1} of {len(chunks)} of the user's continuous speech in strict accordance with the Active Spoken Language Constraints specified above.\n"
+                                        "Anti-Repetition & Anti-Hallucination: Never repeat phrases in an infinite loop. Eliminate stutters and false starts. Transcribe strictly actual acoustic speech.\n"
+                                        "Output ONLY the finalized text for this audio segment directly."
                                     )
                                 },
                                 {
@@ -754,7 +749,7 @@ class GeminiEngine:
 
         # 5. Vocabulary Normalization & Metrics
         if exec_res.success and exec_res.text:
-            if not is_code and transform_type not in (TransformType.TECHNICAL, TransformType.CUSTOM):
+            if not is_code and transform_type not in (TransformType.TECHNICAL, TransformType.CUSTOM, TransformType.CONVERT_PROMPT):
                 try:
                     exec_res.text = VocabEngine.normalize_text(exec_res.text)
                 except Exception:
@@ -938,7 +933,7 @@ class GeminiEngine:
                     "You are Gemini Flow's Wispr Flow Adaptive Dictation Formatter.\n"
                     "Determine if the speaker intended a point-wise or sequential list (advantages, benefits, key points, steps, features, action items, or explicit numbered/bulleted points), OR continuous narrative paragraphs.\n"
                     "- If the speaker dictated sequential points, steps, action items, or a multi-point list, format the speech into an introductory sentence followed by clean bullet points ('• ') on separate lines.\n"
-                    "- If the speaker dictated continuous narrative prose, explanations, questions, or paragraphs, DO NOT use bullet points; format as natural, fluent English paragraphs.\n"
+                    "- If the speaker dictated continuous narrative prose, explanations, questions, or paragraphs, DO NOT use bullet points; format as natural, fluent paragraphs in the original language and authentic script (e.g. Marathi, Hindi, English). Preserve 100% of all spoken concepts in the original language without translation.\n"
                     "- Preserve 100% of all spoken concepts and facts without omission. Eliminate stutters and speech restarts.\n"
                     "- Output ONLY the finalized text directly without conversational commentary."
                 )

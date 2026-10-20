@@ -37,6 +37,7 @@ from ..cost_awareness import (
     get_milestone_info,
     format_duration
 )
+from ..languages import get_all_languages, REGIONS, REGION_ALL, LanguageItem, fuzzy_search_languages, get_language_by_name
 
 from pathlib import Path
 
@@ -2926,7 +2927,13 @@ class SettingsDialog(QDialog):
         return tab
 
     def _create_audio_tab(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; } QWidget#audioScrollChild { background: transparent; }")
+
         tab = QWidget()
+        tab.setObjectName("audioScrollChild")
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(14)
@@ -3000,8 +3007,178 @@ class SettingsDialog(QDialog):
         offline_desc.setStyleSheet("color: #94A3B8; font-size: 11px;")
         layout.addWidget(offline_desc)
 
+        # =========================================================================
+        # Language Selection & Multilingual Recognition Section (200+ Global Languages)
+        # =========================================================================
+        sep_lang = QFrame()
+        sep_lang.setFrameShape(QFrame.Shape.HLine)
+        sep_lang.setFrameShadow(QFrame.Shadow.Sunken)
+        sep_lang.setStyleSheet("background-color: #334155; max-height: 1px; margin: 10px 0;")
+        layout.addWidget(sep_lang)
+
+        lang_header = QLabel("🌐 Spoken Language Selection & Multilingual Recognition (200+ Languages):")
+        lang_header.setStyleSheet("font-size: 14px; font-weight: bold; color: #38BDF8; margin-top: 4px;")
+        layout.addWidget(lang_header)
+
+        lang_desc = QLabel(
+            "   Filter and select your preferred spoken languages. When specific languages are selected (e.g., select only 5 languages, "
+            "or English only by default), Gemini Flow strictly conditions recognition to those languages, guaranteeing authentic "
+            "native script and preventing language confusion."
+        )
+        lang_desc.setWordWrap(True)
+        lang_desc.setStyleSheet("color: #94A3B8; font-size: 11px; margin-bottom: 6px;")
+        layout.addWidget(lang_desc)
+
+        # Language Control Card
+        lang_card = QFrame()
+        lang_card.setStyleSheet("QFrame#langCard { background-color: #0F172A; border: 1px solid #1E293B; border-radius: 10px; padding: 12px; }")
+        lang_card.setObjectName("langCard")
+        lang_card_layout = QVBoxLayout(lang_card)
+        lang_card_layout.setSpacing(10)
+        lang_card_layout.setContentsMargins(10, 10, 10, 10)
+
+        # 1. Active Selection Status Banner & Action Buttons
+        top_lang_bar = QHBoxLayout()
+        self.lang_status_badge = QLabel("🎯 Active: English Only (Default)")
+        self.lang_status_badge.setStyleSheet(
+            "font-size: 12px; font-weight: 700; color: #38BDF8; background-color: #1E293B; "
+            "padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;"
+        )
+        top_lang_bar.addWidget(self.lang_status_badge, stretch=1)
+
+        self.btn_lang_default_en = QPushButton("⚡ English Only (Default)")
+        self.btn_lang_default_en.setObjectName("secondaryBtn")
+        self.btn_lang_default_en.setToolTip("Reset to English only (0 other languages selected)")
+        self.btn_lang_default_en.clicked.connect(self._select_english_only)
+        top_lang_bar.addWidget(self.btn_lang_default_en)
+
+        self.btn_lang_select_all = QPushButton("🌐 Select All (200+)")
+        self.btn_lang_select_all.setObjectName("secondaryBtn")
+        self.btn_lang_select_all.setToolTip("Select all 200+ languages for universal auto-detection")
+        self.btn_lang_select_all.clicked.connect(self._select_all_languages)
+        top_lang_bar.addWidget(self.btn_lang_select_all)
+
+        self.btn_lang_clear = QPushButton("🧹 Clear All")
+        self.btn_lang_clear.setObjectName("secondaryBtn")
+        self.btn_lang_clear.setToolTip("Clear all selections (reverting to English default)")
+        self.btn_lang_clear.clicked.connect(self._clear_all_languages)
+        top_lang_bar.addWidget(self.btn_lang_clear)
+
+        lang_card_layout.addLayout(top_lang_bar)
+
+        # 2. Live Search Bar
+        search_box = QHBoxLayout()
+        self.lang_search = QLineEdit()
+        self.lang_search.setPlaceholderText("🔍 Search 200+ languages by name, native script, country, code (e.g. Marathi, हिन्दी, Español, mr, fr)...")
+        self.lang_search.setStyleSheet("font-size: 13px; padding: 7px 12px; border-radius: 6px; background-color: #1E293B; color: #FFFFFF; border: 1px solid #334155;")
+        self.lang_search.textChanged.connect(self._filter_languages_table)
+        search_box.addWidget(self.lang_search)
+        lang_card_layout.addLayout(search_box)
+
+        # 2b. Smart Typo-Tolerant Suggestion Chips ("Did you mean: ...")
+        self.lang_suggestion_widget = QWidget()
+        self.lang_suggestion_layout = QHBoxLayout(self.lang_suggestion_widget)
+        self.lang_suggestion_layout.setContentsMargins(2, 2, 2, 4)
+        self.lang_suggestion_layout.setSpacing(6)
+        self.lang_suggestion_widget.setVisible(False)
+        lang_card_layout.addWidget(self.lang_suggestion_widget)
+
+        # 3. Category Filter Pills
+        category_box = QHBoxLayout()
+        category_box.setSpacing(6)
+        self.lang_region_buttons = {}
+        for r_name in REGIONS:
+            btn = QPushButton(r_name)
+            btn.setCheckable(True)
+            btn.setObjectName("secondaryBtn")
+            btn.setStyleSheet("""
+                QPushButton {
+                    font-size: 11px;
+                    font-weight: 600;
+                    padding: 4px 10px;
+                    border-radius: 4px;
+                    background-color: #1E293B;
+                    color: #94A3B8;
+                    border: 1px solid #334155;
+                }
+                QPushButton:checked {
+                    background-color: #0284C7;
+                    color: #FFFFFF;
+                    border: 1px solid #38BDF8;
+                }
+            """)
+            if r_name == REGION_ALL:
+                btn.setChecked(True)
+            btn.clicked.connect(lambda checked, r=r_name: self._on_lang_region_clicked(r))
+            self.lang_region_buttons[r_name] = btn
+            category_box.addWidget(btn)
+
+        # Add "⭐ Selected Only" pill
+        btn_sel = QPushButton("⭐ Selected Only")
+        btn_sel.setCheckable(True)
+        btn_sel.setObjectName("secondaryBtn")
+        btn_sel.setStyleSheet("""
+            QPushButton {
+                font-size: 11px;
+                font-weight: 600;
+                padding: 4px 10px;
+                border-radius: 4px;
+                background-color: #1E293B;
+                color: #94A3B8;
+                border: 1px solid #334155;
+            }
+            QPushButton:checked {
+                background-color: #D97706;
+                color: #FFFFFF;
+                border: 1px solid #F59E0B;
+            }
+        """)
+        btn_sel.clicked.connect(lambda checked: self._on_lang_region_clicked("Selected Only"))
+        self.lang_region_buttons["Selected Only"] = btn_sel
+        category_box.addWidget(btn_sel)
+
+        category_box.addStretch()
+        lang_card_layout.addLayout(category_box)
+
+        # 4. Languages Table (211 Languages)
+        self.lang_table = QTableWidget()
+        self.lang_table.setColumnCount(4)
+        self.lang_table.setHorizontalHeaderLabels(["Select", "🌐 Language (English)", "✍️ Native Script", "🏷️ Region & Code"])
+        self.lang_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.lang_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.lang_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.lang_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.lang_table.horizontalHeader().setFixedHeight(32)
+        self.lang_table.verticalHeader().setVisible(False)
+        self.lang_table.setShowGrid(True)
+        self.lang_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.lang_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.lang_table.setMinimumHeight(280)
+        self.lang_table.setMaximumHeight(360)
+        self.lang_table.setStyleSheet("""
+            QTableWidget {
+                background-color: #0B1120;
+                border: 1px solid #1E293B;
+                border-radius: 6px;
+                gridline-color: #1E293B;
+                selection-background-color: #1E293B;
+            }
+            QHeaderView::section {
+                background-color: #1E293B;
+                color: #38BDF8;
+                font-weight: bold;
+                border: 1px solid #0F172A;
+                padding: 4px;
+            }
+        """)
+        self.lang_table.cellClicked.connect(self._on_lang_cell_clicked)
+        lang_card_layout.addWidget(self.lang_table)
+
+        layout.addWidget(lang_card)
+
         layout.addStretch()
-        return tab
+        scroll.setWidget(tab)
+        return scroll
 
     def _create_history_tab(self) -> QWidget:
         tab = QWidget()
@@ -3550,6 +3727,300 @@ class SettingsDialog(QDialog):
         except Exception as e:
             logger.error(f"Error refreshing cost statistics: {e}", exc_info=True)
 
+    # --- Multilingual Recognition & Language Selection (200+ Languages) ---
+    def _populate_languages_table(self):
+        if not hasattr(self, 'lang_table') or not self.lang_table:
+            return
+
+        from ..languages import get_all_languages, REGION_ALL
+        all_langs = get_all_languages()
+        selected_langs = self.config.get_selected_languages() if hasattr(self.config, 'get_selected_languages') else self.config.get("selected_languages", ["English"])
+        if not selected_langs:
+            selected_langs = ["English"]
+        selected_set = {s.strip().lower() for s in selected_langs}
+
+        self.lang_table.blockSignals(True)
+        self.lang_table.setRowCount(len(all_langs))
+
+        for row, lang in enumerate(all_langs):
+            is_checked = (
+                lang.name.lower() in selected_set
+                or lang.code.lower() in selected_set
+                or "all" in selected_set
+            )
+
+            # Col 0: Checkbox + Flag
+            chk_item = QTableWidgetItem(f"{lang.flag} ")
+            chk_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            chk_item.setCheckState(Qt.CheckState.Checked if is_checked else Qt.CheckState.Unchecked)
+            chk_item.setData(Qt.ItemDataRole.UserRole, lang.name)
+            chk_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lang_table.setItem(row, 0, chk_item)
+
+            # Col 1: Language Name (English)
+            name_item = QTableWidgetItem(lang.name)
+            name_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            name_item.setData(Qt.ItemDataRole.UserRole, lang.name)
+            name_font = QFont()
+            name_font.setBold(True)
+            name_item.setFont(name_font)
+            name_item.setForeground(QColor("#FFFFFF"))
+            self.lang_table.setItem(row, 1, name_item)
+
+            # Col 2: Native Script
+            native_item = QTableWidgetItem(lang.native_name)
+            native_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            native_item.setForeground(QColor("#38BDF8"))
+            self.lang_table.setItem(row, 2, native_item)
+
+            # Col 3: Region & Code Badge
+            region_str = f"[{lang.code}] • {lang.region}"
+            reg_item = QTableWidgetItem(region_str)
+            reg_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            reg_item.setForeground(QColor("#94A3B8"))
+            reg_item.setData(Qt.ItemDataRole.UserRole, lang.region)
+            self.lang_table.setItem(row, 3, reg_item)
+
+        self.lang_table.blockSignals(False)
+        self._update_lang_status_badge()
+
+    def _on_lang_cell_clicked(self, row: int, col: int):
+        chk_item = self.lang_table.item(row, 0)
+        if not chk_item:
+            return
+        curr_state = chk_item.checkState()
+        new_state = Qt.CheckState.Unchecked if curr_state == Qt.CheckState.Checked else Qt.CheckState.Checked
+        chk_item.setCheckState(new_state)
+        self._on_lang_checkbox_toggled()
+
+    def _on_lang_checkbox_toggled(self):
+        checked_langs = []
+        for r in range(self.lang_table.rowCount()):
+            item = self.lang_table.item(r, 0)
+            if item and item.checkState() == Qt.CheckState.Checked:
+                name = item.data(Qt.ItemDataRole.UserRole)
+                if name:
+                    checked_langs.append(name)
+
+        if not checked_langs:
+            # 0 languages selected = default to English only
+            self.config.set_selected_languages(["English"])
+        else:
+            self.config.set_selected_languages(checked_langs)
+
+        self._update_lang_status_badge(checked_langs)
+
+    def _update_lang_status_badge(self, checked_langs: Optional[List[str]] = None):
+        if not hasattr(self, 'lang_status_badge') or not self.lang_status_badge:
+            return
+        if checked_langs is None:
+            checked_langs = []
+            for r in range(self.lang_table.rowCount()):
+                item = self.lang_table.item(r, 0)
+                if item and item.checkState() == Qt.CheckState.Checked:
+                    name = item.data(Qt.ItemDataRole.UserRole)
+                    if name:
+                        checked_langs.append(name)
+
+        total_rows = self.lang_table.rowCount()
+        count = len(checked_langs)
+
+        if count == 0:
+            self.lang_status_badge.setText("🎯 Active: English Only (Default)")
+            self.lang_status_badge.setStyleSheet(
+                "font-size: 12px; font-weight: 700; color: #38BDF8; background-color: #1E293B; "
+                "padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;"
+            )
+        elif count == total_rows or "All" in checked_langs:
+            self.lang_status_badge.setText(f"🌐 Active: Universal Multilingual (All {total_rows} Languages)")
+            self.lang_status_badge.setStyleSheet(
+                "font-size: 12px; font-weight: 700; color: #10B981; background-color: #064E3B; "
+                "padding: 6px 12px; border-radius: 6px; border: 1px solid #059669;"
+            )
+        elif count == 1 and checked_langs[0].lower() == "english":
+            self.lang_status_badge.setText("🎯 Active: English Only (Default)")
+            self.lang_status_badge.setStyleSheet(
+                "font-size: 12px; font-weight: 700; color: #38BDF8; background-color: #1E293B; "
+                "padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;"
+            )
+        elif count <= 4:
+            names_str = ", ".join(checked_langs)
+            self.lang_status_badge.setText(f"🎯 Active: {count} Selected ({names_str})")
+            self.lang_status_badge.setStyleSheet(
+                "font-size: 12px; font-weight: 700; color: #F59E0B; background-color: #78350F; "
+                "padding: 6px 12px; border-radius: 6px; border: 1px solid #D97706;"
+            )
+        else:
+            sample_str = ", ".join(checked_langs[:3]) + f" +{count - 3} more"
+            self.lang_status_badge.setText(f"🎯 Active: {count} Selected ({sample_str})")
+            self.lang_status_badge.setStyleSheet(
+                "font-size: 12px; font-weight: 700; color: #F59E0B; background-color: #78350F; "
+                "padding: 6px 12px; border-radius: 6px; border: 1px solid #D97706;"
+            )
+
+    def _filter_languages_table(self):
+        if not hasattr(self, 'lang_table') or not self.lang_table:
+            return
+
+        query = self.lang_search.text().strip() if hasattr(self, 'lang_search') else ""
+        active_region = getattr(self, '_active_lang_region', REGION_ALL)
+
+        # 1. Compute Fuzzy & Typo Matches across 200+ languages
+        matched_items, suggestions = fuzzy_search_languages(query, active_region)
+        matched_names_set = {item.name.lower() for item in matched_items}
+        matched_natives_set = {item.native_name.lower() for item in matched_items}
+
+        # 2. Render Smart Interactive Suggestion Chips
+        if hasattr(self, 'lang_suggestion_widget') and hasattr(self, 'lang_suggestion_layout'):
+            while self.lang_suggestion_layout.count():
+                child = self.lang_suggestion_layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+
+            if query and suggestions:
+                lbl = QLabel("💡 Did you mean / Suggested:")
+                lbl.setStyleSheet("font-size: 11px; font-weight: 700; color: #38BDF8; margin-right: 4px;")
+                self.lang_suggestion_layout.addWidget(lbl)
+
+                for s_name in suggestions[:4]:
+                    s_obj = get_language_by_name(s_name)
+                    s_flag = s_obj.flag if s_obj else "🌐"
+                    btn = QPushButton(f"{s_flag} {s_name}")
+                    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                    btn.setToolTip(f"Click to search and select {s_name}")
+                    btn.setStyleSheet("""
+                        QPushButton {
+                            font-size: 11px;
+                            font-weight: 600;
+                            padding: 3px 8px;
+                            border-radius: 4px;
+                            background-color: #0F172A;
+                            color: #F8FAFC;
+                            border: 1px solid #0284C7;
+                        }
+                        QPushButton:hover {
+                            background-color: #0369A1;
+                            border: 1px solid #38BDF8;
+                            color: #FFFFFF;
+                        }
+                    """)
+                    btn.clicked.connect(lambda checked, n=s_name: self._apply_language_suggestion(n))
+                    self.lang_suggestion_layout.addWidget(btn)
+
+                self.lang_suggestion_layout.addStretch()
+                self.lang_suggestion_widget.setVisible(True)
+            else:
+                self.lang_suggestion_widget.setVisible(False)
+
+        # 3. Filter Table Rows
+        q_lower = query.lower()
+        self.lang_table.setUpdatesEnabled(False)
+        for row in range(self.lang_table.rowCount()):
+            chk_item = self.lang_table.item(row, 0)
+            name_item = self.lang_table.item(row, 1)
+            native_item = self.lang_table.item(row, 2)
+            reg_item = self.lang_table.item(row, 3)
+
+            is_checked = (chk_item and chk_item.checkState() == Qt.CheckState.Checked)
+            name_text = name_item.text().lower() if name_item else ""
+            native_text = native_item.text().lower() if native_item else ""
+            reg_badge = reg_item.text().lower() if reg_item else ""
+            region_name = reg_item.data(Qt.ItemDataRole.UserRole) if reg_item else ""
+
+            if active_region == "Selected Only":
+                if not is_checked:
+                    self.lang_table.setRowHidden(row, True)
+                    continue
+            elif active_region != REGION_ALL and region_name != active_region:
+                self.lang_table.setRowHidden(row, True)
+                continue
+
+            if not query:
+                self.lang_table.setRowHidden(row, False)
+                continue
+
+            matches = (
+                name_text in matched_names_set
+                or native_text in matched_natives_set
+                or q_lower in name_text
+                or q_lower in native_text
+                or q_lower in reg_badge
+                or (region_name and q_lower in str(region_name).lower())
+            )
+            self.lang_table.setRowHidden(row, not matches)
+
+        self.lang_table.setUpdatesEnabled(True)
+
+    def _apply_language_suggestion(self, lang_name: str):
+        """Applies a suggested language: updates search box, focuses row, and checks selection."""
+        if hasattr(self, 'lang_search'):
+            self.lang_search.blockSignals(True)
+            self.lang_search.setText(lang_name)
+            self.lang_search.blockSignals(False)
+
+        if hasattr(self, 'lang_suggestion_widget'):
+            self.lang_suggestion_widget.setVisible(False)
+
+        self._filter_languages_table()
+
+        # Scroll to item in table, highlight, and check it
+        for r in range(self.lang_table.rowCount()):
+            item = self.lang_table.item(r, 1)
+            if item and item.text().lower() == lang_name.lower():
+                self.lang_table.scrollToItem(item, QAbstractItemView.ScrollHint.PositionAtCenter)
+                self.lang_table.selectRow(r)
+                chk_item = self.lang_table.item(r, 0)
+                if chk_item and chk_item.checkState() != Qt.CheckState.Checked:
+                    chk_item.setCheckState(Qt.CheckState.Checked)
+                    self._on_lang_checkbox_toggled()
+                break
+
+    def _on_lang_region_clicked(self, r_name: str):
+        self._active_lang_region = r_name
+        for name, btn in getattr(self, 'lang_region_buttons', {}).items():
+            btn.blockSignals(True)
+            btn.setChecked(name == r_name)
+            btn.blockSignals(False)
+        self._filter_languages_table()
+
+    def _select_english_only(self):
+        self.lang_table.blockSignals(True)
+        for r in range(self.lang_table.rowCount()):
+            chk = self.lang_table.item(r, 0)
+            name_item = self.lang_table.item(r, 1)
+            if chk and name_item:
+                is_en = (name_item.text().strip().lower() == "english")
+                chk.setCheckState(Qt.CheckState.Checked if is_en else Qt.CheckState.Unchecked)
+        self.lang_table.blockSignals(False)
+        self.config.set_selected_languages(["English"])
+        self._update_lang_status_badge(["English"])
+        self._filter_languages_table()
+
+    def _select_all_languages(self):
+        self.lang_table.blockSignals(True)
+        all_names = []
+        for r in range(self.lang_table.rowCount()):
+            chk = self.lang_table.item(r, 0)
+            name_item = self.lang_table.item(r, 1)
+            if chk and name_item:
+                chk.setCheckState(Qt.CheckState.Checked)
+                all_names.append(name_item.text())
+        self.lang_table.blockSignals(False)
+        self.config.set_selected_languages(all_names)
+        self._update_lang_status_badge(all_names)
+        self._filter_languages_table()
+
+    def _clear_all_languages(self):
+        self.lang_table.blockSignals(True)
+        for r in range(self.lang_table.rowCount()):
+            chk = self.lang_table.item(r, 0)
+            if chk:
+                chk.setCheckState(Qt.CheckState.Unchecked)
+        self.lang_table.blockSignals(False)
+        self.config.set_selected_languages(["English"])
+        self._update_lang_status_badge([])
+        self._filter_languages_table()
+
     def _populate_mics(self):
         self.mic_combo.clear()
         self.mic_combo.addItem("Default System Microphone", None)
@@ -3649,6 +4120,8 @@ class SettingsDialog(QDialog):
             self.cb_dsp_noise_gate.setChecked(self.config.get("dsp_noise_gate_enabled", True))
         if hasattr(self, 'cb_offline_fallback') and self.cb_offline_fallback:
             self.cb_offline_fallback.setChecked(self.config.get("offline_fallback_enabled", True))
+
+        self._populate_languages_table()
 
         # Auto Cost Mode
         if hasattr(self, 'cb_auto_cost_mode') and self.cb_auto_cost_mode:
@@ -3871,12 +4344,13 @@ class SettingsDialog(QDialog):
 
         # 2. Update and activate Prompt / Dictation Style
         prompt_id = item["prompt_id"]
-        self.config.set_active_saved_prompt(prompt_id)
+        if prompt_id != "prompt_enhancer":
+            self.config.set_active_saved_prompt(prompt_id)
         id_to_preset = {
             "clean_dictation_custom": "clean_dictation",
             "smart_polish_custom": "smart_polish",
             "code_dev_custom": "code_assistant",
-            "prompt_enhancer": "prompt_enhancer"
+            "prompt_enhancer": "clean_dictation"
         }
         if prompt_id in id_to_preset:
             self.config.set("mode_preset", id_to_preset[prompt_id])
@@ -5056,17 +5530,23 @@ class SettingsDialog(QDialog):
                     "clean_dictation_custom": "clean_dictation",
                     "smart_polish_custom": "smart_polish",
                     "code_dev_custom": "code_assistant",
-                    "prompt_enhancer": "prompt_enhancer"
+                    "prompt_enhancer": "clean_dictation"
                 }
-                if c_data in id_to_preset:
-                    preset = id_to_preset[c_data]
+                preset = id_to_preset.get(c_data, "clean_dictation")
+            else:
+                preset = "clean_dictation"
+        else:
+            preset = "clean_dictation"
 
         p_title = self.prompt_title_input.text().strip()
         custom_prompt = self.custom_prompt_edit.toPlainText().strip()
-        if p_title and custom_prompt:
-            saved_id = self.config.save_custom_prompt(p_title, custom_prompt, prompt_id=target_p_id, set_active=True)
+        if p_title and custom_prompt and getattr(self, '_editing_prompt_id', None):
+            # Only save edits to the custom prompt being actively created/edited
+            saved_id = self.config.save_custom_prompt(p_title, custom_prompt, prompt_id=self._editing_prompt_id, set_active=False)
             self._editing_prompt_id = saved_id
 
+        if preset == "prompt_enhancer":
+            preset = "clean_dictation"
         self.config.set("mode_preset", preset)
         if custom_prompt:
             self.config.set("custom_prompt", custom_prompt)
@@ -5095,6 +5575,18 @@ class SettingsDialog(QDialog):
         if hasattr(self, 'cb_offline_fallback') and self.cb_offline_fallback:
             self.config.set("offline_fallback_enabled", self.cb_offline_fallback.isChecked())
 
+        if hasattr(self, 'lang_table') and self.lang_table:
+            checked_langs = []
+            for r in range(self.lang_table.rowCount()):
+                item = self.lang_table.item(r, 0)
+                if item and item.checkState() == Qt.CheckState.Checked:
+                    name = item.data(Qt.ItemDataRole.UserRole)
+                    if name:
+                        checked_langs.append(name)
+            if not checked_langs:
+                checked_langs = ["English"]
+            self.config.set_selected_languages(checked_langs)
+
         if hasattr(self, 'cb_auto_cost_mode') and self.cb_auto_cost_mode:
             self.config.set("auto_cost_mode", self.cb_auto_cost_mode.isChecked())
 
@@ -5110,6 +5602,7 @@ class SettingsDialog(QDialog):
         self._refresh_vocab_table()
         self._on_profile_combo_changed()
         self._on_vocab_test_changed(self.vocab_test_input.text())
+        self._populate_languages_table()
 
         # Emit live settings applied signal to main coordinator
         self.settings_applied.emit()

@@ -207,58 +207,79 @@ class TextInjector:
         except Exception as e:
             logger.error(f"Error during manual typing: {e}")
 
-    def get_selected_text(self) -> str:
-        """Captures currently highlighted text in foreground window via Ctrl + C simulation."""
+    def get_selected_text(self, require_selection: bool = True) -> str:
+        """
+        Captures currently highlighted / selected text in foreground window via Ctrl + C simulation.
+        Properly releases all modifier and trigger keys (Alt, Ctrl, Shift, Win, P, T) before triggering Ctrl + C,
+        and polls the clipboard with sub-millisecond precision.
+        If require_selection is True, returns empty string when nothing is selected instead of
+        accidentally falling back to stale clipboard history.
+        """
         old_clip = ""
         try:
             old_clip = pyperclip.paste() if pyperclip else ""
         except Exception:
             old_clip = ""
 
-        # Clear clipboard temporarily to detect if new text was copied
+        # Temporarily clear clipboard to detect if new text was copied
         try:
             if pyperclip:
                 pyperclip.copy("")
         except Exception:
             pass
 
-        # 1. Temporarily release modifier keys that might still be held down by user (e.g. Shift from Ctrl+Shift+T, Alt)
+        # 1. Temporarily release modifier and trigger keys that might still be held down by user
+        # (e.g. Alt + P for prompt enhancement, Ctrl + Shift + T for transform)
         VK_SHIFT = 0x10
-        VK_MENU = 0x12
-        VK_T = 0x54
-        VK_C = 0x43
-        try:
-            user32.keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0)
-            user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
-            user32.keybd_event(VK_T, 0, KEYEVENTF_KEYUP, 0)
-        except Exception:
-            pass
+        VK_CONTROL = 0x11
+        VK_MENU = 0x12  # Alt key
+        VK_P = 0x50     # 'P' key
+        VK_T = 0x54     # 'T' key
+        VK_LWIN = 0x5B
+        VK_RWIN = 0x5C
+        for vk in (VK_SHIFT, VK_CONTROL, VK_MENU, VK_P, VK_T, VK_LWIN, VK_RWIN):
+            try:
+                user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+            except Exception:
+                pass
         time.sleep(0.04)
 
         self.focus_target_window()
         time.sleep(0.04)
 
         # 2. Simulate clean Ctrl + C
+        VK_C = 0x43
         user32.keybd_event(VK_CONTROL, 0, 0, 0)
         user32.keybd_event(VK_C, 0, 0, 0)
-        time.sleep(0.05)
+        time.sleep(0.04)
         user32.keybd_event(VK_C, 0, KEYEVENTF_KEYUP, 0)
         user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
-        time.sleep(0.08)
 
+        # 3. Poll clipboard for up to 350ms waiting for newly copied text
         new_text = ""
-        try:
-            new_text = pyperclip.paste().strip() if pyperclip else ""
-        except Exception:
-            new_text = ""
+        poll_start = time.time()
+        while time.time() - poll_start < 0.35:
+            try:
+                t = pyperclip.paste().strip() if pyperclip else ""
+                if t:
+                    new_text = t
+                    break
+            except Exception:
+                pass
+            time.sleep(0.025)
 
-        # 3. If nothing new was copied, fallback to old clipboard content if non-empty
-        if not new_text:
+        # 4. Result evaluation
+        if new_text:
+            return new_text
+
+        # 5. If nothing new was copied:
+        if require_selection:
+            # Restore previous clipboard so user doesn't lose whatever they had
             if old_clip and pyperclip:
                 try:
                     pyperclip.copy(old_clip)
                 except Exception:
                     pass
-            return old_clip.strip() if old_clip else ""
+            return ""
 
-        return new_text
+        return old_clip.strip() if old_clip else ""

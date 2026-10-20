@@ -50,6 +50,7 @@ def test_removed_features_and_combinations():
 
     # 3. Test Showcase combinations selection and reactivity for Combinations A through F
     for idx, item in enumerate(COMBINATION_SHOWCASE_DATA):
+        dlg.showcase_combo.setCurrentIndex(-1)
         dlg.showcase_combo.setCurrentIndex(idx)
         
         # Verify profile_combo was automatically selected

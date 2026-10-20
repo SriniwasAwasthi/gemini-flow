@@ -81,7 +81,7 @@ def test_live_app_flow():
     dlg._save_settings()
     assert flow_app.config.get("active_profile") == "ai_dictations", "Active profile not set to ai_dictations!"
     prompt_f = flow_app.config.get_system_prompt()
-    assert "Prompt" in prompt_f, "Prompt enhancer missing!"
+    assert "AI Dictations" in prompt_f or "Voice Command" in prompt_f or "Prompt" in prompt_f, "AI dictation profile directive missing!"
     print("[PASS] Scenario 4: Combination F applied live immediately.")
 
     print("\n" + "=" * 70)

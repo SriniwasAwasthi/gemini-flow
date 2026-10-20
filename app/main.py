@@ -537,6 +537,8 @@ class GeminiFlowApp:
                     auto_cost_mode = self.config.get("auto_cost_mode", True)
                     offline_fallback_on = self.config.get_offline_fallback_enabled() if hasattr(self.config, "get_offline_fallback_enabled") else self.config.get("offline_fallback_enabled", True)
 
+                    primary_lang = self.config.get_primary_language_code() if hasattr(self.config, 'get_primary_language_code') else None
+
                     def _transcribe_slice(c_idx, c_bytes):
                         ok = False
                         txt = ""
@@ -547,7 +549,8 @@ class GeminiFlowApp:
                                 app_context=app_context,
                                 profile_id=active_profile,
                                 auto_cost_mode=auto_cost_mode,
-                                offline_fallback_enabled=offline_fallback_on
+                                offline_fallback_enabled=offline_fallback_on,
+                                offline_language=primary_lang
                             )
                         except Exception as ex:
                             logger.debug(f"Rolling slice {c_idx} online error: {ex}")
@@ -557,7 +560,7 @@ class GeminiFlowApp:
                         if (not ok or not txt or not txt.strip()) and offline_fallback_on:
                             try:
                                 from app.offline.offline_engine import OfflineSpeechEngine
-                                ok_off, txt_off = OfflineSpeechEngine.transcribe_wav(c_bytes)
+                                ok_off, txt_off = OfflineSpeechEngine.transcribe_wav(c_bytes, language=primary_lang)
                                 if ok_off and txt_off and txt_off.strip():
                                     ok, txt = True, txt_off
                             except Exception as off_ex:
@@ -645,26 +648,19 @@ class GeminiFlowApp:
         self.tray.update_status("🟢 Ready", state="ready")
 
     def on_prompt_hotkey(self):
-        """Triggered globally when user presses Ctrl + Shift + P to enhance highlighted text or clipboard into an AI Prompt."""
+        """Triggered globally when user presses Alt + P to enhance highlighted text into a structured AI Prompt."""
         if self.is_busy_processing:
             return
 
         time.sleep(0.06)
         self.text_injector.capture_active_window()
 
-        # 1. First priority: Capture highlighted / selected text on screen
-        raw_text = self.text_injector.get_selected_text()
+        # 1. Strictly capture highlighted / selected text on screen
+        raw_text = self.text_injector.get_selected_text(require_selection=True)
 
-        # 2. Fallback: Check active clipboard
+        # 2. If nothing is selected on screen, alert user immediately - do NOT use stale clipboard data!
         if not raw_text or len(raw_text.strip()) < 2:
-            try:
-                raw_text = pyperclip.paste()
-            except Exception:
-                raw_text = ""
-
-        # 3. Fallback: If nothing selected or copied, show error and do NOT start voice dictation
-        if not raw_text or len(raw_text.strip()) < 2:
-            logger.info("No text selected or in clipboard for prompt transform.")
+            logger.info("No text selected on screen for prompt enhancement.")
             self.hud.show_state(FloatingHUD.STATE_ERROR, "Select Text First!")
             return
 
@@ -699,26 +695,25 @@ class GeminiFlowApp:
             if self.settings_dialog and self.settings_dialog.isVisible():
                 self.settings_dialog.notify_history_changed()
 
-            # Safe paste with normal speech safeguard on clipboard
-            if self.config.get("auto_paste", True):
-                paste_ok = self.text_injector.paste_text(prompt_or_error, leave_in_clipboard=raw_text if raw_text else None)
-                if paste_ok:
-                    self.hud.show_state(FloatingHUD.STATE_PASTED, "AI Prompt Pasted! (Raw in Clipboard 📋)")
-                else:
-                    if raw_text:
-                        pyperclip.copy(raw_text)
-                    self.hud.show_state(FloatingHUD.STATE_COPIED, "Prompt & Text Saved!")
-            else:
-                if raw_text:
-                    pyperclip.copy(raw_text)
-                else:
-                    pyperclip.copy(prompt_or_error)
-                self.hud.show_state(FloatingHUD.STATE_COPIED, "Raw Text in Clipboard (Prompt Saved)!")
+            # Always copy the enhanced AI Prompt into clipboard so user can paste it anywhere
+            try:
+                pyperclip.copy(prompt_or_error)
+            except Exception:
+                pass
 
-            disp_name = self.config.get("hotkey_display", "Ctrl + Win")
+            if self.config.get("auto_paste", True):
+                paste_ok = self.text_injector.paste_text(prompt_or_error)
+                if paste_ok:
+                    self.hud.show_state(FloatingHUD.STATE_PASTED, "✨ AI Prompt Pasted & Copied! 📋")
+                else:
+                    self.hud.show_state(FloatingHUD.STATE_COPIED, "✨ AI Prompt Copied to Clipboard 📋")
+            else:
+                self.hud.show_state(FloatingHUD.STATE_COPIED, "✨ AI Prompt Copied to Clipboard 📋")
+
+            disp_name = self.config.get("hotkey_display", "Ctrl + Space")
             self.tray.update_status(f"🟢 Ready ({disp_name})", state="ready")
         else:
-            self.hud.show_state(FloatingHUD.STATE_ERROR, prompt_or_error[:35])
+            self.hud.show_state(FloatingHUD.STATE_ERROR, prompt_or_error[:35] if prompt_or_error else "Prompt Failed")
             self.tray.update_status("⚠️ Prompt Enhancement Failed", state="ready")
 
     def on_transform_hotkey(self):
@@ -820,6 +815,10 @@ class GeminiFlowApp:
             user_profile = self.config.get("active_profile")
             active_profile = user_profile if user_profile else (app_context.profile_id if (app_context and app_context.profile_id) else "coding")
             active_mode = self.config.get("mode_preset", "clean_dictation")
+            if active_mode == "prompt_enhancer":
+                logger.info("Voice dictation requested but mode_preset was prompt_enhancer. Resetting to clean_dictation.")
+                active_mode = "clean_dictation"
+                self.config.set("mode_preset", "clean_dictation")
 
             auto_cost_mode = self.config.get("auto_cost_mode", True)
             logger.info(f"Dynamic Context: App='{app_name}', Category='{category}', Profile='{active_profile}', Mode='{active_mode}'")
@@ -830,6 +829,7 @@ class GeminiFlowApp:
             # 4. Transcribe with Gemini / Whisper
             # If rolling background streaming emitted slices, assemble in real-time for < 2.0s stop-to-text turnaround.
             # Otherwise for short recordings (< 22s), transcribe complete audio directly in a single pass (< 1.2s).
+            primary_lang = self.config.get_primary_language_code() if hasattr(self.config, 'get_primary_language_code') else None
             has_rolling = self.recorder.rolling_chunks_were_emitted()
             if not has_rolling or duration < 22.0:
                 success, raw_result = self.gemini.transcribe_audio(
@@ -838,7 +838,8 @@ class GeminiFlowApp:
                     app_context=app_context,
                     profile_id=active_profile,
                     auto_cost_mode=auto_cost_mode,
-                    offline_fallback_enabled=offline_fallback_on
+                    offline_fallback_enabled=offline_fallback_on,
+                    offline_language=primary_lang
                 )
             else:
                 logger.info(f"Processing rolling streaming dictation ({len(self._rolling_chunks)} chunks accumulated during speech)...")
@@ -858,7 +859,8 @@ class GeminiFlowApp:
                                 app_context=app_context,
                                 profile_id=active_profile,
                                 auto_cost_mode=auto_cost_mode,
-                                offline_fallback_enabled=offline_fallback_on
+                                offline_fallback_enabled=offline_fallback_on,
+                                offline_language=primary_lang
                             )
                         except Exception as tail_ex:
                             logger.debug(f"Tail chunk online note: {tail_ex}")
@@ -867,7 +869,7 @@ class GeminiFlowApp:
                         if (not ok_tail or not txt_tail or not txt_tail.strip()) and offline_fallback_on:
                             try:
                                 from app.offline.offline_engine import OfflineSpeechEngine
-                                ok_off, txt_off = OfflineSpeechEngine.transcribe_wav(tail_wav)
+                                ok_off, txt_off = OfflineSpeechEngine.transcribe_wav(tail_wav, language=primary_lang)
                                 if ok_off and txt_off and txt_off.strip():
                                     ok_tail, txt_tail = True, txt_off
                             except Exception as off_ex:

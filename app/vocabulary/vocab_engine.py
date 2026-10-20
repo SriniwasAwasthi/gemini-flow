@@ -434,16 +434,16 @@ class VocabularyEngine:
             return f'{prefix}{m.group(2)}'
         result = re.sub(pat_restart2, _sub_restart2, result, flags=re.IGNORECASE)
 
-        # Pass 5: Collapse consecutive identical multi-word phrase loops and single-word stutters
-        token = r"[A-Za-z0-9_\'-]+"
+        # Pass 5: Collapse consecutive identical multi-word phrase loops and single-word stutters (Universal Multilingual)
+        u_token = r"[^\s,;:.!?—\-]+"
         for phrase_len in range(12, 0, -1):
             pat = re.compile(
-                r'\b((?:' + token + r'[\s,;—\-]+){' + str(phrase_len - 1) + r'}' + token + r')(?:[\s,;—\-]+)\1\b',
+                r'(?<![^\s,;:.!?—\-])((?:' + u_token + r'[\s,;—\-]+){' + str(phrase_len - 1) + r'}' + u_token + r')(?:[\s,;—\-]+)\1(?![^\s,;:.!?—\-])',
                 flags=re.IGNORECASE
             )
             prev = None
             iters = 0
-            while prev != result and iters < 10:
+            while prev != result and iters < 8:
                 prev = result
                 iters += 1
                 result = pat.sub(r'\1', result)

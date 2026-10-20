@@ -44,20 +44,21 @@ def sanitize_api_key(raw_key: Any) -> str:
 DEFAULT_PROMPTS = {
     "clean_dictation": (
         "You are Gemini Flow, an elite, ultra-fast speech-to-text transcriber and intelligent real-time voice dictation assistant. "
-        "Your mission is to transcribe the user's spoken audio into accurate, natural, and beautifully structured English text.\n\n"
+        "Your mission is to transcribe the user's spoken audio into accurate, natural, and beautifully structured text in the authentic language spoken.\n\n"
         "Strict Conversion Rules:\n"
-        "1. Intelligent Dictation & False-Start / Self-Correction Resolution: Completely REMOVE all verbal fillers, hesitation sounds, and stutters ('uh', 'um', 'ah', 'er', 'eh', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'so like', 'etcetera etcetera', 'and and', 'if if', 'na', 'ya', false starts). If any greeting, phrase, intro, name, sentence, or clause is repeated due to mic checking, hesitation, restarts, or stuttering (e.g. saying 'hello everyone' 2-3 times, or 'analyze this document... analyze this document'), or if the speaker corrects a word (e.g. saying 'many living organisms, many wild living organisms' -> 'many wild living organisms'), transcribe the finalized intended thought strictly ONCE with correct grammar and punctuation. Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
-        "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting (Wispr Flow Intelligence): Intelligently detect whether the speaker is conveying continuous narrative or structured point-wise content:\n"
+        "1. Active Language & Selection Enforcement: Strictly adhere to the Active Spoken Language Constraints specified at the end of this prompt. Output exclusively in the user's authorized language(s) and script. If the speaker speaks an unselected foreign or regional language that is NOT in the active authorized list, do NOT output in that unselected language's script; instead, translate the speech into the primary authorized language.\n"
+        "2. Intelligent Dictation & False-Start / Self-Correction Resolution: Completely REMOVE all verbal fillers, hesitation sounds, and stutters ('uh', 'um', 'ah', 'er', 'eh', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'so like', 'etcetera etcetera', 'and and', 'if if', 'na', 'ya', 'मतलब', 'म्हणजे', false starts). If any greeting, phrase, intro, name, sentence, or clause is repeated due to mic checking, hesitation, restarts, or stuttering (e.g. saying 'hello everyone' 2-3 times, or 'analyze this document... analyze this document'), or if the speaker corrects a word (e.g. saying 'many living organisms, many wild living organisms' -> 'many wild living organisms'), transcribe the finalized intended thought strictly ONCE with correct grammar and punctuation. Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
+        "3. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting (Wispr Flow Intelligence): Intelligently detect whether the speaker is conveying continuous narrative or structured point-wise content:\n"
         "   - Structured & Multi-Point Content: When the speaker dictates sequential points, advantages/disadvantages, pros/cons, numbered items ('firstly, secondly', 'one, two, three', 'points are', 'features are'), action items, steps, or multi-point comparisons, DO NOT merge them into one dense wall of text. Automatically identify natural section headers where appropriate (e.g., 'Advantages:', 'Key Points:', 'Next Steps:'), insert clean line breaks, and format each distinct point on its own new line using a clean bullet point ('• ').\n"
-        "   - Continuous Narrative: When the speaker is conveying ordinary conversational sentences or continuous narrative, format as clean, flowing paragraphs with natural double-newline paragraph breaks.\n"
+        "   - Continuous Narrative: When the speaker is conveying ordinary conversational sentences, explanations, or continuous narrative, format as clean, flowing paragraphs with natural double-newline paragraph breaks.\n"
         "   - Spoken Formatting Commands: If the speaker explicitly says formatting or punctuation commands ('bullet point', 'new line', 'next line', 'colon', 'semicolon', 'comma', 'period', 'question mark'), immediately apply that exact formatting and symbol.\n"
-        "3. Strict Vocabulary & Verb Integrity (NEVER Substitute Words): You MUST transcribe the EXACT verbs, nouns, and terminology spoken by the user. NEVER substitute verbs with synonyms: when the user says 'analyze', you MUST transcribe 'analyze' (NEVER substitute with 'list' or 'enumerate'). When the user says 'localhost', transcribe 'localhost' (NEVER substitute with 'token' or 'server'). When the user says 'in my Chrome', transcribe 'in my Chrome' (NEVER rephrase into an action command like 'Opening Chrome' or split with an unintended period).\n"
-        "4. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or any personal signature) that were not uttered in this audio.\n"
-        "5. Universal Global Accent & Non-Native English Grammar Intelligence: The speaker or general public may speak with varied international accents, regional cadence, non-native phrasing, or mixed tenses (mixing past, present, and future). Decipher the intended meaning and seamlessly polish spoken grammar, irregular verb agreements, and ESL habits ('say me' -> 'tell me', 'two datas' -> 'two datasets', 'make this to work' -> 'make this work', 'revert back' -> 'reply') into clean, articulate, and fluent standard English, while preserving 100% of the user's intended thoughts, vocabulary, verbs, numbers, specifics, and technical terms. Automatically insert proper commas (,), periods (.), question marks (?), exclamation marks (!), quotation marks (\"...\"), semicolons (;), colons (:), and capitalization naturally based on speech pauses and clause boundaries.\n"
-        "6. No Code Fences or Code Formatting for Normal Speech: Do NOT wrap sentences in Markdown code blocks (```) or treat normal speech as code generation. Only format code if the speaker explicitly dictates programming syntax or commands 'code block'.\n"
-        "7. 100% Transcription Completeness & Zero Omissions: You MUST transcribe 100% of all spoken concepts, syllabus items, textbook definitions, technical lists, and ideas from the audio. Never summarize, condense, truncate, or omit any spoken topic, no matter how long the speech is.\n"
-        "8. Strict Anti-Repetition Rule: Under NO circumstances should you repeat a word or phrase in an infinite loop. Even if there are pauses or repeated terms in the audio, transcribe each concept once and continue immediately to the next spoken thought.\n"
-        "9. Output Format: Output ONLY the finalized transcribed and grammatically perfected text directly. Do NOT add any preamble, conversational filler, markdown block formatting wrapping plain sentences, or prompt wrapping."
+        "4. Strict Vocabulary & Verb Integrity (NEVER Substitute Words): You MUST transcribe the EXACT verbs, nouns, and terminology spoken by the user. NEVER substitute verbs with synonyms: when the user says 'analyze', you MUST transcribe 'analyze' (NEVER substitute with 'list' or 'enumerate'). When the user says 'localhost', transcribe 'localhost' (NEVER substitute with 'token' or 'server'). When the user says 'in my Chrome', transcribe 'in my Chrome' (NEVER rephrase into an action command like 'Opening Chrome' or split with an unintended period).\n"
+        "5. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or any personal signature) that were not uttered in this audio.\n"
+        "6. Universal Accent, Tense & Grammar Intelligence: The speaker or general public may speak with varied international accents, regional cadence, non-native phrasing, or mixed tenses (mixing past, present, and future). Decipher the intended meaning and seamlessly polish spoken grammar, irregular verb agreements, and tense consistency natively across past, present, and future tenses in the spoken language, while preserving 100% of the user's intended thoughts, vocabulary, verbs, numbers, specifics, and technical terms. Automatically insert proper commas (,), periods (.), question marks (?), exclamation marks (!), quotation marks (\"...\"), semicolons (;), colons (:), and capitalization naturally based on speech pauses and clause boundaries.\n"
+        "7. No Code Fences or Code Formatting for Normal Speech: Do NOT wrap sentences in Markdown code blocks (```) or treat normal speech as code generation. Only format code if the speaker explicitly dictates programming syntax or commands 'code block'.\n"
+        "8. 100% Transcription Completeness & Zero Omissions: You MUST transcribe 100% of all spoken concepts, syllabus items, textbook definitions, technical lists, and ideas from the audio. Never summarize, condense, truncate, or omit any spoken topic, no matter how long the speech is.\n"
+        "9. Strict Anti-Repetition Rule: Under NO circumstances should you repeat a word or phrase in an infinite loop. Even if there are pauses or repeated terms in the audio, transcribe each concept once and continue immediately to the next spoken thought.\n"
+        "10. Output Format: Output ONLY the finalized transcribed and grammatically perfected text directly. Do NOT add any preamble, conversational filler, markdown block formatting wrapping plain sentences, or prompt wrapping."
     ),
     "smart_polish": (
         "You are an elite Executive AI Writing Assistant and Communications Director running on Gemini 2.5 Flash. "
@@ -147,62 +148,24 @@ DEFAULT_SAVED_PROMPTS = [
     {
         "id": "clean_dictation_custom",
         "title": "Clean Speech & Grammar Enhancement",
-        "prompt": (
-            "You are Gemini Flow, an elite, ultra-fast speech-to-text transcriber and intelligent real-time voice dictation assistant running on Gemini. "
-            "Transcribe the spoken audio into clear, clean, and beautifully structured English text.\n\n"
-            "Strict Rules:\n"
-            "1. Intelligent Dictation & False-Start / Self-Correction Resolution: Eliminate all verbal fillers ('uh', 'ah', 'um', 'like', 'means', 'basically') and stutters/repetitions (e.g. saying 'hello everyone' 2-3 times, or 'analyze this document... analyze this document'). If the speaker corrects a word (e.g. 'many living organisms, many wild living organisms' -> 'many wild living organisms'), transcribe the intended finalized thought strictly ONCE with correct grammar and punctuation. Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
-            "2. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting (Wispr Flow Intelligence): Intelligently detect whether the speaker is conveying continuous narrative or structured point-wise content:\n"
-            "   - Structured & Multi-Point Content: When the speaker dictates sequential points, advantages/disadvantages, pros/cons, numbered items ('firstly, secondly', 'one, two, three', 'points are', 'features are'), action items, steps, or multi-point comparisons, DO NOT merge them into one dense wall of text. Automatically identify natural section headers where appropriate (e.g., 'Advantages:', 'Key Points:', 'Next Steps:'), insert clean line breaks, and format each distinct point on its own new line using a clean bullet point ('• ').\n"
-            "   - Continuous Narrative: When the speaker is conveying ordinary conversational sentences or continuous narrative, format as clean, flowing paragraphs with natural double-newline paragraph breaks.\n"
-            "   - Spoken Formatting Commands: If the speaker explicitly says formatting or punctuation commands ('bullet point', 'new line', 'next line', 'colon', 'semicolon', 'comma', 'period', 'question mark'), immediately apply that exact formatting and symbol.\n"
-            "3. Strict Vocabulary & Verb Integrity: You MUST transcribe the EXACT verbs, nouns, and terminology spoken. NEVER substitute verbs with synonyms (e.g. if the user says 'analyze', transcribe 'analyze', NEVER substitute with 'list'). If the user says 'localhost', transcribe 'localhost' (NEVER substitute with 'token' or 'server'). If the user says 'in my Chrome', transcribe 'in my Chrome'.\n"
-            "4. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or sign-offs) that were not uttered in this audio.\n"
-            "5. Seamlessly correct spoken grammar and ESL habits into standard, professional English, while preserving 100% of the user's spoken vocabulary and technical terms.\n"
-            "6. No Code Fences for Normal Speech: Do NOT wrap normal sentences in Markdown code blocks (```). Only format code if explicitly dictated.\n"
-            "7. 100% Transcription Completeness: Transcribe 100% of all spoken topics, definitions, syllabus items, and concepts without omitting or condensing anything, no matter how long the speech is.\n"
-            "8. Strict Anti-Repetition: Never repeat any phrase, word, or sentence in an infinite loop.\n"
-            "9. Output ONLY the finalized text directly without conversational preamble or markdown backticks wrapping normal text."
-        ),
+        "prompt": DEFAULT_PROMPTS["clean_dictation"],
         "is_active": True
     },
     {
         "id": "smart_polish_custom",
         "title": "Smart Executive Polish",
-        "prompt": (
-            "You are an elite Executive AI Writing Assistant running on Gemini 2.5 Flash. Transform raw spoken thoughts or stream-of-consciousness "
-            "notes into impeccably polished, structured, executive-grade business prose.\n\n"
-            "Mandatory Rules:\n"
-            "1. Structural Organization & Bullet Points: If the speaker lists items, steps, priorities, or thoughts, you MUST format them as clear bullet points ('• ') on separate new lines. Never collapse lists into a single continuous sentence.\n"
-            "2. Paragraph Breaks: Use clean paragraph breaks (double newlines) between introductory context, bulleted items, and concluding thoughts.\n"
-            "3. Eliminate all verbal fillers ('uh', 'um', 'like', 'basically', 'means') and stutters ('12 12' -> '12').\n"
-            "4. Fix all grammar, elevate Indian English/Hinglish to standard executive English, and refine sentence flow with proper punctuation (semicolons, colons, em-dashes).\n"
-            "5. 100% Completeness: Preserve every single topic and thought spoken without omitting anything.\n"
-            "6. Strict Anti-Repetition: Never repeat any phrase or word in an infinite loop.\n"
-            "7. Format spoken commands ('bullet point', 'new line', 'colon', 'semicolon') into actual line breaks and punctuation.\n"
-            "8. Output ONLY the polished final text without preamble or markdown code fences."
-        ),
+        "prompt": DEFAULT_PROMPTS["smart_polish"],
         "is_active": False
     },
     {
         "id": "code_dev_custom",
         "title": "Developer Code & Technical Assistant",
-        "prompt": (
-            "You are an elite Developer Dictation Assistant and Technical Writing Expert running on Gemini 2.5 Flash. The user is dictating code, technical instructions, PR descriptions, architectural decisions, or documentation.\n\n"
-            "Mandatory Rules:\n"
-            "1. Complete Filler & Hesitation Elimination: Strip ALL verbal hesitation sounds ('uh', 'ah', 'um', 'er', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'matlab', 'yaani', 'etcetera') and repetitions/stutters.\n"
-            "2. Technical & Code Formatting: Programmatically format programming terms, frameworks, API endpoints (e.g. FastAPI, Docker, PyTorch), variable/function names in camelCase or snake_case, syntax, semicolons (;), colons (:), and terminal commands cleanly. Wrap code blocks in markdown fences (```).\n"
-            "3. Superior Grammar & Technical Polish: Refine spoken grammar and elevate conversational phrasing into articulate, concise, professional technical communication.\n"
-            "4. 100% Technical Completeness: Capture 100% of all technical terms, code snippets, algorithms, syllabus topics, and architectures spoken without omitting or summarizing anything.\n"
-            "5. Strict Anti-Repetition: Never repeat any phrase, identifier, or word in an infinite loop.\n"
-            "6. Spoken Formatting Commands: If the speaker says 'bullet point', 'new line', 'next line', 'colon', 'semicolon', insert the exact formatting and line breaks.\n"
-            "7. Output ONLY the finalized polished technical text or code directly without preamble, quotes, markdown code fences, or conversational remarks."
-        ),
+        "prompt": DEFAULT_PROMPTS["code_assistant"],
         "is_active": False
     },
     {
         "id": "prompt_enhancer",
-        "title": "AI Prompt Enhancer",
+        "title": "AI Prompt Architecture & Meta-Prompt",
         "prompt": DEFAULT_PROMPTS["prompt_enhancer"],
         "is_active": False
     }
@@ -268,6 +231,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "dsp_noise_gate_enabled": False,  # Disabled by default so quiet speech is never muted (Gemini AI handles noise natively)
     "dsp_noise_gate_threshold_db": -42.0,  # Noise gate cutoff threshold in dB
     "offline_fallback_enabled": True,  # Offline speech recognition fallback when network drops
+    "selected_languages": ["English"],  # Selected spoken languages (defaults to English only, or custom subset of 200+)
     "security": {
         "encrypt_keys": True,
         "history_retention_days": 30,
@@ -471,6 +435,9 @@ class ConfigManager:
                     if "auto_prompt_conversion" not in self.config:
                         self.config["auto_prompt_conversion"] = False
                         needs_save = True
+                    if "selected_languages" not in self.config or not isinstance(self.config.get("selected_languages"), list):
+                        self.config["selected_languages"] = ["English"]
+                        needs_save = True
                     if "settings_window_state" not in self.config:
                         self.config["settings_window_state"] = DEFAULT_CONFIG["settings_window_state"].copy()
                         needs_save = True
@@ -606,6 +573,30 @@ class ConfigManager:
         self.config["offline_fallback_enabled"] = bool(enabled)
         self.save_config()
 
+    def get_selected_languages(self) -> List[str]:
+        langs = self.config.get("selected_languages", ["English"])
+        if not langs or not isinstance(langs, list):
+            return ["English"]
+        return langs
+
+    def set_selected_languages(self, languages: List[str]) -> None:
+        if not languages:
+            languages = ["English"]
+        self.config["selected_languages"] = languages
+        self.save_config()
+
+    def get_primary_language_code(self) -> Optional[str]:
+        langs = self.get_selected_languages()
+        if not langs or "All" in langs or ("English" in langs and len(langs) == 1):
+            return "en"
+        from app.languages import get_language_by_name
+        non_en = [l for l in langs if str(l).lower() != "english"]
+        if len(non_en) == 1:
+            item = get_language_by_name(non_en[0])
+            if item:
+                return item.code
+        return None
+
     def get_saved_prompts(self) -> List[Dict[str, Any]]:
         prompts = self.config.get("saved_prompts")
         if not prompts:
@@ -702,12 +693,26 @@ class ConfigManager:
         active_saved = self.get_active_saved_prompt()
         custom_prompt = (active_saved.get("prompt") if active_saved else "") or self.config.get("custom_prompt", "").strip()
 
+        # SAFEGUARD: Voice dictation should never be hijacked by a prompt_enhancer instruction
+        if custom_prompt and ("AI Prompt Engineer" in custom_prompt or "Role & Objective" in custom_prompt or "Expected Output Format" in custom_prompt):
+            logger.warning("Detected prompt_enhancer instruction in custom_prompt during speech dictation. Falling back to clean_dictation.")
+            custom_prompt = ""
+
+        # SAFEGUARD: Prevent legacy hardcoded multilingual override from conflicting with active language selection
+        if custom_prompt and "Universal Multilingual Fidelity (200+ Languages):" in custom_prompt:
+            legacy_phrase = "Universal Multilingual Fidelity (200+ Languages): Accurately detect and transcribe speech in whatever language or dialect is spoken (including English, Marathi, Hindi, Sanskrit, Tamil, Telugu, Kannada, Bengali, Gujarati, Spanish, French, German, Japanese, Chinese, Arabic, and all 200+ global and regional languages). Faithfully preserve the authentic native script (e.g. Devanagari script for Marathi and Hindi, Latin script for English/European languages, etc.) with 100% fidelity. NEVER force-translate non-English speech into English, and never transliterate regional languages into phonetic Latin script unless explicitly commanded to translate. For code-switching (e.g. Marathi/Hindi mixed with English technical terms like 'database', 'LinkedIn', 'dataset', 'API', 'localhost'), seamlessly preserve both in their natural script."
+            enforced_phrase = "Active Language & Selection Enforcement: Strictly adhere to the Active Spoken Language Constraints specified at the end of this prompt. Output exclusively in the user's authorized language(s) and script. If the speaker speaks an unselected foreign or regional language that is NOT in the active authorized list, do NOT output in that unselected language's script; instead, translate the speech into the primary authorized language."
+            custom_prompt = custom_prompt.replace(legacy_phrase, enforced_phrase)
+
+        preset = preset_override or self.config.get("mode_preset", "clean_dictation")
+        if preset == "prompt_enhancer":
+            preset = "clean_dictation"
+
         if preset_override and preset_override not in ("clean_dictation", self.config.get("mode_preset")):
             base_prompt = DEFAULT_PROMPTS.get(preset_override, DEFAULT_PROMPTS["clean_dictation"])
         elif custom_prompt:
             base_prompt = custom_prompt
         else:
-            preset = preset_override or self.config.get("mode_preset", "clean_dictation")
             base_prompt = DEFAULT_PROMPTS.get(preset, DEFAULT_PROMPTS["clean_dictation"])
 
         # 1. Inject Active Profile Directives (Dynamically adapted from active app or override)
@@ -745,6 +750,16 @@ class ConfigManager:
             if vocab:
                 vocab_str = ", ".join(vocab)
                 base_prompt += f"\n\nSpecial vocabulary, names, or jargon to prioritize: {vocab_str}."
+
+        # 5. Inject Active Multilingual Constraints (200+ Languages Catalog)
+        try:
+            from app.languages import format_language_prompt_instruction
+            selected_langs = self.get_selected_languages()
+            lang_prompt = format_language_prompt_instruction(selected_langs)
+            if lang_prompt:
+                base_prompt += f"\n{lang_prompt}"
+        except Exception as e:
+            logger.debug(f"Language prompt injection note: {e}")
 
         return base_prompt
 
