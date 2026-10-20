@@ -163,10 +163,12 @@ Explore the core modules and visual interface of Gemini Flow:
 
 ---
 
-### 8. Searchable Dictation History & Export
+### 8. Searchable Dictation History & Inspection Center
 ![Dictation History & Search](images/07_history.png)
-> **Comprehensive Activity Log**: Search, review, and filter all previous dictations by date, active application, or AI model used.  
-> **Instant Clipboard Copy**: One-click quick-copy chips let you retrieve earlier notes and snippets effortlessly.
+> **Comprehensive Activity Log & Real-Time Audit**: Review, search, and inspect past dictations organized cleanly by date categories (e.g., `Today (24)`). Each record displays the active foreground application (e.g. `Antigravity`, `VS Code`, `Chrome`), AI model utilized (`gemini-3.5-flash-lite`), exact timestamp, and transcription snippet.  
+> **Full Transcription Inspector & Metric Analytics**: Instantly inspect full transcript text alongside word count, character count, and audio processing duration (e.g. `24 words, 131 chars, ⏱️ 22.52s`).  
+> **Interactive Productivity Controls**: Dedicated one-click actions to `📌 Pin` critical notes, `⭐ Favorite` frequent dictations, `✏️ Rename` custom titles, `📋 Copy Text` to clipboard, `💉 Reinsert (Paste)` directly into your active cursor location, or `🗑️ Delete`.  
+> **Data Governance & Retention Management**: Features instant multi-field search across transcripts, custom titles, target apps, and models, coupled with `🔒 Retention_Purge` automated data cleanup policies and on-demand history clearance.
 
 ---
 
@@ -189,49 +191,52 @@ Explore the core modules and visual interface of Gemini Flow:
 ![Audio Device & Multilingual Catalog](images/11_audio_device.png)
 > **210+ World Languages Catalog & Real-Time Fuzzy Search**: Select any subset of 210+ global languages or activate English Only (default). Features instant phonetic and fuzzy search (e.g. typing *"marathi"*, *"latn"*, or *"romance"* immediately finds the match), 7 regional tabs (Indian & South Asian, Major European, East Asian, Middle Eastern, African, Americas), quick selection actions (*Select All / Universal Mode*, *English Only*, *Clear All*), and active language tag chips with one-click removal.  
 > **Dual Recognition & Zero Romanization Guarantee**: If speaking in selected languages, transcribes directly in authentic native script (Gujarati script `ગુજરાતી`, German with umlauts, Spanish with inverted punctuation `¿`/`¡`, Italian, Devanagari for Hindi/Marathi). If speaking unselected languages or in English-only mode, intelligently translates the spoken thought directly into English prose, completely forbidding broken Romanized transliterations (e.g. zero `"majama"`, `"kem cho"`, or `"kya chal raha hai"`).  
-> **Acoustic Noise Reduction & Ceiling Fan Gate**: Features a real-time 85 Hz Butterworth high-pass filter that eliminates ceiling fan drone and motor hum, coupled with an adaptive RMS Noise Gate (<5ms silence interception).  
+> **Acoustic Noise Reduction & Ceiling Fan Gate**: Features a real-time 85 Hz Butterworth high-pass filter that eliminates ceiling fan drone and motor hum, coupled with an adaptive RMS Noise Gate (Sub-5ms silence interception).  
 > **Local Offline Speech Recognition Fallback (Whisper AI)**: Built-in faster-whisper CTranslate2 int8 engine that auto-activates when offline or when cloud API quotas are exhausted, providing 100% private on-device transcription.
 
 ---
 
 ## 🏗️ System Architecture
 
+![Gemini Flow System Architecture Blueprint](Gemini%20Flow%20AI%20Workspace%20Poster.png)
+> **Full High-Resolution Architecture Blueprint**: End-to-end multi-tiered topography covering real-time PortAudio driver capture, 85Hz Butterworth DSP fan filtering, dual-engine Win32 kernel hotkeys, dynamic model load-balancing, 210+ multilingual prompt conditioning, and synthetic keystroke injection.
+
 ```mermaid
 flowchart TD
-    subgraph Audio ["1. Audio Capture & DSP Engine"]
+    subgraph Audio ["1. Audio Capture and DSP Engine"]
         A["🎤 Microphone Hardware Input"] --> B["🎧 85Hz Butterworth High-Pass Filter"]
-        B --> C["🔇 Adaptive RMS Noise Gate (<5ms Silence Interception)"]
+        B --> C["🔇 Adaptive RMS Noise Gate (Sub-5ms Silence Interception)"]
         C --> D["📦 Low-Latency Audio Stream Buffer"]
         D --> E["⚡ Real-Time Background Rolling Slices (22s)"]
     end
 
-    subgraph Routing ["2. Routing & Model Intelligence"]
-        E --> F{"Connection & Quota Check"}
-        F -->|"Online (Keep-Alive TLS)"| G["🚀 Google Gemini Engine (3.5 Lite / 3.6 Flash)"]
-        F -->|"Offline or 429 Quota"| H["💻 Local Whisper AI (int8 CPU Fallback)"]
+    subgraph Routing ["2. Routing and Model Intelligence"]
+        E --> F{"Connection and Quota Check"}
+        F -->|"Online Keep-Alive TLS"| G["🚀 Google Gemini Engine (3.5 Lite or 3.6 Flash)"]
+        F -->|"Offline or Quota Limit"| H["💻 Local Whisper AI (int8 CPU Fallback)"]
         
         G --> I["🧠 Intelligent Load Balancer"]
-        I -->|"Fast Speech Dictation (<1.5s)"| J["🎙️ gemini-3.5-flash-lite"]
-        I -->|"Prompt & Polish"| K["⚡ gemini-3.6-flash"]
+        I -->|"Fast Speech Dictation (Sub-1.5s)"| J["🎙️ gemini-3.5-flash-lite"]
+        I -->|"Prompt and Polish"| K["⚡ gemini-3.6-flash"]
         I -->|"Resilient Auto-Failover"| L["🔄 Multi-Model Failover (2.5s)"]
     end
 
-    subgraph Intelligence ["3. Multilingual Intelligence & Showcase Combos (A–F)"]
+    subgraph Intelligence ["3. Multilingual Intelligence and Showcase Combos (A-F)"]
         J --> M["🌐 210+ World Languages Selection Engine"]
         K --> M
         L --> M
         H --> M
         M --> N{"Active Language Mode"}
-        N -->|"English Only (Default)"| O1["🇺🇸 Intelligent English Translation\n(Zero Romanization Guarantee)"]
-        N -->|"Selected Regional Languages"| O2["✍️ Authentic Native Script Transcription\n(Gujarati, Devanagari, German, Spanish, etc.)"]
-        O1 --> P["📚 Custom Vocabulary & Phonetic Sound-Alikes"]
+        N -->|"English Only Mode"| O1["🇺🇸 Intelligent English Translation<br/>(Zero Romanization Guarantee)"]
+        N -->|"Selected Regional Languages"| O2["✍️ Authentic Native Script Transcription<br/>(Gujarati, Devanagari, German, Spanish, etc.)"]
+        O1 --> P["📚 Custom Vocabulary and Phonetic Sound-Alikes"]
         O2 --> P
-        P --> Q["🎛️ Reactive Combination Showcase (A–F)"]
-        Q --> R["✨ Formatted, Polished & Structured Text"]
+        P --> Q["🎛️ Reactive Combination Showcase (A through F)"]
+        Q --> R["✨ Formatted, Polished and Structured Text"]
     end
 
     subgraph Injection ["4. Windows OS Integration"]
-        R --> S["⌨️ Win32 Keystroke & Clipboard Injector"]
+        R --> S["⌨️ Win32 Keystroke and Clipboard Injector"]
         S --> T["🖥️ Active Cursor Focus Location (Sub-2s Turnaround)"]
     end
 ```
