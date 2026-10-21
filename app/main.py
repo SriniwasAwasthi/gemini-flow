@@ -512,11 +512,11 @@ class GeminiFlowApp:
         def _rolling_loop():
             chunk_idx = 0
             while self.recorder.is_recording and not self._is_cancelled and self._rolling_active:
-                time.sleep(0.5)
+                time.sleep(0.25)
                 if not self.recorder.is_recording or self._is_cancelled or not self._rolling_active:
                     break
 
-                chunk_wav = self.recorder.get_rolling_chunk(min_sec=18.0, max_sec=28.0)
+                chunk_wav = self.recorder.get_rolling_chunk(min_sec=5.0, max_sec=8.0)
                 if chunk_wav and len(chunk_wav) > 2000:
                     curr_idx = chunk_idx
                     chunk_idx += 1
@@ -831,7 +831,7 @@ class GeminiFlowApp:
             # Otherwise for short recordings (< 22s), transcribe complete audio directly in a single pass (< 1.2s).
             primary_lang = self.config.get_primary_language_code() if hasattr(self.config, 'get_primary_language_code') else None
             has_rolling = self.recorder.rolling_chunks_were_emitted()
-            if not has_rolling or duration < 22.0:
+            if not has_rolling:
                 success, raw_result = self.gemini.transcribe_audio(
                     wav_bytes=wav_bytes,
                     system_instruction=prompt,
@@ -883,9 +883,9 @@ class GeminiFlowApp:
                     # Run tail chunk concurrently with any remaining in-flight background chunks
                     threading.Thread(target=_transcribe_tail, daemon=True, name="TailChunkWorker").start()
 
-                # Wait for in-flight rolling chunks and tail chunk to complete (up to 6.5s, breaks immediately when all_done)
+                # Wait for in-flight rolling chunks and tail chunk to complete (sub-second turnaround, breaks immediately when all_done)
                 t_wait_start = time.time()
-                while time.time() - t_wait_start < 6.5:
+                while time.time() - t_wait_start < 2.5:
                     with self._rolling_lock:
                         all_done = all(c.get("done", False) if isinstance(c, dict) else bool(c) for c in self._rolling_chunks)
                     if all_done:

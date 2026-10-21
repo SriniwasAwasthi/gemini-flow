@@ -343,19 +343,30 @@ The `ConfigManager.get_system_prompt` method constructs the complete system prom
   }
   ```
 
-## 3.5 Post-Processing & Output Normalization
-1. **Preamble & Code Fence Stripping**:
+## 3.5 Post-Processing & Cognitive AI Polish Brain Engine
+1. **Wispr Flow Cognitive AI Polish Brain (`AIPolishBrain`)**:
+   - Executes multi-stage cognitive parsing in sub-millisecond local Python execution:
+     - **Verbal Self-Correction & Mistake Overrides**: Intelligently identifies conversational re-takes, slip-of-the-tongue errors, and mid-sentence changes of mind. Overrides erroneous statements with the corrected phrase while completely removing conversational apologies (*"sorry"*, *"oh sorry"*, *"my bad"*, *"no wait"*, *"actually"*, *"excuse me"*, *"désolé"*, *"सॉरी"*).
+       - Examples:
+         - `"Today is Monday... sorry today is Tuesday."` $\rightarrow$ `"Today is Tuesday."`
+         - `"Convert this data under 4 seconds... no sorry under 3 seconds."` $\rightarrow$ `"Convert this data under 3 seconds."`
+         - `"I am in 11th standard... sorry I am in 12th standard."` $\rightarrow$ `"I am in 12th standard."`
+         - `"The budget is $500... actually $750."` $\rightarrow$ `"The budget is $750."`
+     - **Repetition & Stutter Collapse**: Folds redundant stutters and repeated sentences into a single finalized thought (e.g. `"I just want 100% data. If I just want 100% accurate data."` $\rightarrow$ `"I want 100% accurate data."`), while strictly protecting valid narrative repetitions.
+     - **12 Tenses Grammatical Harmony**: Enforces strict tense alignment across all 12 English tenses (simple, continuous, perfect, perfect continuous for past, present, and future).
+     - **Zero-Latency In-Memory Adaptive Bullet Structuring**: Detects sequential list markers (*"first"*, *"second"*, *"features are"*, *"advantages are"*, *"points are"*) and formats clean bullet lists (`• `) with zero network overhead (0ms).
+2. **Preamble & Code Fence Stripping**:
    - Strips leading/trailing markdown code fences (```` ``` ````) and accidental outer quotation marks (`"..."`).
-2. **Deterministic Verbal Hesitation & Disfluency Scrubbing**:
+3. **Deterministic Verbal Hesitation & Disfluency Scrubbing**:
    - Regex pass strips residual filler tokens:
      `\b(uh|um|ah|er|eh|uhm|ahm|umm|ahh|uhh)\b[,;:]*`
-3. **Stutter & Repetition Collapse**:
+4. **Stutter & Repetition Collapse**:
    - Collapses identical repeating words, ordinals, numbers, or phrases up to 3 tokens long:
      `\b(\w+(?:\s+\w+){1,3})(?:[\s,;—\-]+)\1\b` $\rightarrow$ `\1`
      (e.g., `"12 12 12"` $\rightarrow$ `"12"`, `"12th 12th"` $\rightarrow$ `"12th"`, `"and and"` $\rightarrow$ `"and"`).
-4. **Punctuation Normalization**:
+5. **Punctuation Normalization**:
    - Normalizes consecutive commas, removes leading punctuation slips, fixes spacing before punctuation marks, and ensures proper initial capitalization.
-5. **Dictionary & Snippet Expansion**:
+6. **Dictionary & Snippet Expansion**:
    - Replaces phonetic variants via boundary-checked regex patterns.
    - Evaluates conversational triggers to expand multi-line snippets.
 

@@ -371,6 +371,15 @@ class VocabularyEngine:
                     intro += ':'
                 return f'{intro}\n' + '\n'.join(bullets)
 
+        # AI Polish Brain sequential bullet formatter
+        try:
+            from app.intelligence.ai_polish_brain import AIPolishBrain
+            res_brain = AIPolishBrain.smart_bullet_formatter(text)
+            if res_brain != text:
+                return res_brain
+        except Exception:
+            pass
+
         return text
 
     @staticmethod
@@ -385,7 +394,14 @@ class VocabularyEngine:
 
         result = text.strip()
 
-        # Pass 0: Eliminate unsolicited trailing name injection (e.g. '... to the GitHub. I am Sriniwas Awasthi.')
+        # Pass 0: AI Polish Brain Self-Correction & Verbal Override Resolution
+        try:
+            from app.intelligence.ai_polish_brain import AIPolishBrain
+            result = AIPolishBrain.resolve_self_corrections(result)
+        except Exception as brain_err:
+            logger.debug(f"AIPolishBrain self-correction note: {brain_err}")
+
+        # Pass 0b: Eliminate unsolicited trailing name injection (e.g. '... to the GitHub. I am Sriniwas Awasthi.')
         # If the user did not say 'introduce myself' or 'my name is', strip unsolicited trailing self-introduction
         if not re.search(r'\b(?:my name is|call me|introduce myself)\b', result, re.IGNORECASE):
             result = re.sub(r'[\s,\.]+(?:I am|This is|My name is)\s+Sriniwas\s*(?:Awasthi)?[\.\?!]?\s*$', '.', result, flags=re.IGNORECASE)

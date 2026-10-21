@@ -271,7 +271,7 @@ class AudioRecorder:
 
         return wav_io.getvalue()
 
-    def get_rolling_chunk(self, min_sec: float = 18.0, max_sec: float = 28.0) -> Optional[bytes]:
+    def get_rolling_chunk(self, min_sec: float = 5.0, max_sec: float = 8.0) -> Optional[bytes]:
         """
         Extracts a silence-aligned audio slice if accumulated speech exceeds min_sec (18s+).
         Enables real-time background transcription while recording long speech (1-120 minutes)

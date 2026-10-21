@@ -28,10 +28,11 @@ from app.offline.offline_engine import OfflineSpeechEngine
 logger = logging.getLogger("GeminiFlow.GeminiEngine")
 
 FALLBACK_MODELS = [
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.1-flash-lite",
     "gemini-3.5-transcribe",
     "gemini-3.6-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
     "gemini-flash-latest",
     "gemini-2.5-flash"
 ]
@@ -464,10 +465,13 @@ class GeminiEngine:
                                     f"{system_instruction}\n\n"
                                     "EXECUTION DIRECTIVES:\n"
                                     "1. Process the attached audio in strict accordance with the Active Spoken Language Constraints specified above.\n"
-                                    "2. Anti-Hallucination & Silence Detection: Transcribe ONLY the acoustic speech actually uttered. If the audio contains only silence, breathing, background noise, or room sound, return an empty string. NEVER generate conversational responses, imaginary sentences, hallucinated facts, or status words.\n"
+                                    "2. Anti-Hallucination & Silence Detection: Transcribe ONLY acoustic speech actually uttered. If silence or background noise, return empty string.\n"
                                     "3. Formatting & Structure: If structured points, lists, or steps are dictated, format cleanly with bullet points ('• ') and natural section headers; otherwise format flowing narrative in clean paragraphs.\n"
-                                    "4. Proper Name Integrity: Transcribe proper nouns and names accurately ONLY if explicitly spoken. NEVER inject unuttered personal names or sign-offs.\n"
-                                    "5. Output Format: Output ONLY the finalized text directly without preamble, commentary, or markdown code fences."
+                                    "4. Self-Correction & Speech Override Resolution: When the speaker changes their mind or corrects a word, date, number, time, name, or statement (e.g. 'today is Monday... sorry today is Tuesday' -> 'today is Tuesday'; 'convert this under 4 seconds... no sorry under 3 seconds' -> 'convert this under 3 seconds'; 'I am in 11th standard... sorry I am in 12th standard' -> 'I am in 12th standard'), ALWAYS override the mistake with the correction. Drop the error and apologies ('sorry', 'oh sorry', 'my bad', 'no wait').\n"
+                                    "5. Repetition & Stutter Collapse: Eliminate verbal stutters and repeated sentences (e.g. 'I want 100% data. If I just want 100% accurate data.' -> 'I want 100% accurate data.').\n"
+                                    "6. Grammar & All 12 Tenses: Ensure flawless grammar, vocabulary, and tense consistency natively across past, present, and future tenses.\n"
+                                    "7. Proper Name Integrity: Transcribe proper nouns and names accurately ONLY if explicitly spoken.\n"
+                                    "8. Output Format: Output ONLY the finalized text directly without preamble, commentary, or markdown code fences."
                                 )
                             },
                             {
@@ -537,9 +541,10 @@ class GeminiEngine:
 
         # Resilient chunk models
         chunk_model_candidates = [
-            "gemini-3.5-transcribe",
             "gemini-3.5-flash-lite",
-            "gemini-3.5-flash",
+            "gemini-flash-lite-latest",
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-transcribe",
             "gemini-2.5-flash"
         ]
 
@@ -926,26 +931,38 @@ class GeminiEngine:
         if not has_points:
             return text
 
-        # 1. High-speed Gemini AI structuring pass if API key available (<1.5s)
+        # 1. Instant deterministic formatting via AIPolishBrain and VocabEngine (0ms latency, zero network overhead)
+        try:
+            from app.intelligence.ai_polish_brain import AIPolishBrain
+            bulleted = AIPolishBrain.smart_bullet_formatter(text)
+            if "•" in bulleted:
+                return bulleted
+        except Exception:
+            pass
+
+        bulleted = VocabEngine.adaptive_bullet_format(text)
+        if "•" in bulleted:
+            return bulleted
+
+        # 2. High-speed Gemini AI structuring pass if API key available with gemini-3.5-flash-lite (<0.8s)
         if self.api_key:
             try:
                 struct_prompt = (
                     "You are Gemini Flow's Wispr Flow Adaptive Dictation Formatter.\n"
                     "Determine if the speaker intended a point-wise or sequential list (advantages, benefits, key points, steps, features, action items, or explicit numbered/bulleted points), OR continuous narrative paragraphs.\n"
                     "- If the speaker dictated sequential points, steps, action items, or a multi-point list, format the speech into an introductory sentence followed by clean bullet points ('• ') on separate lines.\n"
-                    "- If the speaker dictated continuous narrative prose, explanations, questions, or paragraphs, DO NOT use bullet points; format as natural, fluent paragraphs in the original language and authentic script (e.g. Marathi, Hindi, English). Preserve 100% of all spoken concepts in the original language without translation.\n"
-                    "- Preserve 100% of all spoken concepts and facts without omission. Eliminate stutters and speech restarts.\n"
+                    "- If the speaker dictated continuous narrative prose, explanations, questions, or paragraphs, DO NOT use bullet points; format as natural, fluent paragraphs in the original language and authentic script. Preserve 100% of all spoken concepts.\n"
                     "- Output ONLY the finalized text directly without conversational commentary."
                 )
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.api_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={self.api_key}"
                 payload = {
                     "contents": [{"parts": [{"text": f"{struct_prompt}\n\nSpoken Text:\n{text}"}]}],
                     "generationConfig": {
                         "temperature": 0.0,
-                        "thinkingConfig": {"thinkingBudget": 0}
+                        "maxOutputTokens": 2048
                     }
                 }
-                resp = self.session.post(url, json=payload, timeout=(2.0, 3.5))
+                resp = self.session.post(url, json=payload, timeout=(1.5, 2.5))
                 if resp.status_code == 200:
                     data = resp.json()
                     parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
@@ -956,6 +973,5 @@ class GeminiEngine:
             except Exception as e:
                 logger.debug(f"AI adaptive structuring note: {e}")
 
-        # 2. Deterministic rule-based fallback
         return VocabEngine.adaptive_bullet_format(text)
 
