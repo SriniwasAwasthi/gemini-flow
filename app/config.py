@@ -53,10 +53,14 @@ DEFAULT_PROMPTS = {
         "- Saying 'convert this whole data under 4 seconds... no sorry under 3 seconds' -> Output strictly: 'convert this whole data under 3 seconds.' "
         "- Saying 'I am in 11th standard... sorry I am in 12th standard' -> Output strictly: 'I am in 12th standard.' "
         "- Saying 'the budget is $500... actually $750' -> Output strictly: 'the budget is $750.' "
-        "- Saying 'the meeting is at 2 PM... sorry 3 PM' -> Output strictly: 'the meeting is at 3 PM.' "
+        "- Saying 'total budget was around ₹550. Oh wait, the total budget was ₹750.' -> Output strictly: 'the total budget was ₹750.' "
+        "- Saying 'the budget is $500... actually $750' -> Output strictly: 'the budget is $750.' "
+        "- Saying 'the meeting is at 2 p.m. Sorry, the meeting is at 3 p.m.' -> Output strictly: 'the meeting is at 3 p.m.' "
+        "- Saying 'convert this whole data under 4 seconds or no, sorry, under 3 seconds' -> Output strictly: 'convert this whole data under 3 seconds.' "
         "If a sentence or thought is repeated with additions or refinements (e.g. saying 'I just want 100% data. If I just want 100% accurate data.'), collapse the repetition into the single finalized refined thought ('I want 100% accurate data.'). Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
         "3. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting (Wispr Flow Intelligence): Intelligently detect whether the speaker is conveying continuous narrative or structured point-wise content:\n"
         "   - Structured & Multi-Point Content: When the speaker dictates sequential points, advantages/disadvantages, pros/cons, numbered items ('firstly, secondly', 'one, two, three', 'points are', 'features are'), action items, steps, or multi-point comparisons, DO NOT merge them into one dense wall of text. Automatically identify natural section headers where appropriate (e.g., 'Advantages:', 'Key Points:', 'Next Steps:'), insert clean line breaks, and format each distinct point on its own new line using a clean bullet point ('• ').\n"
+        "   - CRITICAL BULLET POINT NUMBERING RULE: When formatting bullet points ('• '), you MUST OMIT the spoken numbering or ordinal words ('First is', 'Second is', 'And third is', 'First point is', 'Point 1:', '1.') from the beginning of each bullet item, because the bullet marker '• ' itself denotes the numbering. Example: Spoken 'first is Antigravity, second is I made changes in Wispr, and third is I used an API key' -> formatted into bullet items '• Antigravity.', '• I made changes in Wispr.', '• I used an API key.'\n"
         "   - Continuous Narrative: When the speaker is conveying ordinary conversational sentences, explanations, or continuous narrative, format as clean, flowing paragraphs with natural double-newline paragraph breaks.\n"
         "   - Spoken Formatting Commands: If the speaker explicitly says formatting or punctuation commands ('bullet point', 'new line', 'next line', 'colon', 'semicolon', 'comma', 'period', 'question mark'), immediately apply that exact formatting and symbol.\n"
         "4. Strict Vocabulary & Verb Integrity (NEVER Substitute Words): You MUST transcribe the EXACT verbs, nouns, and terminology spoken by the user. NEVER substitute verbs with synonyms: when the user says 'analyze', you MUST transcribe 'analyze' (NEVER substitute with 'list' or 'enumerate'). When the user says 'localhost', transcribe 'localhost' (NEVER substitute with 'token' or 'server'). When the user says 'in my Chrome', transcribe 'in my Chrome' (NEVER rephrase into an action command like 'Opening Chrome' or split with an unintended period).\n"
@@ -121,6 +125,10 @@ DEFAULT_DICTIONARY = [
     {"spoken": "Shreeniwas", "replacement": "Sriniwas"},
     {"spoken": "Shreenivas", "replacement": "Sriniwas"},
     {"spoken": "Wisper", "replacement": "Wispr"},
+    {"spoken": "the whisper", "replacement": "Wispr"},
+    {"spoken": "whisper", "replacement": "Wispr"},
+    {"spoken": "hold data under", "replacement": "whole data under"},
+    {"spoken": "hold data", "replacement": "whole data"},
     {"spoken": "Javascript", "replacement": "JavaScript"},
     {"spoken": "Typescript", "replacement": "TypeScript"},
     {"spoken": "Github", "replacement": "GitHub"},

@@ -73,7 +73,7 @@ DEFAULT_VOCABULARY = [
     },
     {
         "canonical_term": "Wispr",
-        "aliases": ["Wisper", "Whisper flow", "Wispr Flow"],
+        "aliases": ["Wisper", "Whisper flow", "Wispr Flow", "whisper", "the whisper"],
         "category": "Project",
         "enabled": True,
         "notes": "Application inspiration brand"

@@ -3,7 +3,7 @@ Comprehensive Verification Suite:
 1. AI Polish Brain: Self-Correction & Verbal Mistake Overrides (25+ tests).
 2. Sub-2-Second Audio Dictation Latency Verification.
 3. Repetition Collapse & Progressive Sentence Refinement.
-4. Intelligent Point-Wise Bullet Formatting.
+4. Intelligent Point-Wise Bullet Formatting with Ordinal Stripping.
 5. Multilingual Native Script & All 12 Tenses Preservation.
 """
 import sys
@@ -49,37 +49,37 @@ def test_ai_brain_overrides_25x():
             "I am in 11th standard, but I forgot that I have just completed my 11th and I went to the 12th standard, so I said, 'Oh, sorry. I am in 12th standard.'",
             "I am in 12th standard."
         ),
-        # 4. Standard 11th vs 12th (direct)
+        # 4. User's exact case 4: Budget override with ₹ (Rupees)
         (
-            "I am in 11th standard, oh sorry, 12th standard.",
+            "So I was just buying some new things and the total budget was around ₹550. Oh wait, the total budget was ₹750.",
+            "So I was just buying some new things and the total budget was ₹750."
+        ),
+        # 5. User's exact case 5: Meeting time override with p.m.
+        (
+            "The meeting is at 2 p.m. Sorry, the meeting is at 3 p.m.",
+            "The meeting is at 3 p.m."
+        ),
+        # 6. User's exact case 6: Parameter override with 'or no, sorry'
+        (
+            "Can you just convert this hold data under 4 seconds or no, sorry, under 3 seconds?",
+            "Can you just convert this whole data under 3 seconds?"
+        ),
+        # 7. User's exact case 7: Repetition with progressive refinement
+        (
+            "I just want 100% data. I just want 100% accurate data.",
+            "I just want 100% accurate data."
+        ),
+        # 8. User's exact case 8: Monday vs Tuesday direct with oh sorry
+        (
+            "So, I'm Sriniwas Awasthi. Today is Monday. Oh, sorry, today is Tuesday.",
+            "So, I'm Sriniwas Awasthi. Today is Tuesday."
+        ),
+        # 9. Standard 11th vs 12th (full repeat)
+        (
+            "I am in 11th standard... sorry I am in 12th standard.",
             "I am in 12th standard."
         ),
-        # 5. Standard 11th vs 12th (full repeat)
-        (
-            "I am in 11th standard, sorry I am in 12th standard.",
-            "I am in 12th standard."
-        ),
-        # 6. Direct day override with simple sorry
-        (
-            "Today is Monday, sorry today is Tuesday.",
-            "Today is Tuesday."
-        ),
-        # 7. Under 4 seconds vs 3 seconds (simple)
-        (
-            "Convert this whole data under 4 seconds, no sorry under 3 seconds.",
-            "Convert this whole data under 3 seconds."
-        ),
-        # 8. User's exact case 4: Repetition with progressive refinement
-        (
-            "I just want 100% data. If I just want 100% accurate data.",
-            "If I just want 100% accurate data."
-        ),
-        # 9. Time override
-        (
-            "The meeting is at 2 PM, sorry at 3 PM.",
-            "The meeting is at 3 PM."
-        ),
-        # 10. Cost override
+        # 10. Cost override with dollar
         (
             "The total budget is $500, actually $750.",
             "The total budget is $750."
@@ -168,7 +168,9 @@ def test_ai_brain_overrides_25x():
         status = "PASS" if match else "FAIL"
         if not match:
             all_ok = False
-        print(f"  [{status}] Case {idx:02d}: {out}")
+            print(f"  [{status}] Case {idx:02d}: Got '{out}' != Expected '{expected}'")
+        else:
+            print(f"  [{status}] Case {idx:02d}: {out}")
 
     assert all_ok, "Some AI Brain self-correction test cases failed!"
     print(f"\n[PASS] All 25 AI Polish Brain Self-Correction Cases Verified 100%!\n")
@@ -190,7 +192,6 @@ def test_audio_recorder_rolling_slice_configuration():
     print("TEST 3: AUDIO RECORDER ROLLING SLICE CONFIGURATION")
     print("=" * 70)
     rec = AudioRecorder(sample_rate=16000, channels=1)
-    # Check default arguments of get_rolling_chunk
     import inspect
     sig = inspect.signature(rec.get_rolling_chunk)
     min_sec = sig.parameters['min_sec'].default
@@ -201,9 +202,44 @@ def test_audio_recorder_rolling_slice_configuration():
     print(f"[PASS] AudioRecorder configured for rapid 5-8s background rolling transcription!\n")
 
 
+def test_bullet_formatting_and_ordinal_stripping():
+    print("=" * 70)
+    print("TEST 4: BULLET POINT FORMATTING & ORDINAL STRIPPING (WISPR FLOW INTELLIGENCE)")
+    print("=" * 70)
+    # Test 4a: Spoken list with ordinal words stripped
+    user_spoken_bulleted = (
+        "Hey hello, I'm Sriniwas Awasthi. How are you doing? It's 10:20 a.m. and today is the 21st of October. So I have some advantages:\n"
+        "• First is Antigravity.\n"
+        "• Second is I just made some changes in Wispr.\n"
+        "• And third is I have used one API key."
+    )
+    cleaned_bullets = AIPolishBrain.smart_bullet_formatter(user_spoken_bulleted)
+    print(f"  Cleaned Bullet Output:\n{cleaned_bullets}\n")
+    assert "• Antigravity." in cleaned_bullets, f"Expected '• Antigravity.' in output, got: {cleaned_bullets}"
+    assert "• I just made some changes in Wispr." in cleaned_bullets, f"Expected '• I just made some changes in Wispr.' in output"
+    assert "• I have used one API key." in cleaned_bullets, f"Expected '• I have used one API key.' in output"
+    assert "First is" not in cleaned_bullets
+    assert "Second is" not in cleaned_bullets
+    assert "And third is" not in cleaned_bullets
+    print("  [PASS] Spoken ordinals ('First is', 'Second is', 'And third is') stripped cleanly from bullets!")
+
+    # Test 4b: Continuous speech formatted into clean bullets
+    spoken_continuous = (
+        "Hey hello, I'm Sriniwas Awasthi. How are you doing? It's 10:20 a.m. and today is the 21st of October. "
+        "So I have some advantages. First point is Antigravity. Second point is I just made some changes in Wispr. "
+        "And third point is I have used one API key."
+    )
+    formatted = AIPolishBrain.smart_bullet_formatter(spoken_continuous)
+    print(f"\n  Continuous Speech to Bullets:\n{formatted}\n")
+    assert "• Antigravity." in formatted
+    assert "• I just made some changes in Wispr." in formatted
+    assert "• I have used one API key." in formatted
+    print("  [PASS] Continuous speech with 'first point is...', 'second point is...' formatted to clean bullets!")
+
+
 def test_simulated_sub_2s_latency_on_recorded_speech():
     print("=" * 70)
-    print("TEST 4: EMPIRICAL SPEECH-TO-TEXT LATENCY & ACCURACY BENCHMARK (< 2.0s SLA)")
+    print("TEST 5: EMPIRICAL SPEECH-TO-TEXT LATENCY & ACCURACY BENCHMARK (< 2.0s SLA)")
     print("=" * 70)
     audio_path = Path(__file__).parent.parent / "test_audio_sample.wav"
     if not audio_path.exists():
@@ -223,7 +259,6 @@ def test_simulated_sub_2s_latency_on_recorded_speech():
     eng = GeminiEngine(api_key=cfg.get_api_key(), model_name="gemini-3.5-flash-lite")
     prompt = cfg.get_system_prompt()
 
-    # Test short 5s speech: direct single-pass transcription
     wf.setpos(0)
     pcm5 = wf.readframes(int(5.0 * fr))
     out5 = io.BytesIO()
@@ -242,19 +277,6 @@ def test_simulated_sub_2s_latency_on_recorded_speech():
     print(f"[PASS] Short speech transcription completed successfully!\n")
 
 
-def test_bullet_formatting_and_12_tenses():
-    print("=" * 70)
-    print("TEST 5: BULLET POINT STRUCTURING & 12 TENSES GRAMMAR")
-    print("=" * 70)
-    spoken_list = "We discussed three main things. First, deploy the Gemini model. Second, fix latency issue. Third, prepare stakeholder presentation."
-    bulleted = AIPolishBrain.smart_bullet_formatter(spoken_list)
-    print(f"  Spoken List Input:\n  {spoken_list}")
-    print(f"  Bulleted Output:\n{bulleted}")
-    assert "•" in bulleted, "Expected bullet points in output!"
-    assert "Deploy the Gemini model" in bulleted or "deploy the Gemini model" in bulleted
-    print(f"[PASS] Sequential spoken list cleanly formatted into bullet points ('• ')!\n")
-
-
 if __name__ == "__main__":
     print("\n" + "=" * 70)
     print("RUNNING GEMINI FLOW ULTRA-FAST AI BRAIN & LATENCY VERIFICATION")
@@ -262,7 +284,7 @@ if __name__ == "__main__":
     test_ai_brain_overrides_25x()
     test_model_router_speech_model()
     test_audio_recorder_rolling_slice_configuration()
-    test_bullet_formatting_and_12_tenses()
+    test_bullet_formatting_and_ordinal_stripping()
     test_simulated_sub_2s_latency_on_recorded_speech()
     print("=" * 70)
     print("ALL TESTS PASSED 100% PERFECTLY! SYSTEM IS 100% VERIFIED & PRODUCTION READY.")
