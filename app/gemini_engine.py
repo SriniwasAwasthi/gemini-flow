@@ -210,7 +210,7 @@ class GeminiEngine:
             return False, "Audio is too short or empty."
 
         # Check if user explicitly chose offline mode, or if API key is not configured
-        is_explicit_offline = str(self.model_name).lower() in ("offline-whisper", "offline", "whisper", "local")
+        is_explicit_offline = any(k in str(self.model_name).lower() for k in ("offline", "whisper", "local", "on-device"))
 
         if not self.api_key or is_explicit_offline:
             if offline_fallback_enabled or is_explicit_offline:
@@ -224,6 +224,8 @@ class GeminiEngine:
                 if offline_ok:
                     if offline_text:
                         try:
+                            from app.intelligence.ai_polish_brain import AIPolishBrain
+                            offline_text = AIPolishBrain.polish_speech(offline_text)
                             offline_text = VocabEngine.normalize_text(offline_text)
                         except Exception:
                             pass
@@ -260,32 +262,26 @@ class GeminiEngine:
 
         # 3. If online transcription failed due to network loss, 429 rate limit, or server errors, invoke local offline fallback
         if not exec_res.success and offline_fallback_enabled:
-            is_invalid_key = (
-                exec_res.fallback_reason
-                and exec_res.fallback_reason.error_type == APIErrorType.INVALID_KEY
-            )
-            # Fall back to high-speed offline Whisper AI on any API error, rate limit 429, timeout, or network drop
-            if not is_invalid_key or not self.api_key:
-                logger.info("Online Gemini execution did not succeed. Fast fallback to local offline Whisper AI...")
-                try:
-                    t_off_start = time.time()
-                    prompt_ctx = "Clean speech dictation, accurate grammar, proper punctuation."
-                    offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx, language=offline_language)
-                    if offline_ok:
-                        if offline_text:
-                            try:
-                                offline_text = VocabEngine.normalize_text(offline_text)
-                            except Exception:
-                                pass
-                        exec_res = ExecutionResult(
-                            success=True,
-                            text=offline_text,
-                            model_used="Offline Local Speech (Whisper AI)",
-                            fallback_occurred=True,
-                            latency_seconds=time.time() - t_off_start
-                        )
-                except Exception as off_ex:
-                    logger.debug(f"Offline fallback exception: {off_ex}")
+            logger.info("Online Gemini execution did not succeed. Fast fallback to local offline Whisper AI...")
+            try:
+                t_off_start = time.time()
+                prompt_ctx = "Clean speech dictation, accurate grammar, proper punctuation."
+                offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx, language=offline_language)
+                if offline_ok:
+                    if offline_text:
+                        try:
+                            offline_text = VocabEngine.normalize_text(offline_text)
+                        except Exception:
+                            pass
+                    exec_res = ExecutionResult(
+                        success=True,
+                        text=offline_text,
+                        model_used="Offline Local Speech (Whisper AI)",
+                        fallback_occurred=True,
+                        latency_seconds=time.time() - t_off_start
+                    )
+            except Exception as off_ex:
+                logger.debug(f"Offline fallback exception: {off_ex}")
 
         self.last_result = exec_res
         self.last_model_used = exec_res.model_used
@@ -397,7 +393,9 @@ class GeminiEngine:
                     out_wf.writeframes(chunk_pcm)
                 chunks.append(out_io.getvalue())
 
-                current_frame = best_split_frame
+                # Acoustic overlap (0.25s) to guarantee zero clipped words across chunk boundaries
+                overlap_f = int(0.25 * framerate)
+                current_frame = max(current_frame + overlap_f, best_split_frame - overlap_f)
 
             return chunks if chunks else [wav_bytes]
         except Exception as ex:
@@ -406,7 +404,10 @@ class GeminiEngine:
 
     @staticmethod
     def _stitch_chunk_transcripts(chunks: List[str]) -> str:
-        """Intelligently joins multi-chunk transcripts without creating awkward breaks or dropping words."""
+        """
+        Intelligently joins multi-chunk transcripts without creating awkward breaks,
+        dropping words, or duplicating overlapping boundary words.
+        """
         valid = [c.strip() for c in chunks if c and c.strip()]
         if not valid:
             return ""
@@ -414,15 +415,37 @@ class GeminiEngine:
         for next_chunk in valid[1:]:
             if not next_chunk:
                 continue
-            if stitched.endswith(("\n", "\n\n")) or next_chunk.startswith(("\n", "•", "-", "*")):
-                stitched = stitched.rstrip() + "\n\n" + next_chunk.lstrip()
-            elif stitched.endswith((".", "!", "?", ":", ";")):
-                stitched += " " + next_chunk
-            elif stitched.endswith(","):
-                stitched += " " + next_chunk
+
+            # Detect and deduplicate boundary overlap (1 to 6 overlapping words between chunks)
+            prev_words = stitched.split()
+            next_words = next_chunk.split()
+            overlap_k = 0
+            max_check = min(6, len(prev_words), len(next_words))
+            for k in range(max_check, 0, -1):
+                p_slice = [re.sub(r'[^\w]', '', w).lower() for w in prev_words[-k:]]
+                n_slice = [re.sub(r'[^\w]', '', w).lower() for w in next_words[:k]]
+                if p_slice == n_slice and all(len(w) > 0 for w in p_slice):
+                    overlap_k = k
+                    break
+
+            if overlap_k > 0:
+                joined_next = " ".join(next_words[overlap_k:])
+                if not joined_next:
+                    continue
+                if stitched.endswith(("\n", "\n\n")) or joined_next.startswith(("\n", "•", "-", "*")):
+                    stitched = stitched.rstrip() + "\n\n" + joined_next.lstrip()
+                elif stitched.endswith((".", "!", "?", ":", ";", ",")):
+                    stitched += " " + joined_next
+                else:
+                    stitched += " " + joined_next
             else:
-                stitched += " " + next_chunk
-        return stitched
+                if stitched.endswith(("\n", "\n\n")) or next_chunk.startswith(("\n", "•", "-", "*")):
+                    stitched = stitched.rstrip() + "\n\n" + next_chunk.lstrip()
+                elif stitched.endswith((".", "!", "?", ":", ";", ",")):
+                    stitched += " " + next_chunk
+                else:
+                    stitched += " " + next_chunk
+        return stitched.strip()
 
     @staticmethod
     def _extract_part_text(p: Any) -> str:
@@ -450,7 +473,7 @@ class GeminiEngine:
             gen_config: Dict[str, Any] = {
                 "temperature": 0.0,
                 "topP": 0.95,
-                "maxOutputTokens": 2048
+                "maxOutputTokens": 8192
             }
             # Optimize Gemini 2.5/2.0 Flash for sub-2-second speech transcription by disabling thinking overhead
             if "2.5" in model.lower() or "2.0" in model.lower():
@@ -558,7 +581,7 @@ class GeminiEngine:
                 c_gen_config: Dict[str, Any] = {
                     "temperature": 0.0,
                     "topP": 0.95,
-                    "maxOutputTokens": 2048
+                    "maxOutputTokens": 8192
                 }
                 if "2.5" in try_model.lower() or "2.0" in try_model.lower():
                     c_gen_config["thinkingConfig"] = {"thinkingBudget": 0}
@@ -686,7 +709,11 @@ class GeminiEngine:
         )
 
         # 2. Resolve Primary Model for text transformations (default to gemini-3.5-flash-lite for instant sub-second quota-available execution)
-        primary_model = self.model_name if (self.model_name and self.model_name not in ("auto", "gemini-3.5-transcribe")) else "gemini-3.5-flash-lite"
+        if not self.model_name or self.model_name in ("auto", "gemini-3.5-transcribe"):
+            routing = ModelRouter.route_model(task_type="text", profile_name=profile_id, auto_cost_mode=auto_cost_mode)
+            primary_model = routing.model_name
+        else:
+            primary_model = self.model_name
         is_code = (transform_type == TransformType.TECHNICAL or "code" in (custom_instruction or "").lower() or "function" in (custom_instruction or "").lower())
 
         # 3. Model execution function
@@ -752,7 +779,21 @@ class GeminiEngine:
             is_audio=False
         )
 
-        # 5. Vocabulary Normalization & Metrics
+        # 5. Local Intelligence Fallback on total online transformation failure
+        if not exec_res.success:
+            try:
+                from app.intelligence.ai_polish_brain import AIPolishBrain
+                cleaned = AIPolishBrain.polish_speech(raw_text)
+                cleaned = self._clean_output(cleaned)
+                if cleaned:
+                    exec_res.success = True
+                    exec_res.text = cleaned
+                    exec_res.model_used = "Local Intelligence Polish (Offline Fallback)"
+                    exec_res.fallback_occurred = True
+            except Exception as loc_err:
+                logger.debug(f"Local intelligence transform fallback note: {loc_err}")
+
+        # 5b. Vocabulary Normalization & Metrics
         if exec_res.success and exec_res.text:
             if not is_code and transform_type not in (TransformType.TECHNICAL, TransformType.CUSTOM, TransformType.CONVERT_PROMPT):
                 try:

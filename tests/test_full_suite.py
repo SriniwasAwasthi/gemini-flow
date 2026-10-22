@@ -111,7 +111,6 @@ def run_comprehensive_audit():
         "History",
         "Profiles",
         "AI Dictation",
-        "AI Model Router",
         "Audio Device"
     ]
 

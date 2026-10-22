@@ -9,13 +9,14 @@ import io
 import time
 import logging
 import threading
-from typing import Tuple, Optional, Any
+from typing import Tuple, Optional, Any, Dict
 
 logger = logging.getLogger("GeminiFlow.OfflineSpeech")
 
 
 class OfflineSpeechEngine:
     _whisper_instance: Optional[Any] = None
+    _whisper_models: Dict[str, Any] = {}
     _model_lock = threading.Lock()
     _active_model_name: str = "base.en"
     _is_warming_up: bool = False
@@ -26,12 +27,12 @@ class OfflineSpeechEngine:
         Thread-safe singleton accessor for faster-whisper WhisperModel.
         Loads the model once and retains it in memory for instant subsequent transcriptions.
         """
-        if cls._whisper_instance is not None:
-            return cls._whisper_instance
+        if model_size in cls._whisper_models:
+            return cls._whisper_models[model_size]
 
         with cls._model_lock:
-            if cls._whisper_instance is not None:
-                return cls._whisper_instance
+            if model_size in cls._whisper_models:
+                return cls._whisper_models[model_size]
 
             try:
                 from faster_whisper import WhisperModel
@@ -42,7 +43,7 @@ class OfflineSpeechEngine:
                 optimal_workers = max(2, min(4, cpu_count // 3))
                 # Try loading with local_files_only first for zero-network environments
                 try:
-                    cls._whisper_instance = WhisperModel(
+                    instance = WhisperModel(
                         model_size,
                         device="cpu",
                         compute_type="int8",
@@ -52,16 +53,18 @@ class OfflineSpeechEngine:
                     )
                 except Exception:
                     # Fallback to standard load (downloads if needed)
-                    cls._whisper_instance = WhisperModel(
+                    instance = WhisperModel(
                         model_size,
                         device="cpu",
                         compute_type="int8",
                         cpu_threads=optimal_threads,
                         num_workers=optimal_workers
                     )
+                cls._whisper_models[model_size] = instance
+                cls._whisper_instance = instance
                 cls._active_model_name = model_size
                 logger.info(f"Local Whisper model '{model_size}' loaded in {time.time() - t0:.2f}s ({optimal_threads} threads, {optimal_workers} workers).")
-                return cls._whisper_instance
+                return instance
             except Exception as e:
                 logger.warning(f"Could not load Whisper model '{model_size}': {e}")
                 if model_size != "tiny.en":
@@ -85,25 +88,38 @@ class OfflineSpeechEngine:
         return None
 
     @classmethod
-    def warmup_whisper(cls, model_size: str = "base.en"):
+    def warmup_whisper(cls, model_size: str = "base.en", blocking: bool = False):
         """
-        Asynchronously warms up the local Whisper model in memory so that the first
+        Warms up the local Whisper model in memory so that the first
         offline user transcription executes instantaneously without cold-start latency.
+        If blocking=True, waits until the model and CPU kernels are initialized.
         """
-        if cls._whisper_instance is not None or cls._is_warming_up:
+        if cls._whisper_instance is not None:
             return
 
         def _do_warmup():
             cls._is_warming_up = True
             try:
-                cls.get_whisper_model(model_size)
+                m = cls.get_whisper_model(model_size)
+                if m is not None:
+                    try:
+                        import numpy as np
+                        dummy = np.zeros(16000, dtype=np.float32)
+                        _ = list(m.transcribe(dummy, beam_size=1, word_timestamps=False)[0])
+                    except Exception:
+                        pass
             except Exception as ex:
                 logger.debug(f"Offline Whisper warmup notice: {ex}")
             finally:
                 cls._is_warming_up = False
 
-        warmup_thread = threading.Thread(target=_do_warmup, daemon=True, name="WhisperOfflineWarmup")
-        warmup_thread.start()
+        if blocking:
+            _do_warmup()
+        else:
+            if cls._is_warming_up:
+                return
+            warmup_thread = threading.Thread(target=_do_warmup, daemon=True, name="WhisperOfflineWarmup")
+            warmup_thread.start()
 
     @classmethod
     def transcribe_wav(cls, wav_bytes: bytes, initial_prompt: Optional[str] = None, language: Optional[str] = None) -> Tuple[bool, str]:
@@ -145,7 +161,7 @@ class OfflineSpeechEngine:
         return False, "Local offline speech recognition could not decode audio. Please check microphone."
 
     @classmethod
-    def _split_into_chunks(cls, wav_bytes: bytes, target_sec: float = 24.0) -> list[bytes]:
+    def _split_into_chunks(cls, wav_bytes: bytes, target_sec: float = 24.0, overlap_sec: float = 0.3) -> list[bytes]:
         import wave
         import numpy as np
         try:
@@ -162,9 +178,12 @@ class OfflineSpeechEngine:
                 return [wav_bytes]
 
             chunk_len = int(target_sec * fr * nc)
+            overlap_len = int(overlap_sec * fr * nc)
             chunks = []
-            for i in range(0, len(samples), chunk_len):
-                slice_data = samples[i : i + chunk_len].tobytes()
+            start = 0
+            while start < len(samples):
+                end = min(len(samples), start + chunk_len)
+                slice_data = samples[start:end].tobytes()
                 out_bio = io.BytesIO()
                 with wave.open(out_bio, "wb") as out_wf:
                     out_wf.setnchannels(nc)
@@ -172,6 +191,9 @@ class OfflineSpeechEngine:
                     out_wf.setframerate(fr)
                     out_wf.writeframes(slice_data)
                 chunks.append(out_bio.getvalue())
+                if end >= len(samples):
+                    break
+                start = end - overlap_len
             return chunks if chunks else [wav_bytes]
         except Exception as ex:
             logger.debug(f"Audio chunk split note: {ex}")
@@ -179,7 +201,12 @@ class OfflineSpeechEngine:
 
     @classmethod
     def _transcribe_with_whisper(cls, wav_bytes: bytes, initial_prompt: Optional[str] = None, language: Optional[str] = None) -> Tuple[bool, str]:
-        model = cls.get_whisper_model()
+        is_non_english = bool(language and language.lower() not in ("en", "english"))
+        target_model_size = "base" if is_non_english else "base.en"
+        model = cls.get_whisper_model(model_size=target_model_size)
+        if model is None:
+            # Fallback to default model
+            model = cls.get_whisper_model(model_size="base.en")
         if model is None:
             return False, "Whisper model unavailable"
 
@@ -192,7 +219,7 @@ class OfflineSpeechEngine:
             "condition_on_previous_text": False,
             "temperature": 0.0,
             "vad_filter": True,
-            "vad_parameters": dict(min_silence_duration_ms=450, speech_pad_ms=300),
+            "vad_parameters": dict(threshold=0.20, min_silence_duration_ms=1000, speech_pad_ms=500),
             "initial_prompt": prompt
         }
         if is_multilingual and language:
@@ -216,7 +243,8 @@ class OfflineSpeechEngine:
                 with ThreadPoolExecutor(max_workers=max_w) as pool:
                     results = list(pool.map(_worker, enumerate(chunks)))
                 results.sort(key=lambda x: x[0])
-                final_text = " ".join([r[1] for r in results if r[1].strip()]).strip()
+                from app.gemini_engine import GeminiEngine
+                final_text = GeminiEngine._stitch_chunk_transcripts([r[1] for r in results if r[1].strip()])
                 return True, final_text
 
         # Standard direct high-accuracy transcription (<= 28s)

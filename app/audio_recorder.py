@@ -24,7 +24,7 @@ def apply_dsp_filters(
     high_pass_enabled: bool = True,
     high_pass_hz: float = 85.0,
     noise_gate_enabled: bool = True,
-    noise_gate_threshold_db: float = -42.0
+    noise_gate_threshold_db: float = -52.0
 ) -> np.ndarray:
     """
     Applies real-time Digital Signal Processing (DSP) audio enhancement:
@@ -62,8 +62,8 @@ def apply_dsp_filters(
                 diff = rms_db - noise_gate_threshold_db
                 gains = np.where(
                     diff >= knee_width / 2.0, 1.0,
-                    np.where(diff <= -knee_width / 2.0, 0.05,
-                             0.05 + 0.95 * ((diff + knee_width / 2.0) / knee_width))
+                    np.where(diff <= -knee_width / 2.0, 0.45,
+                             0.45 + 0.55 * ((diff + knee_width / 2.0) / knee_width))
                 )
 
                 expanded_gains = np.repeat(gains, frame_len, axis=0)
@@ -271,7 +271,7 @@ class AudioRecorder:
 
         return wav_io.getvalue()
 
-    def get_rolling_chunk(self, min_sec: float = 5.0, max_sec: float = 8.0) -> Optional[bytes]:
+    def get_rolling_chunk(self, min_sec: float = 2.5, max_sec: float = 5.0) -> Optional[bytes]:
         """
         Extracts a silence-aligned audio slice if accumulated speech exceeds min_sec (18s+).
         Enables real-time background transcription while recording long speech (1-120 minutes)
@@ -307,7 +307,9 @@ class AudioRecorder:
                 split_sample = candidate_idx * block_size + block_size // 2
 
             chunk_audio = full_audio[cursor : cursor + split_sample]
-            self._rolling_sample_cursor = cursor + split_sample
+            # Keep 0.20s acoustic overlap padding so words spoken across boundaries are never lost
+            overlap_samples = int(0.20 * self.sample_rate)
+            self._rolling_sample_cursor = max(cursor + overlap_samples, cursor + split_sample - overlap_samples)
 
         return self._samples_to_wav(chunk_audio, trim_silence=False)
 
@@ -366,7 +368,7 @@ class AudioRecorder:
             return b"", duration
 
     @staticmethod
-    def contains_speech(wav_bytes: bytes, threshold_rms: float = 0.0008, threshold_peak: float = 0.005) -> bool:
+    def contains_speech(wav_bytes: bytes, threshold_rms: float = 0.0005, threshold_peak: float = 0.003) -> bool:
         """
         Determines whether the recorded audio buffer contains acoustic human speech.
         Uses conservative thresholds to protect quiet speech, whispers, and soft syllables,

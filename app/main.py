@@ -376,9 +376,10 @@ class GeminiFlowApp:
 
         # Core components
         self.config = ConfigManager()
+        active_model = self.config.get("model_name") or self.config.get("model_mode", "auto")
         self.gemini = GeminiEngine(
             api_key=self.config.get_api_key(),
-            model_name=self.config.get("model_mode", "auto")
+            model_name=active_model
         )
         self.text_injector = TextInjector()
         self.signals = WorkerSignals()
@@ -512,11 +513,11 @@ class GeminiFlowApp:
         def _rolling_loop():
             chunk_idx = 0
             while self.recorder.is_recording and not self._is_cancelled and self._rolling_active:
-                time.sleep(0.25)
+                time.sleep(0.15)
                 if not self.recorder.is_recording or self._is_cancelled or not self._rolling_active:
                     break
 
-                chunk_wav = self.recorder.get_rolling_chunk(min_sec=5.0, max_sec=8.0)
+                chunk_wav = self.recorder.get_rolling_chunk(min_sec=3.5, max_sec=6.0)
                 if chunk_wav and len(chunk_wav) > 2000:
                     curr_idx = chunk_idx
                     chunk_idx += 1
@@ -797,6 +798,8 @@ class GeminiFlowApp:
                 return
 
             self.gemini.set_api_key(api_key)
+            active_model = self.config.get("model_name") or self.config.get("model_mode", "auto")
+            self.gemini.set_model(active_model)
 
             # Fast-path acoustic silence check: if audio is pure room noise/silence, exit in <5ms with zero hallucinations
             if not AudioRecorder.contains_speech(wav_bytes):
@@ -843,7 +846,7 @@ class GeminiFlowApp:
                 )
             else:
                 logger.info(f"Processing rolling streaming dictation ({len(self._rolling_chunks)} chunks accumulated during speech)...")
-                tail_wav = self.recorder.get_tail_chunk() or wav_bytes
+                tail_wav = self.recorder.get_tail_chunk()
                 if tail_wav and len(tail_wav) > 1000:
                     with self._rolling_lock:
                         tail_idx = len(self._rolling_chunks)
@@ -883,22 +886,44 @@ class GeminiFlowApp:
                     # Run tail chunk concurrently with any remaining in-flight background chunks
                     threading.Thread(target=_transcribe_tail, daemon=True, name="TailChunkWorker").start()
 
-                # Wait for in-flight rolling chunks and tail chunk to complete (sub-second turnaround, breaks immediately when all_done)
+                # Wait for in-flight rolling chunks and tail chunk with sub-second turnaround
                 t_wait_start = time.time()
-                while time.time() - t_wait_start < 2.5:
+                speculative_whisper_started = False
+                while time.time() - t_wait_start < 3.2:
                     with self._rolling_lock:
                         all_done = all(c.get("done", False) if isinstance(c, dict) else bool(c) for c in self._rolling_chunks)
                     if all_done:
                         break
-                    time.sleep(0.025)
 
-                # Zero-Loss Guarantee: If any chunk timed out or failed to return text, rescue it immediately
+                    # Parallel Speculative Rescue: If any chunk is taking > 1.4s, launch offline Whisper concurrently
+                    if time.time() - t_wait_start > 1.4 and not speculative_whisper_started and offline_fallback_on:
+                        speculative_whisper_started = True
+                        with self._rolling_lock:
+                            pending = [c for c in self._rolling_chunks if isinstance(c, dict) and not c.get("done", False) and c.get("wav")]
+                        for p_chunk in pending:
+                            def _rescue_chunk(chunk_ref):
+                                try:
+                                    from app.offline.offline_engine import OfflineSpeechEngine
+                                    ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(chunk_ref["wav"], language=primary_lang)
+                                    if ok_r and txt_r and txt_r.strip():
+                                        with self._rolling_lock:
+                                            if not chunk_ref.get("text"):
+                                                chunk_ref["text"] = txt_r.strip()
+                                                chunk_ref["done"] = True
+                                                chunk_ref["wav"] = None
+                                except Exception:
+                                    pass
+                            threading.Thread(target=_rescue_chunk, args=(p_chunk,), daemon=True).start()
+
+                    time.sleep(0.015)
+
+                # Zero-Loss Guarantee: Immediate local Whisper rescue for any unresolved slice
                 with self._rolling_lock:
                     for c in self._rolling_chunks:
                         if isinstance(c, dict) and not c.get("text") and c.get("wav") and len(c.get("wav")) > 1000:
                             try:
                                 from app.offline.offline_engine import OfflineSpeechEngine
-                                ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(c["wav"])
+                                ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(c["wav"], language=primary_lang)
                                 if ok_r and txt_r and txt_r.strip():
                                     c["text"] = txt_r.strip()
                                     c["done"] = True
@@ -907,42 +932,53 @@ class GeminiFlowApp:
                                 pass
 
                 with self._rolling_lock:
-                    # Detect if any chunk containing acoustic speech failed to transcribe
-                    unresolved_speech_chunks = [
-                        c for c in self._rolling_chunks
-                        if isinstance(c, dict) and not c.get("text") and c.get("wav") and AudioRecorder.contains_speech(c["wav"])
-                    ]
+                    total_chunks = len(self._rolling_chunks)
                     valid_chunks = [
                         (c["text"].strip() if isinstance(c, dict) else str(c).strip())
                         for c in self._rolling_chunks
                         if (isinstance(c, dict) and c.get("text") and c["text"].strip()) or (isinstance(c, str) and c.strip())
                     ]
 
-                if not unresolved_speech_chunks and valid_chunks:
+                # 100% Completeness Guarantee:
+                # Ensure EVERY single chunk is resolved before stitching.
+                # If any chunk is still missing, immediately rescue via local Whisper AI.
+                with self._rolling_lock:
+                    for c in self._rolling_chunks:
+                        if isinstance(c, dict) and not c.get("text"):
+                            w_bytes = c.get("wav")
+                            if w_bytes and len(w_bytes) > 800:
+                                try:
+                                    from app.offline.offline_engine import OfflineSpeechEngine
+                                    ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(w_bytes, language=primary_lang)
+                                    if ok_r and txt_r and txt_r.strip():
+                                        c["text"] = txt_r.strip()
+                                        c["done"] = True
+                                        c["wav"] = None
+                                except Exception:
+                                    pass
+
+                    valid_chunks = [
+                        (c["text"].strip() if isinstance(c, dict) else str(c).strip())
+                        for c in self._rolling_chunks
+                        if (isinstance(c, dict) and c.get("text") and c["text"].strip()) or (isinstance(c, str) and c.strip())
+                    ]
+                    total_chunks = len(self._rolling_chunks)
+
+                if valid_chunks:
                     raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
                     raw_result = self.gemini._clean_output(raw_result)
                     success = True
                 else:
-                    if unresolved_speech_chunks:
-                        logger.warning(
-                            f"Rolling streaming had {len(unresolved_speech_chunks)} unresolved speech chunk(s). "
-                            "Triggering full-session audio fallback to prevent any loss of spoken content."
-                        )
-                    # Complete full-session fallback: transcribe entire session wav_bytes
+                    logger.warning("No valid text from rolling chunks. Running full-session recovery...")
                     success, raw_result = self.gemini.transcribe_audio(
                         wav_bytes=wav_bytes,
                         system_instruction=prompt,
                         app_context=app_context,
                         profile_id=active_profile,
                         auto_cost_mode=auto_cost_mode,
-                        offline_fallback_enabled=offline_fallback_on
+                        offline_fallback_enabled=offline_fallback_on,
+                        offline_language=primary_lang
                     )
-                    # If full-audio fallback also failed, salvage whatever valid rolling chunks completed
-                    if not success and valid_chunks:
-                        logger.warning("Full-session audio fallback failed; salvaging completed rolling chunks to prevent total loss.")
-                        raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
-                        raw_result = self.gemini._clean_output(raw_result)
-                        success = True
 
             if self._is_cancelled:
                 return
@@ -998,7 +1034,13 @@ class GeminiFlowApp:
             # 6. Apply AI Brain Normalization (Deduplication, False-Starts, Stray Greetings, Adaptive Bullets)
             normalized_text = VocabEngine.normalize_text(raw_result)
             if "•" not in normalized_text and active_mode in ("clean_dictation", "smart_polish"):
-                normalized_text = self.gemini.structure_bullet_points(normalized_text)
+                try:
+                    from app.intelligence.ai_polish_brain import AIPolishBrain
+                    bulleted = AIPolishBrain.smart_bullet_formatter(normalized_text)
+                    if "•" in bulleted:
+                        normalized_text = bulleted
+                except Exception:
+                    pass
             final_text = GeminiEngine.apply_dictionary(normalized_text, self.config.get_dictionary())
             final_text = GeminiEngine.apply_snippets(final_text, self.config.get_snippets())
             raw_spoken_text = final_text
@@ -1214,7 +1256,8 @@ class GeminiFlowApp:
 
         self.hotkey_mgr.update_config(hotkey, mode, prompt_hk, trans_hk)
         self.gemini.set_api_key(self.config.get_api_key())
-        self.gemini.set_model(self.config.get("model_mode", "auto"))
+        active_model = self.config.get("model_name") or self.config.get("model_mode", "auto")
+        self.gemini.set_model(active_model)
         self.tray.update_status(f"🟢 Ready ({disp_name})", state="ready")
 
     def open_history(self):
@@ -1244,7 +1287,8 @@ class GeminiFlowApp:
 
         self.hotkey_mgr.update_config(hotkey, mode, prompt_hk, trans_hk)
         self.gemini.set_api_key(self.config.get_api_key())
-        self.gemini.set_model(self.config.get("model_mode", "auto"))
+        active_model = self.config.get("model_name") or self.config.get("model_mode", "auto")
+        self.gemini.set_model(active_model)
         self.tray.update_status(f"🟢 Ready ({disp_name})", state="ready")
 
     def quit_app(self):

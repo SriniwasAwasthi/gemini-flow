@@ -83,6 +83,21 @@ class AIPolishBrain:
         result = text.strip()
         cue_pat = cls.CUE_PATTERN
 
+        # Pass 0: Metacognitive instruction override
+        # e.g. "Convert this whole data under 4 seconds, and again I just forgot I don't want in 4 seconds I just say convert this whole data into under 3 seconds."
+        c2_m = re.search(
+            r"(?:^|[\.\!\?\s]*)(?:[^.!?]*?)(?:,\s*|\.\s+|\s+)?(?:and\s+)?(?:again,?\s*)?(?:I\s+(?:just\s+)?forgot|I\s+forgot|I\s+don'?t\s+want)\s+[^.!?]+?(?:I\s+(?:just\s+)?say|make\s+it|use|take)\s+([^.!?]+)",
+            result,
+            re.IGNORECASE
+        )
+        if c2_m:
+            res_c2 = c2_m.group(1).strip()
+            if res_c2 and res_c2[0].islower():
+                res_c2 = res_c2[0].upper() + res_c2[1:]
+            if not res_c2.endswith(('.', '!', '?', '।')):
+                res_c2 += "."
+            result = res_c2
+
         # Pass 1: Narrative & Metacognitive error overrides
         # e.g. "I am in 11th standard, but I forgot that I have just completed my 11th and I went to the 12th standard, so I said, 'Oh, sorry. I am in 12th standard.'"
         pat_nar = re.compile(
@@ -94,8 +109,9 @@ class AIPolishBrain:
         result = pat_nar.sub(r'\1.', result)
 
         # e.g. "today is Monday. But I forgot today is not Monday; today is a Tuesday..."
+        # or "today is Monday. Wait, today is not Monday; today is Tuesday..."
         result = re.sub(
-            r'(\band\s+today\s+is\s+)(\w+)[\.\?!,]*\s+(?:but\s+)?(?:I\s+(?:just\s+)?forgot\s+)?(?:that\s+)?(?:today\s+is\s+not\s+\2;?\s*|it\'?s\s+not\s+\2;?\s*)(?:today\s+is\s+(?:a\s+)?|it\'?s\s+(?:a\s+)?)([^.!?]+)',
+            r'(\band\s+today\s+is\s+|\btoday\s+is\s+)(\w+)[\.\?!,]*\s+(?:' + cue_pat + r'[\s,\.]*)?(?:but\s+)?(?:I\s+(?:just\s+)?forgot\s+)?(?:that\s+)?(?:today\s+is\s+not\s+\2;?\s*|it\'?s\s+not\s+\2;?\s*)(?:today\s+is\s+(?:a\s+)?|it\'?s\s+(?:a\s+)?)([^.!?]+)',
             r'\1\3',
             result,
             flags=re.IGNORECASE
@@ -160,16 +176,28 @@ class AIPolishBrain:
         result = re.sub(r'\bhold\s+data\b', 'whole data', result, flags=re.IGNORECASE)
 
         # Pass 5: Day of the Week Overrides
-        # Handles: "Today is Monday. Oh, sorry, today is Tuesday."
+        # Handles: "Today is Monday. Oh, sorry, today is Tuesday." or "on Monday, wait Tuesday"
         pat_day = re.compile(
-            r'\b(today\s+is\s+(?:a\s+)?)'
+            r'\b((?:today\s+is\s+(?:a\s+)?|on\s+|starting\s+on\s+|by\s+|next\s+|this\s+)?)\b'
             r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[,\.]?\s*'
             + cue_pat +
-            r'[\s,\.]+(?:today\s+is\s+(?:a\s+)?)?'
+            r'[\s,\.]+(?:(?:today\s+is\s+(?:a\s+)?|on\s+|starting\s+on\s+|by\s+|next\s+|this\s+)\s*)?'
             r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b',
             flags=re.IGNORECASE
         )
         result = pat_day.sub(r'\1\3', result)
+
+        # Pass 5b: Month Overrides
+        # Handles: "Release in January, no wait, February."
+        pat_month = re.compile(
+            r'\b((?:in\s+|on\s+|by\s+|during\s+|for\s+|from\s+|around\s+|until\s+|release\s+in\s+|launch\s+in\s+|start\s+in\s+)?)\b'
+            r'(January|February|March|April|May|June|July|August|September|October|November|December)[,\.]?\s*'
+            + cue_pat +
+            r'[\s,\.]+(?:(?:in\s+|on\s+|by\s+|during\s+|for\s+|from\s+|around\s+|until\s+|release\s+in\s+|launch\s+in\s+|start\s+in\s+)\s*)?'
+            r'(January|February|March|April|May|June|July|August|September|October|November|December)\b',
+            flags=re.IGNORECASE
+        )
+        result = pat_month.sub(r'\1\3', result)
 
         # Pass 6: Standard / Class / Education Overrides
         # Handles: "I am in 11th standard... sorry I am in 12th standard."
@@ -205,6 +233,20 @@ class AIPolishBrain:
             flags=re.IGNORECASE
         )
         result = pat_verb_override.sub(r'\1\3 \2', result)
+
+        # Pass 7c: Clause override with correction cue: "Clause A, [CUE] Clause B"
+        # e.g. "We need 5 seconds latency, rather we need 3 seconds latency." -> "We need 3 seconds latency."
+        # e.g. "Tomorrow we deploy to production, wait tomorrow we will deploy to production." -> "Tomorrow we will deploy to production."
+        m_cue = re.search(r'([^.!?।]+?)[,\.]?\s+' + cue_pat + r'[\s,\.]+(.+)', result, flags=re.IGNORECASE)
+        if m_cue:
+            cl1 = m_cue.group(1).strip()
+            cl2 = m_cue.group(2).strip()
+            w1 = set(re.findall(r'\w+', cl1.lower()))
+            w2 = set(re.findall(r'\w+', cl2.lower()))
+            common = w1 & w2
+            if len(common) >= 2 and (len(common) / max(len(w1), len(w2))) >= 0.4:
+                cl2_clean = cl2[0].upper() + cl2[1:]
+                result = cl2_clean
 
         # Pass 8: Devanagari Hindi / Marathi day/phrase override
         # e.g. "आज सोमवार है, सॉरी आज मंगलवार है।" -> "आज मंगलवार है।"
@@ -265,24 +307,64 @@ class AIPolishBrain:
                     next_words = clean_tokens(next_s)
 
                     if curr_words and next_words:
+                        # 1. Exact duplicate sentence stutter collapse
                         if curr_words == next_words:
                             continue
 
-                        curr_str = ' '.join(curr_words)
-                        next_str = ' '.join(next_words)
-                        if len(next_words) >= 2 and next_str in curr_str:
-                            filtered.append((curr_s, curr_p))
+                        # Check for explicit verbal correction or restart cues in either sentence
+                        has_cue = any(
+                            cue in (curr_s + " " + next_s).lower()
+                            for cue in ('sorry', 'wait', 'no', 'mean', 'rather', 'actually', 'correction', 'instead', 'my bad', 'not')
+                        )
+
+                        # 2. Trailing clause duplicate collapse (e.g. "So, I am Sriniwas Awasthi, and today is Tuesday. Today is a Tuesday.")
+                        if len(next_words) >= 2 and curr_words[-len(next_words):] == next_words:
                             skip_next = True
+                            filtered.append((curr_s, curr_p))
                             continue
 
-                        # Progressive refinement overlap (e.g. "I just want 100% data." vs "I just want 100% accurate data.")
+                        # 3. Subsequence progressive refinement (e.g. "We want zero latency. We want zero latency on Windows.")
+                        def _is_subseq(sub, full):
+                            if len(sub) < 2 or len(sub) >= len(full):
+                                return False
+                            it = iter(full)
+                            return all(w in it for w in sub)
+
+                        if _is_subseq(curr_words, next_words) and (len(next_words) - len(curr_words) <= 5):
+                            clean_next = re.sub(r'^(?:so|if|and|like|just)\s+', '', next_s, flags=re.IGNORECASE).strip()
+                            if clean_next:
+                                clean_next = clean_next[0].upper() + clean_next[1:]
+                                merged[idx+1] = (clean_next, next_p)
+                            continue
+
+                        # Progressive refinement overlap (e.g. "I just want 100% data. If I just want 100% accurate data.")
                         stopwords = {'we', 'i', 'you', 'he', 'she', 'it', 'they', 'need', 'to', 'the', 'a', 'an', 'in', 'on', 'at', 'is', 'are', 'was', 'were', 'and', 'or', 'so', 'of', 'for', 'with', 'by'}
                         c_content = [w for w in curr_words if w not in stopwords]
                         n_content = [w for w in next_words if w not in stopwords]
-                        if c_content and n_content:
+
+                        is_numbered_sequence = (
+                            len(curr_words) >= 2 and len(next_words) >= 2 and
+                            curr_words[0] in ('section', 'chapter', 'part', 'step', 'point', 'item', 'topic') and
+                            next_words[0] in ('section', 'chapter', 'part', 'step', 'point', 'item', 'topic') and
+                            curr_words[1] != next_words[1]
+                        )
+
+                        # Only drop earlier sentence if an explicit correction cue was present,
+                        # or if it's an immediate stutter restart with addition (e.g. "I want 100% data. If I just want 100% accurate data.")
+                        if not is_numbered_sequence and c_content and n_content:
                             common_content = set(c_content) & set(n_content)
-                            overlap_content_ratio = len(common_content) / len(c_content)
-                            if overlap_content_ratio >= 0.75 and abs(len(curr_words) - len(next_words)) <= 3:
+                            overlap_content_ratio = len(common_content) / len(c_content) if c_content else 0
+                            is_immediate_restart = (
+                                overlap_content_ratio >= 0.75 and
+                                len(c_content) >= 2 and
+                                abs(len(curr_words) - len(next_words)) <= 3 and
+                                (has_cue or any(re.match(r'^(?:so|if|and|like|just)\b', next_s, re.I) for _ in [1]))
+                            )
+                            if is_immediate_restart:
+                                clean_next = re.sub(r'^(?:so|if|and|like|just)\s+', '', next_s, flags=re.IGNORECASE).strip()
+                                if clean_next:
+                                    clean_next = clean_next[0].upper() + clean_next[1:]
+                                    merged[idx+1] = (clean_next, next_p)
                                 continue
 
                 filtered.append((curr_s, curr_p))
@@ -353,19 +435,155 @@ class AIPolishBrain:
                 bullets = [f"• {it.rstrip('.')}." for it in items if it]
                 return f"{intro}\n" + "\n".join(bullets)
 
+        try:
+            from app.vocabulary.vocab_engine import VocabEngine
+            formatted = VocabEngine.adaptive_bullet_format(text)
+            if "•" in formatted:
+                return cls.smart_bullet_formatter(formatted)
+        except Exception:
+            pass
+
         return text
+
+    @classmethod
+    def correct_grammar(cls, text: str) -> str:
+        """
+        Enhances spoken English grammar while strictly preserving all 12 English tenses,
+        authentic meaning, proper nouns, dates, numbers, and technical terminology:
+        - Corrects subject-verb agreement ('We was' -> 'We were', 'he don't' -> 'he doesn't')
+        - Corrects double negatives ('don't know nothing' -> 'don't know anything')
+        - Fixes spoken punctuation and article agreements ('an user' -> 'a user', 'a apple' -> 'an apple')
+        - Retains 100% of past, present, and future tense distinctions without mutating timeline.
+        """
+        if not text or not text.strip():
+            return text
+
+        t = text
+
+        # 1. Subject-verb agreement (without affecting modals like 'would have', 'could have')
+        t = re.sub(r'\b(we|they|you)\s+was\b', r'\1 were', t, flags=re.IGNORECASE)
+        t = re.sub(r"\b(he|she|it)\s+don'?t\b", r"\1 doesn't", t, flags=re.IGNORECASE)
+        t = re.sub(r'(?<!will\s)(?<!would\s)(?<!could\s)(?<!should\s)(?<!must\s)\b(he|she|it)\s+have\b', r'\1 has', t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(i|we|they|you)\s+has\b', r'\1 have', t, flags=re.IGNORECASE)
+        t = re.sub(
+            r'\b(there)\s+is\s+(\d+|many|several|multiple|a\s+few)\b',
+            lambda m: f"{'There' if m.group(1)[0].isupper() else 'there'} are {m.group(2)}",
+            t,
+            flags=re.IGNORECASE
+        )
+
+        # 2. Double negative resolution
+        t = re.sub(r'\b(don\'?t|doesn\'?t|didn\'?t|won\'?t|can\'?t|couldn\'?t|hasn\'?t|haven\'?t)\s+know\s+nothing\b', r'\1 know anything', t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(don\'?t|doesn\'?t|didn\'?t|won\'?t|can\'?t|couldn\'?t|hasn\'?t|haven\'?t)\s+see\s+nothing\b', r'\1 see anything', t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(don\'?t|doesn\'?t|didn\'?t|won\'?t|can\'?t|couldn\'?t|hasn\'?t|haven\'?t)\s+have\s+no\b', r'\1 have any', t, flags=re.IGNORECASE)
+
+        # 3. Indefinite article agreement (with case preservation)
+        def _fix_a_to_an(m):
+            lead = 'A ' if m.group(0)[0].isupper() else 'a '
+            lead_an = 'An ' if m.group(0)[0].isupper() else 'an '
+            word = m.group(1)
+            if word.lower().startswith(('user', 'unit', 'one', 'univ', 'util')):
+                return lead + word
+            return lead_an + word
+
+        def _fix_an_to_a(m):
+            lead = 'A ' if m.group(0)[0].isupper() else 'a '
+            lead_an = 'An ' if m.group(0)[0].isupper() else 'an '
+            word = m.group(1)
+            if word.lower().startswith(('hour', 'honest', 'honor', 'heir')):
+                return lead_an + word
+            return lead + word
+
+        t = re.sub(r'\ba\s+([aeiouAEIOU]\w*|hour\w*|honest\w*|honor\w*|heir\w*)\b', _fix_a_to_an, t, flags=re.IGNORECASE)
+        t = re.sub(r'\ban\s+([bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]\w*)\b', _fix_an_to_a, t, flags=re.IGNORECASE)
+
+        # 4. Spoken punctuation commands
+        t = re.sub(r'(?<=[a-zA-Z0-9])\s+(?:period|full stop)\b', '.', t, flags=re.IGNORECASE)
+        t = re.sub(r'(?<=[a-zA-Z0-9])\s+comma\b', ',', t, flags=re.IGNORECASE)
+        t = re.sub(r'(?<=[a-zA-Z0-9])\s+question mark\b', '?', t, flags=re.IGNORECASE)
+        t = re.sub(r'(?<=[a-zA-Z0-9])\s+exclamation mark\b', '!', t, flags=re.IGNORECASE)
+        t = re.sub(r'(?<=[a-zA-Z0-9])\s+colon\b', ':', t, flags=re.IGNORECASE)
+        t = re.sub(r'(?<=[a-zA-Z0-9])\s+semicolon\b', ';', t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(?:new\s+line|next\s+line|new\s+paragraph)\b', '\n\n', t, flags=re.IGNORECASE)
+
+        return t
+
+    @classmethod
+    def intelligent_structure_formatting(cls, text: str) -> str:
+        """
+        Structures long continuous dictations into readable paragraphs, short paragraphs,
+        and adaptive bullet points based on topic shifts and transitions.
+        """
+        if not text or not text.strip():
+            return text
+
+        # If already formatted with paragraph breaks, preserve
+        if "\n\n" in text:
+            return text
+
+        # Split into distinct thoughts/paragraphs when major discourse transition cues occur
+        t = text
+        transitions = [
+            r'\b(?:Furthermore|Moreover|In addition|On the other hand|Regarding|Moving on to|As for the next step|To summarize|In conclusion)\b'
+        ]
+        for tr in transitions:
+            t = re.sub(r'(?<=[.!?])\s+(' + tr + ')', r'\n\n\1', t)
+
+        return t
+
+    @classmethod
+    def extract_vocabulary_and_terms(cls, text: str) -> str:
+        """
+        Extracts key technical vocabulary, proper nouns, and significant terms
+        from spoken text when explicitly requested by the user.
+        """
+        if not text or not text.strip():
+            return ""
+
+        import re
+        words = re.findall(r'\b[A-Za-z0-9_\-\.\$₹€£]+\b', text)
+        stopwords = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+            'by', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have',
+            'has', 'had', 'do', 'does', 'did', 'can', 'could', 'will', 'would', 'shall',
+            'should', 'may', 'might', 'must', 'i', 'you', 'he', 'she', 'it', 'we', 'they',
+            'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'its', 'our', 'their',
+            'this', 'that', 'these', 'those', 'what', 'which', 'who', 'whom', 'whose',
+            'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
+            'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same',
+            'so', 'than', 'too', 'very', 's', 't', 'just', 'don', 'now', 'also', 'first',
+            'second', 'third', 'main', 'things', 'yesterday'
+        }
+        seen = set()
+        key_terms = []
+        for w in words:
+            w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', w)
+            if len(w_clean) > 2 and w_clean.lower() not in stopwords:
+                key = w_clean.lower()
+                if key not in seen:
+                    seen.add(key)
+                    key_terms.append(w_clean)
+
+        if not key_terms:
+            return text
+
+        bullets = [f"• {t}" for t in key_terms[:30]]
+        return "Key Vocabulary & Terms Extracted:\n" + "\n".join(bullets)
 
     @classmethod
     def polish_speech(cls, text: str) -> str:
         """
         Runs the full sub-millisecond AI Polish Brain pipeline:
         1. Resolve self-corrections and speech overrides
-        2. Format bullet points if sequential or listed
-        3. Normalize grammar & punctuation
+        2. Correct grammar and preserve all 12 tenses
+        3. Apply intelligent structure and paragraph breaks
+        4. Format bullet points if sequential or listed with stripped ordinals
         """
         if not text or not text.strip():
             return text
 
         t = cls.resolve_self_corrections(text)
+        t = cls.correct_grammar(t)
+        t = cls.intelligent_structure_formatting(t)
         t = cls.smart_bullet_formatter(t)
         return t

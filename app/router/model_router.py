@@ -203,13 +203,13 @@ class ModelRouter:
         speech_meta = self.model_registry.get("gemini-3.5-transcribe", meta)
         flash_meta = self.model_registry.get("gemini-3.6-flash", meta)
 
-        # 2. Voice Audio Dictation Routing (Ultra-low latency <1.0s, native bullet points, self-corrections, 12 tenses)
+        # 2. Voice Audio Dictation Routing (Dedicated ultra-low latency < 1.0s transcription model)
         if task in ("DICTATE", "VOICE", "TRANSCRIPTION", "SPEECH", "AUDIO"):
             speech_meta = self.model_registry.get("gemini-3.5-flash-lite", meta)
             return RoutingResult(
                 model_name="gemini-3.5-flash-lite",
                 metadata=speech_meta,
-                reason="Ultra-fast speech transcription with native bullet points, self-corrections, and grammar (< 1.0s)",
+                reason="Dedicated ultra-low latency flash lite model (< 1.0s turnaround)",
                 is_auto=True
             )
 
