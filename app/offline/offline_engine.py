@@ -5,6 +5,8 @@ near-zero latency, accurate on-device offline dictation without any internet con
 Gracefully falls back to Windows SAPI / SpeechRecognition if dependencies are missing.
 """
 import os
+os.environ.setdefault('OMP_WAIT_POLICY', 'PASSIVE')
+os.environ.setdefault('KMP_BLOCKTIME', '0')
 import io
 import time
 import logging
@@ -35,35 +37,80 @@ class OfflineSpeechEngine:
                 return cls._whisper_models[model_size]
 
             try:
+                import ctranslate2
+                import ctypes
                 from faster_whisper import WhisperModel
-                logger.info(f"Initializing local WhisperModel('{model_size}', device='cpu', compute_type='int8')...")
+                has_cuda = False
+                if ctranslate2.get_cuda_device_count() > 0:
+                    try:
+                        ctypes.CDLL("cublas64_12.dll")
+                        has_cuda = True
+                    except Exception:
+                        has_cuda = False
+                device = "cuda" if has_cuda else "cpu"
+                compute_type = "float16" if has_cuda else "int8"
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                bundled_path = os.path.join(project_root, "models", model_size)
+                model_target = bundled_path if (os.path.exists(bundled_path) and os.path.exists(os.path.join(bundled_path, "model.bin"))) else model_size
+
+                logger.info(f"Initializing WhisperModel('{model_target}', device='{device}', compute_type='{compute_type}')...")
                 t0 = time.time()
                 cpu_count = os.cpu_count() or 4
-                optimal_threads = max(4, min(8, cpu_count - 2))
-                optimal_workers = max(2, min(4, cpu_count // 3))
-                # Try loading with local_files_only first for zero-network environments
+                optimal_threads = 1 if has_cuda else min(4, cpu_count)
+                optimal_workers = 1
                 try:
                     instance = WhisperModel(
-                        model_size,
-                        device="cpu",
-                        compute_type="int8",
+                        model_target,
+                        device=device,
+                        compute_type=compute_type,
                         cpu_threads=optimal_threads,
                         num_workers=optimal_workers,
                         local_files_only=True
                     )
                 except Exception:
-                    # Fallback to standard load (downloads if needed)
-                    instance = WhisperModel(
-                        model_size,
-                        device="cpu",
-                        compute_type="int8",
-                        cpu_threads=optimal_threads,
-                        num_workers=optimal_workers
-                    )
+                    try:
+                        instance = WhisperModel(
+                            model_target,
+                            device=device,
+                            compute_type=compute_type,
+                            cpu_threads=optimal_threads,
+                            num_workers=optimal_workers
+                        )
+                    except Exception as cuda_err:
+                        if device == "cuda":
+                            logger.warning(f"CUDA initialization failed ({cuda_err}), falling back to CPU int8...")
+                            instance = WhisperModel(
+                                model_target,
+                                device="cpu",
+                                compute_type="int8",
+                                cpu_threads=min(4, cpu_count),
+                                num_workers=1
+                            )
+                        else:
+                            raise cuda_err
                 cls._whisper_models[model_size] = instance
                 cls._whisper_instance = instance
                 cls._active_model_name = model_size
-                logger.info(f"Local Whisper model '{model_size}' loaded in {time.time() - t0:.2f}s ({optimal_threads} threads, {optimal_workers} workers).")
+                try:
+                    import numpy as np
+                    dummy = np.zeros(16000, dtype=np.float32)
+                    _ = list(instance.transcribe(dummy, beam_size=1, word_timestamps=False)[0])
+                except Exception as prime_err:
+                    if device == "cuda":
+                        logger.warning(f"CUDA priming failed ({prime_err}), falling back to CPU int8...")
+                        instance = WhisperModel(
+                            model_target,
+                            device="cpu",
+                            compute_type="int8",
+                            cpu_threads=min(4, cpu_count),
+                            num_workers=1
+                        )
+                        import numpy as np
+                        dummy = np.zeros(16000, dtype=np.float32)
+                        _ = list(instance.transcribe(dummy, beam_size=1, word_timestamps=False)[0])
+                        cls._whisper_models[model_size] = instance
+                        cls._whisper_instance = instance
+                logger.info(f"Local Whisper model '{model_size}' loaded and primed in {time.time() - t0:.2f}s ({optimal_threads} threads, {optimal_workers} workers).")
                 return instance
             except Exception as e:
                 logger.warning(f"Could not load Whisper model '{model_size}': {e}")
@@ -88,13 +135,13 @@ class OfflineSpeechEngine:
         return None
 
     @classmethod
-    def warmup_whisper(cls, model_size: str = "base.en", blocking: bool = False):
+    def warmup_whisper(cls, model_size: str = "tiny.en", blocking: bool = False):
         """
         Warms up the local Whisper model in memory so that the first
         offline user transcription executes instantaneously without cold-start latency.
         If blocking=True, waits until the model and CPU kernels are initialized.
         """
-        if cls._whisper_instance is not None:
+        if model_size in cls._whisper_models:
             return
 
         def _do_warmup():
@@ -210,16 +257,30 @@ class OfflineSpeechEngine:
         if model is None:
             return False, "Whisper model unavailable"
 
-        default_prompt = "Clean verbatim speech dictation, accurate grammar, proper punctuation."
-        prompt = initial_prompt if initial_prompt else default_prompt
+        vocab_bias = "Vocabulary: Sriniwas Awasthi, Gemini Flow, Antigravity, Wispr, API key."
+        try:
+            from app.vocabulary.vocab_engine import VocabEngine
+            vocab_bias = VocabEngine.get_instance().get_whisper_prompt()
+        except Exception:
+            pass
+
+        if not initial_prompt or initial_prompt.strip() in ("", "Clean verbatim speech dictation, accurate grammar, proper punctuation.", "Clean speech dictation, accurate grammar, proper punctuation."):
+            prompt = vocab_bias
+        else:
+            if vocab_bias and "Sriniwas Awasthi" not in initial_prompt:
+                prompt = f"{initial_prompt} {vocab_bias}"
+            else:
+                prompt = initial_prompt
 
         is_multilingual = getattr(getattr(model, "model", None), "is_multilingual", False)
         kwargs: dict = {
-            "beam_size": 3,
+            "beam_size": 1,
             "condition_on_previous_text": False,
             "temperature": 0.0,
+            "repetition_penalty": 1.2,
+            "no_repeat_ngram_size": 3,
             "vad_filter": True,
-            "vad_parameters": dict(threshold=0.20, min_silence_duration_ms=1000, speech_pad_ms=500),
+            "vad_parameters": dict(threshold=0.25, min_silence_duration_ms=300, speech_pad_ms=200),
             "initial_prompt": prompt
         }
         if is_multilingual and language:
@@ -228,29 +289,39 @@ class OfflineSpeechEngine:
         # Estimate duration in seconds
         approx_sec = len(wav_bytes) / 32000.0
 
-        # If audio is long (> 28s) and not pre-streamed, split into parallel chunks for sub-second/multi-core throughput
-        if approx_sec > 28.0:
-            chunks = cls._split_into_chunks(wav_bytes, target_sec=22.0)
-            if len(chunks) > 1:
-                from concurrent.futures import ThreadPoolExecutor
-                def _worker(pair):
-                    idx, b = pair
-                    c_stream = io.BytesIO(b)
-                    segs, _ = model.transcribe(c_stream, **kwargs)
-                    return idx, " ".join([s.text.strip() for s in segs if s.text.strip()])
-
-                max_w = min(4, len(chunks))
-                with ThreadPoolExecutor(max_workers=max_w) as pool:
-                    results = list(pool.map(_worker, enumerate(chunks)))
-                results.sort(key=lambda x: x[0])
-                from app.gemini_engine import GeminiEngine
-                final_text = GeminiEngine._stitch_chunk_transcripts([r[1] for r in results if r[1].strip()])
-                return True, final_text
+        # Direct sequential C++ decoding (handles any length seamlessly with zero thread contention)
 
         # Standard direct high-accuracy transcription (<= 28s)
-        audio_stream = io.BytesIO(wav_bytes)
+        # Fast path: decode 16-bit PCM into float32 numpy array & ensure 16kHz for sub-second Whisper decoding
+        audio_input = None
+        try:
+            import numpy as np
+            with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
+                fr = wf.getframerate()
+                nc = wf.getnchannels()
+                sw = wf.getsampwidth()
+                pcm_data = wf.readframes(wf.getnframes())
+                if sw == 2 and pcm_data:
+                    raw_arr = np.frombuffer(pcm_data, dtype=np.int16).astype(np.float32) / 32768.0
+                    if nc > 1:
+                        raw_arr = raw_arr.reshape(-1, nc).mean(axis=1)
+                    if fr != 16000 and fr > 0:
+                        new_len = int(len(raw_arr) * 16000 / fr)
+                        audio_input = np.interp(
+                            np.linspace(0, len(raw_arr), new_len, endpoint=False),
+                            np.arange(len(raw_arr)),
+                            raw_arr
+                        ).astype(np.float32)
+                    else:
+                        audio_input = raw_arr
+        except Exception:
+            audio_input = None
+
+        if audio_input is None:
+            audio_input = io.BytesIO(wav_bytes)
+
         t0 = time.time()
-        segments, info = model.transcribe(audio_stream, **kwargs)
+        segments, info = model.transcribe(audio_input, **kwargs)
 
         phrases = [seg.text.strip() for seg in segments if seg.text.strip()]
         final_text = " ".join(phrases).strip()

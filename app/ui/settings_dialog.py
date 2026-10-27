@@ -141,19 +141,20 @@ QComboBox QAbstractItemView::item:selected {
     color: #FFFFFF;
 }
 QPushButton {
-    background-color: #6366F1;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 9px 18px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4F46E5, stop:1 #7C3AED);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 7px;
+    padding: 9px 20px;
     font-weight: 600;
     font-size: 13px;
 }
 QPushButton:hover {
-    background-color: #4F46E5;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366F1, stop:1 #8B5CF6);
+    border: 1px solid rgba(139, 92, 246, 0.5);
 }
 QPushButton:pressed {
-    background-color: #4338CA;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4338CA, stop:1 #6D28D9);
 }
 QPushButton#secondaryBtn {
     background-color: #334155;
@@ -1350,17 +1351,18 @@ class SettingsDialog(QDialog):
         model_label = QLabel("Gemini AI Model / Routing Mode:")
         layout.addWidget(model_label)
         self.model_combo = QComboBox(self)
-        self.model_combo.setView(QListView())
+        mv = QListView(self.model_combo)
+        mv.setTextElideMode(Qt.TextElideMode.ElideRight)
+        mv.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        mv.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.model_combo.setView(mv)
+        self.model_combo.setMaxVisibleItems(10)
         self.model_combo.addItems([
             "auto (Intelligent AI Model Router — Dynamic Per-Task Selection)",
             "gemini-3.5-transcribe (Dedicated Speech Model — Ultra Fast < 1.5s — Recommended)",
-            "gemini-3.6-flash (Fast Advanced Reasoning & Polish)",
             "gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
-            "gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
-            "gemini-flash-latest (Auto Latest Production Flash)",
-            "gemini-3.7-flash (Advanced Reasoning & Technical Dictation)",
-            "gemini-2.5-flash (Standard Flash)",
-            "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)"
+            "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)",
+            "ollama-gemma2 (Ollama Gemma 2B — 100% Local GPU Offline Brain)"
         ])
         self.model_combo.currentIndexChanged.connect(self._on_general_model_combo_changed)
         layout.addWidget(self.model_combo)
@@ -1701,17 +1703,18 @@ class SettingsDialog(QDialog):
         sel_layout.addWidget(sel_title)
 
         self.router_model_combo = QComboBox(sel_card)
-        self.router_model_combo.setView(QListView())
+        rmv = QListView(self.router_model_combo)
+        rmv.setTextElideMode(Qt.TextElideMode.ElideRight)
+        rmv.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        rmv.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.router_model_combo.setView(rmv)
+        self.router_model_combo.setMaxVisibleItems(10)
         self.router_model_combo.addItems([
             "auto (Intelligent AI Model Router — Dynamic Per-Task Selection)",
             "gemini-3.5-transcribe (Dedicated Speech Model — Ultra Fast < 1.5s — Recommended)",
-            "gemini-3.6-flash (Fast Advanced Reasoning & Polish)",
             "gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
-            "gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
-            "gemini-flash-latest (Auto Latest Production Flash)",
-            "gemini-3.7-flash (Advanced Reasoning & Technical Dictation)",
-            "gemini-2.5-flash (Standard Flash)",
-            "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)"
+            "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)",
+            "ollama-gemma2 (Ollama Gemma 2B — 100% Local GPU Offline Brain)"
         ])
         self.router_model_combo.currentIndexChanged.connect(self._on_router_model_combo_changed)
         sel_layout.addWidget(self.router_model_combo)
@@ -1783,46 +1786,32 @@ class SettingsDialog(QDialog):
         # Model comparison items
         models_examples = [
             (
-                "1. gemini-3.5-flash-lite (Lowest Latency < 1.0s — Currently Active Default)",
+                "1. gemini-3.5-transcribe (Dedicated Speech Model — Ultra Fast < 1.5s — Recommended)",
+                "⚡ ~0.9s – 1.4s (Acoustic Precision)",
+                "Direct neural speech-to-text. Flawless punctuation, accurate capitalization, handles technical and casual vocabulary natively.",
+                "Hey, could you explain how to use this AI dictation tool? We haven't finished the API backend yet, but the frontend UI is almost done. However, I have provided two datasets; could you please analyze them and let me know if they are identical? Also, remember to reply to the team today. Thanks!",
+                "Voice dictation across Windows, coding IDEs, chat messengers, technical notes, and emails."
+            ),
+            (
+                "2. gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
                 "⚡ ~0.7s – 1.0s (Blazing Fast)",
-                "100% filler removal ('uh', 'ah'), seamless Indian English upgrade ('say me' ➔ 'tell me', 'two datas' ➔ 'two datasets', 'revert back' ➔ 'reply'), crisp punctuation.",
-                "Hey, can you tell me how to use this AI dictation tool? We haven't finished the API backend yet, but the frontend UI is almost done. However, I have provided two datasets; could you please analyze them and let me know if they are identical? Also, remember to reply to the team today. Thanks!",
-                "Instant daily dictation across WhatsApp, ChatGPT, Antigravity, Slack, Discord, and search bars where speed (<1s) is essential."
+                "100% filler removal ('uh', 'ah'), Indian English normalization, and crisp punctuation with lightning-fast cloud turnaround.",
+                "Hey, can you tell me how to use this AI dictation tool? We haven't finished the API backend yet, but the frontend UI is almost done. However, I have provided two datasets; could you analyze them and let me know if they are identical? Also, remember to reply to the team today. Thanks!",
+                "Instant quick dictation, text transformations, and daily typing where sub-second latency is essential."
             ),
             (
-                "2. gemini-3.5-flash (Balanced Dictation & Prompt Enhancer)",
-                "⚡ ~1.2s – 1.8s (Balanced & Fluid)",
-                "Fluid grammatical flow. Uses semicolons (;) and em-dashes (—) for compound clauses, splits run-ons into natural sentences.",
-                "Hey, could you explain how to use this AI dictation tool? We haven't finished the API backend yet; however, the frontend UI is nearly complete. I have provided two datasets—could you analyze them and verify whether they match? Also, please remember to follow up with the team today. Thanks!",
-                "Daily emails, GitHub PR descriptions, ticket updates, and writing clear messages with natural cadence."
+                "3. offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)",
+                "🛡️ ~0.3s – 1.4s (Zero Cloud / Maximum Privacy)",
+                "100% on-device speech acoustics via Faster-Whisper + instant local AI Polish Brain (0.12ms). Works on airplanes or zero-internet environments.",
+                "Hey, can you tell me how to use this AI dictation tool? We haven't finished the API backend yet, but the frontend UI is almost done. However, I have provided two datasets; please analyze them and let me know if they are identical. Also, remember to reply to the team today. Thanks!",
+                "Zero-internet offline dictation, confidential documents, travel mode, and private offline typing."
             ),
             (
-                "3. gemini-3.6-flash (Fast Advanced Reasoning & Executive Polish)",
-                "🚀 ~1.1s – 1.6s (Executive Grade)",
-                "Native executive polish, superior vocabulary synthesis, elevated professional diction, rich semicolons, colons, and quotation formatting.",
-                "Hey, could you please explain how to utilize this AI dictation tool? Although the frontend UI is nearly finished, the API backend remains in progress. I have provided two datasets for your review—could you examine both to determine if they are identical? Furthermore, please ensure you get back to the team today. Thank you!",
-                "Executive emails, formal client proposals, pitch decks, high-impact AI prompt engineering, and professional publications."
-            ),
-            (
-                "4. gemini-3.7-flash (Advanced Reasoning & Technical Dictation)",
-                "⏱️ ~1.8s – 2.5s (Deep Technical Synthesis)",
-                "Deep technical awareness. Formats variable names, API endpoints, code syntax, and logical conditional structures with precision.",
-                "Hey, could you explain how to operate this AI dictation system? Our team has not yet completed the API backend, though the frontend UI is almost finalized. I have submitted two datasets: please analyze and verify if both data objects are identical. Additionally, remember to follow up with the engineering team today. Thanks!",
-                "VS Code, terminal commands, writing technical documentation, software architecture notes, and developer prompts."
-            ),
-            (
-                "5. gemini-2.5-flash (Standard Flash — Textbook Grammar)",
-                "⏱️ ~2.0s – 3.0s (Academic Precision)",
-                "Spends additional compute time refining formal syntax, formal clauses, and textbook grammatical rules.",
-                "Hey, could you please explain how this AI dictation tool is used? We have not yet finished the API backend, but the frontend UI is almost done. However, I have provided two datasets; please analyze them and let me know if they are identical. Also, remember to get back to the team today. Thanks!",
-                "Formal letters, academic papers, and official correspondence requiring strict textbook grammar."
-            ),
-            (
-                "6. gemini-2.5-pro (Deep Thought & Document Generation)",
-                "⏳ ~4.0s – 6.0s (Deepest Analysis)",
-                "Synthesizes long stream-of-consciousness dictations into structured paragraphs, sections, and clear bulleted action items.",
-                "Hey,\n\nCould you please explain how to use this AI dictation tool?\n\nKey Project Updates & Requests:\n• Backend: The API backend is still in progress.\n• Frontend: The UI is nearly complete.\n• Data Analysis: I have provided two datasets—please analyze them and confirm whether they are identical.\n• Follow-Up: Please remember to reply to the team with updates today.\n\nThank you!",
-                "Long recordings (1–5 minutes of continuous talking), brainstorming sessions, meeting debriefs, and multi-step action plans."
+                "4. ollama-gemma2 (Ollama Gemma 2B — 100% Local GPU Offline Brain)",
+                "🧠 ~0.5s – 1.8s (Local LLM Refinement)",
+                "Coupled with Faster-Whisper, sends transcripts to local Gemma 2B (or on-device AI Polish Brain with 0ms delay if daemon is offline) for deep restructuring.",
+                "Hey, could you explain how to use this AI dictation tool?\n\nStatus:\n• API Backend: In progress\n• Frontend UI: Almost done\n• Datasets: Provided two sets for comparison\n\nAction: Please analyze both and reply to the team today. Thanks!",
+                "Local AI structuring, converting spoken thoughts into clean bullet points with zero API usage."
             ),
         ]
 
@@ -4044,7 +4033,7 @@ class SettingsDialog(QDialog):
         if model_mode == "auto":
             self.model_combo.setCurrentIndex(0)
         else:
-            model_name = self.config.get("model_name", "gemini-2.5-flash")
+            model_name = self.config.get("model_name", "gemini-3.5-transcribe")
             found = False
             for i in range(1, self.model_combo.count()):
                 if self.model_combo.itemText(i).startswith(model_name):
@@ -4117,7 +4106,7 @@ class SettingsDialog(QDialog):
         if hasattr(self, 'cb_dsp_fan_filter') and self.cb_dsp_fan_filter:
             self.cb_dsp_fan_filter.setChecked(self.config.get("dsp_fan_filter_enabled", True))
         if hasattr(self, 'cb_dsp_noise_gate') and self.cb_dsp_noise_gate:
-            self.cb_dsp_noise_gate.setChecked(self.config.get("dsp_noise_gate_enabled", True))
+            self.cb_dsp_noise_gate.setChecked(self.config.get("dsp_noise_gate_enabled", False))
         if hasattr(self, 'cb_offline_fallback') and self.cb_offline_fallback:
             self.cb_offline_fallback.setChecked(self.config.get("offline_fallback_enabled", True))
 
@@ -4389,12 +4378,32 @@ class SettingsDialog(QDialog):
             self.router_model_combo.blockSignals(True)
             self.router_model_combo.setCurrentIndex(index)
             self.router_model_combo.blockSignals(False)
+        raw_text = self.model_combo.itemText(index)
+        model_code = raw_text.split()[0] if raw_text else "auto"
+        if model_code == "auto":
+            self.config.set("model_mode", "auto")
+            self.config.set("model_name", "gemini-3.5-transcribe")
+        else:
+            self.config.set("model_mode", model_code)
+            self.config.set("model_name", model_code)
+        if hasattr(self, 'gemini') and self.gemini:
+            self.gemini.set_model(model_code)
 
     def _on_router_model_combo_changed(self, index: int):
         if hasattr(self, 'model_combo') and self.model_combo.currentIndex() != index:
             self.model_combo.blockSignals(True)
             self.model_combo.setCurrentIndex(index)
             self.model_combo.blockSignals(False)
+        raw_text = self.router_model_combo.itemText(index)
+        model_code = raw_text.split()[0] if raw_text else "auto"
+        if model_code == "auto":
+            self.config.set("model_mode", "auto")
+            self.config.set("model_name", "gemini-3.5-transcribe")
+        else:
+            self.config.set("model_mode", model_code)
+            self.config.set("model_name", model_code)
+        if hasattr(self, 'gemini') and self.gemini:
+            self.gemini.set_model(model_code)
 
     def notify_history_changed(self):
         """Called live by main coordinator when new transcription or prompt finishes."""
@@ -4418,24 +4427,8 @@ class SettingsDialog(QDialog):
                         self._refresh_history()
                         self._refresh_cost_stats()
 
-            # Check config file (only sync if user is not actively typing in inputs)
-            if CONFIG_FILE.exists():
-                c_mtime = CONFIG_FILE.stat().st_mtime
-                if self._last_config_mtime == 0.0:
-                    self._last_config_mtime = c_mtime
-                elif c_mtime > self._last_config_mtime + 2.0:
-                    self._last_config_mtime = c_mtime
-                    focused = QApplication.focusWidget()
-                    if focused not in (self.custom_prompt_edit, self.prompt_title_input, self.vocab_input, self.api_key_input):
-                        self.config.load_config()
-                        if CONFIG_FILE.exists():
-                            self._last_config_mtime = CONFIG_FILE.stat().st_mtime
-                        self._refresh_saved_prompts()
-                        self._refresh_dictionary()
-                        self._refresh_snippets()
-                        self._refresh_vocab_table()
-                        cur_prof = self.config.get("active_profile", "coding")
-                        self.sync_active_profile(cur_prof)
+            # Intentionally do not overwrite in-memory state from disk while user is configuring settings
+            pass
         except Exception as e:
             logger.debug(f"Live poll note: {e}")
 

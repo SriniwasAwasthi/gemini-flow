@@ -125,8 +125,27 @@ class AudioRecorder:
             logger.error(f"Error querying audio devices: {e}")
         return devices
 
+    @staticmethod
+    def _validate_device_index(dev_idx: Optional[int]) -> Optional[int]:
+        """Validates that device index exists, has input channels, and is not an output speaker."""
+        if dev_idx is None or sd is None:
+            return None
+        try:
+            dev_info = sd.query_devices(dev_idx)
+            if dev_info.get("max_input_channels", 0) <= 0:
+                logger.warning(f"Device index {dev_idx} ({dev_info.get('name')}) has 0 input channels. Using default mic.")
+                return None
+            name_lower = dev_info.get("name", "").lower()
+            if "speaker" in name_lower and "mic" not in name_lower and "input" not in name_lower:
+                logger.warning(f"Device index {dev_idx} appears to be a speaker ({dev_info.get('name')}). Using default mic.")
+                return None
+            return dev_idx
+        except Exception as e:
+            logger.warning(f"Device index {dev_idx} invalid ({e}). Falling back to default mic.")
+            return None
+
     def set_device(self, device_index: Optional[int]):
-        self.device_index = device_index
+        self.device_index = self._validate_device_index(device_index)
 
     def warmup_audio(self):
         """
@@ -139,7 +158,7 @@ class AudioRecorder:
             # 1. Query devices to initialize PortAudio driver subsystem
             _ = sd.query_devices()
             # 2. Briefly test opening an input stream for 50ms to prime OS audio buffer
-            target_device = self.device_index
+            target_device = self._validate_device_index(self.device_index)
             try:
                 with sd.InputStream(samplerate=self.sample_rate, channels=self.channels, dtype="float32", device=target_device, blocksize=512):
                     time.sleep(0.04)
@@ -190,7 +209,7 @@ class AudioRecorder:
             self._tail_wav_bytes = None
 
         # Attempt with configured device index, or fallback to system default
-        target_device = self.device_index
+        target_device = self._validate_device_index(self.device_index)
         try:
             self.stream = sd.InputStream(
                 samplerate=self.sample_rate,
@@ -271,7 +290,7 @@ class AudioRecorder:
 
         return wav_io.getvalue()
 
-    def get_rolling_chunk(self, min_sec: float = 2.5, max_sec: float = 5.0) -> Optional[bytes]:
+    def get_rolling_chunk(self, min_sec: float = 30.0, max_sec: float = 45.0) -> Optional[bytes]:
         """
         Extracts a silence-aligned audio slice if accumulated speech exceeds min_sec (18s+).
         Enables real-time background transcription while recording long speech (1-120 minutes)

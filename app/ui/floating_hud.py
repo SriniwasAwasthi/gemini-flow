@@ -15,9 +15,9 @@ class AudioWaveWidget(QWidget):
     """Animated sound wave bars with glowing gradient reacting dynamically to mic volume."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(58, 26)
+        self.setFixedSize(64, 26)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.num_bars = 5
+        self.num_bars = 7
         self.bar_heights = [5.0] * self.num_bars
         self.target_amplitude = 0.0
         self.phase = 0.0
@@ -70,8 +70,8 @@ class AudioWaveWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        bar_width = 3.6
-        spacing = 5.2
+        bar_width = 3.2
+        spacing = 4.6
         total_w = self.num_bars * bar_width + (self.num_bars - 1) * spacing
         start_x = (self.width() - total_w) / 2
         center_y = self.height() / 2
@@ -83,13 +83,14 @@ class AudioWaveWidget(QWidget):
             x = start_x + i * (bar_width + spacing)
             y = center_y - (h / 2)
 
-            # Luminous gradient (Electric Indigo to Cyan)
+            # Luminous 3-stop luxury gradient (Electric Cyan -> Indigo -> Magenta)
             grad = QLinearGradient(x, y, x, y + h)
-            grad.setColorAt(0.0, QColor(99, 102, 241, 255))  # Electric Indigo / Violet
-            grad.setColorAt(1.0, QColor(6, 182, 212, 255))   # Luminous Cyan
+            grad.setColorAt(0.0, QColor(6, 182, 212, 255))   # Luminous Cyan
+            grad.setColorAt(0.5, QColor(99, 102, 241, 255))  # Electric Indigo
+            grad.setColorAt(1.0, QColor(236, 72, 153, 255))  # Hot Pink / Magenta
 
             painter.setBrush(QBrush(grad))
-            painter.drawRoundedRect(int(x), int(y), int(bar_width), int(h), 1.8, 1.8)
+            painter.drawRoundedRect(int(x), int(y), int(bar_width), int(h), 1.6, 1.6)
 
 
 class FloatingHUD(QWidget):

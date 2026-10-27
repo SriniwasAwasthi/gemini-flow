@@ -138,16 +138,26 @@ namespace GeminiFlow
                 // 3. Locate Python executable dynamically across any laptop/PC
                 string pythonPath = "";
 
-                // Priority A: Project Virtual Environment (created by run.bat)
-                string venvPythonw = Path.Combine(projectDir, "venv", "Scripts", "pythonw.exe");
-                string venvPython = Path.Combine(projectDir, "venv", "Scripts", "python.exe");
-                if (File.Exists(venvPythonw))
+                // Priority 0: Bundled Standalone Embedded Runtime (for 100% portable execution on ANY PC without Python)
+                string embeddedPythonw = Path.Combine(projectDir, "runtime", "pythonw.exe");
+                string embeddedPython = Path.Combine(projectDir, "runtime", "python.exe");
+                if (File.Exists(embeddedPythonw))
                 {
-                    pythonPath = venvPythonw;
+                    pythonPath = embeddedPythonw;
                 }
-                else if (File.Exists(venvPython))
+                else if (File.Exists(embeddedPython))
                 {
-                    pythonPath = venvPython;
+                    pythonPath = embeddedPython;
+                }
+
+                // Priority A: Project Virtual Environment (created by run.bat)
+                else if (File.Exists(Path.Combine(projectDir, "venv", "Scripts", "pythonw.exe")))
+                {
+                    pythonPath = Path.Combine(projectDir, "venv", "Scripts", "pythonw.exe");
+                }
+                else if (File.Exists(Path.Combine(projectDir, "venv", "Scripts", "python.exe")))
+                {
+                    pythonPath = Path.Combine(projectDir, "venv", "Scripts", "python.exe");
                 }
                 // Priority B: Author's local development environment
                 else if (File.Exists(@"E:\PYTHON\pythonw.exe"))
@@ -194,6 +204,20 @@ namespace GeminiFlow
                 psi.UseShellExecute = false;
                 psi.CreateNoWindow = true;
                 psi.WindowStyle = ProcessWindowStyle.Hidden;
+
+                // Configure portable environment variables
+                string runtimeDir = Path.Combine(projectDir, "runtime");
+                if (Directory.Exists(runtimeDir) && pythonPath.StartsWith(runtimeDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    psi.EnvironmentVariables["PYTHONHOME"] = runtimeDir;
+                    psi.EnvironmentVariables["PYTHONPATH"] = projectDir;
+                }
+                string modelsDir = Path.Combine(projectDir, "models");
+                if (Directory.Exists(modelsDir))
+                {
+                    psi.EnvironmentVariables["HF_HOME"] = modelsDir;
+                    psi.EnvironmentVariables["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1";
+                }
 
                 Process.Start(psi);
             }

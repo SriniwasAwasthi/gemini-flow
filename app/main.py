@@ -312,11 +312,19 @@ from .transformation.transform_engine import TransformType, TransformEngine
 from .profiles.profile_manager import ProfileManager
 from .reliability.fallback_handler import FallbackHandler
 
-# Configure logging
+# Configure logging with bulletproof fallback
 import logging.handlers
-log_file = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow" / "gemini_flow.log"
-log_file.parent.mkdir(parents=True, exist_ok=True)
-handlers = [logging.handlers.RotatingFileHandler(str(log_file), maxBytes=5 * 1024 * 1024, backupCount=2, encoding="utf-8")]
+handlers = []
+try:
+    log_file = Path(os.environ.get('APPDATA', Path.home())) / 'GeminiFlow' / 'gemini_flow.log'
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    handlers.append(logging.handlers.RotatingFileHandler(str(log_file), maxBytes=5 * 1024 * 1024, backupCount=2, encoding='utf-8'))
+except Exception:
+    try:
+        local_log = Path(__file__).parent.parent / 'gemini_flow.log'
+        handlers.append(logging.handlers.RotatingFileHandler(str(local_log), maxBytes=5 * 1024 * 1024, backupCount=2, encoding='utf-8'))
+    except Exception:
+        pass
 if sys.stdout is not None:
     try:
         if hasattr(sys.stdout, "reconfigure"):
@@ -432,6 +440,7 @@ class GeminiFlowApp:
         self.watchdog_timer.start(5000)
 
         self.is_busy_processing = False
+        self._busy_start_time = 0.0
         self._is_cancelled = False
         self._rolling_chunks = []
         self._rolling_lock = threading.Lock()
@@ -443,9 +452,12 @@ class GeminiFlowApp:
             try:
                 self.gemini.warm_connection()
                 self.recorder.warmup_audio()
-                if self.config.get("offline_fallback_enabled", True) or str(self.config.get("model_name", "")).lower() in ("offline-whisper", "offline"):
+                # Unconditional Whisper pre-warmup in background daemon thread for 0ms cold-start latency
+                try:
                     from app.offline.offline_engine import OfflineSpeechEngine
                     OfflineSpeechEngine.warmup_whisper()
+                except Exception as w_err:
+                    logger.debug(f"Whisper warmup note: {w_err}")
                 if self.config.get("start_with_windows", True):
                     setup_windows_startup(True)
                 ensure_desktop_shortcuts()
@@ -472,11 +484,19 @@ class GeminiFlowApp:
     def on_start_speech(self):
         """Triggered globally when user presses hotkey to speak."""
         if self.is_busy_processing:
-            logger.warning("Still processing previous speech, ignoring new start.")
-            self.hotkey_mgr.set_recording_state(False)
-            if hasattr(self, 'hud') and self.hud:
-                self.hud.show_state(FloatingHUD.STATE_PROCESSING, "Finalizing previous speech...")
-            return
+            # Auto-recovery: If busy for > 12 seconds, forcefully reset and allow user to dictate immediately
+            busy_duration = time.time() - getattr(self, '_busy_start_time', 0.0) if getattr(self, '_busy_start_time', 0.0) > 0 else 999.0
+            if busy_duration > 12.0:
+                logger.warning(f"Previous processing took too long ({busy_duration:.1f}s). Force-resetting busy state to accept new speech.")
+                self.is_busy_processing = False
+                self._busy_start_time = 0.0
+                self.hotkey_mgr.set_processing_state(False)
+            else:
+                logger.warning("Still processing previous speech, ignoring new start.")
+                self.hotkey_mgr.set_recording_state(False)
+                if hasattr(self, 'hud') and self.hud:
+                    self.hud.show_state(FloatingHUD.STATE_PROCESSING, "Finalizing previous speech...")
+                return
 
         self._is_cancelled = False
         with self._rolling_lock:
@@ -517,7 +537,7 @@ class GeminiFlowApp:
                 if not self.recorder.is_recording or self._is_cancelled or not self._rolling_active:
                     break
 
-                chunk_wav = self.recorder.get_rolling_chunk(min_sec=3.5, max_sec=6.0)
+                chunk_wav = self.recorder.get_rolling_chunk(min_sec=30.0, max_sec=45.0)
                 if chunk_wav and len(chunk_wav) > 2000:
                     curr_idx = chunk_idx
                     chunk_idx += 1
@@ -610,6 +630,7 @@ class GeminiFlowApp:
 
         # 3. Update UI to processing state
         self.is_busy_processing = True
+        self._busy_start_time = time.time()
         self.hotkey_mgr.set_processing_state(True)
         self.hud.show_state(FloatingHUD.STATE_PROCESSING, "Refining with Gemini...")
         self.tray.update_status("⚡ Processing with Gemini...", state="processing")
@@ -629,6 +650,7 @@ class GeminiFlowApp:
         with self._rolling_lock:
             self._rolling_chunks = []
         self.is_busy_processing = False
+        self._busy_start_time = 0.0
         self.hotkey_mgr.set_recording_state(False)
         self.hotkey_mgr.set_processing_state(False)
 
@@ -964,21 +986,44 @@ class GeminiFlowApp:
                     ]
                     total_chunks = len(self._rolling_chunks)
 
-                if valid_chunks:
-                    raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
-                    raw_result = self.gemini._clean_output(raw_result)
-                    success = True
-                else:
-                    logger.warning("No valid text from rolling chunks. Running full-session recovery...")
+                # 100% Completeness Guarantee:
+                # If any chunk is missing, rescue it with local Whisper AI
+                missing_chunks = [c for c in self._rolling_chunks if isinstance(c, dict) and not c.get("text")]
+                if missing_chunks:
+                    logger.warning(f"Detected {len(missing_chunks)} unresolved rolling chunk(s). Rescuing with local Whisper...")
+                    for mc in missing_chunks:
+                        if mc.get("wav"):
+                            try:
+                                from app.offline.offline_engine import OfflineSpeechEngine
+                                ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(mc["wav"], language=primary_lang)
+                                if ok_r and txt_r.strip():
+                                    mc["text"] = txt_r.strip()
+                                    mc["done"] = True
+                            except Exception:
+                                pass
+
+                valid_chunks = [
+                    (c["text"].strip() if isinstance(c, dict) else str(c).strip())
+                    for c in self._rolling_chunks
+                    if (isinstance(c, dict) and c.get("text") and c["text"].strip()) or (isinstance(c, str) and c.strip())
+                ]
+
+                # If still missing chunks or incomplete, run full-session audio recovery so ZERO speech is ever lost
+                if len(valid_chunks) < len(self._rolling_chunks) or not valid_chunks:
+                    logger.warning(f"Rolling assembly incomplete ({len(valid_chunks)}/{len(self._rolling_chunks)}). Running full-session recovery...")
                     success, raw_result = self.gemini.transcribe_audio(
                         wav_bytes=wav_bytes,
                         system_instruction=prompt,
                         app_context=app_context,
                         profile_id=active_profile,
                         auto_cost_mode=auto_cost_mode,
-                        offline_fallback_enabled=offline_fallback_on,
+                        offline_fallback_enabled=True,
                         offline_language=primary_lang
                     )
+                else:
+                    raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
+                    raw_result = self.gemini._clean_output(raw_result)
+                    success = True
 
             if self._is_cancelled:
                 return
@@ -1031,21 +1076,25 @@ class GeminiFlowApp:
                     else:
                         logger.warning(f"Voice command transformation failed ({exec_res.error_message}). Continuing with normalized dictation.")
 
-            # 6. Apply AI Brain Normalization (Deduplication, False-Starts, Stray Greetings, Adaptive Bullets)
-            normalized_text = VocabEngine.normalize_text(raw_result)
-            if "•" not in normalized_text and active_mode in ("clean_dictation", "smart_polish"):
-                try:
-                    from app.intelligence.ai_polish_brain import AIPolishBrain
-                    bulleted = AIPolishBrain.smart_bullet_formatter(normalized_text)
-                    if "•" in bulleted:
-                        normalized_text = bulleted
-                except Exception:
-                    pass
+            # 6. Apply AI Polish Brain (Deduplication, Self-Corrections, 12 Tenses Grammar, Adaptive Bullets)
+            try:
+                from app.intelligence.ai_polish_brain import AIPolishBrain
+                normalized_text = AIPolishBrain.polish_speech(raw_result)
+            except Exception as pe:
+                logger.debug(f"AIPolishBrain polish exception: {pe}")
+                normalized_text = VocabEngine.normalize_text(raw_result)
             final_text = GeminiEngine.apply_dictionary(normalized_text, self.config.get_dictionary())
             final_text = GeminiEngine.apply_snippets(final_text, self.config.get_snippets())
             raw_spoken_text = final_text
 
             model_used = self.gemini.last_model_used or "gemini-2.5-flash"
+
+            # Diagnostic Stage Instrumentation (Part 3)
+            logger.info(f"[DIAGNOSTIC] Stage 1 (Audio Capture): duration={duration:.2f}s, bytes={len(wav_bytes)}, format=16kHz mono PCM")
+            logger.info(f"[DIAGNOSTIC] Stage 2 (Raw Recognizer Output): '{raw_result}' (Model: {model_used})")
+            logger.info(f"[DIAGNOSTIC] Stage 3 (Normalized / Polished): '{normalized_text}'")
+            logger.info(f"[DIAGNOSTIC] Stage 4 (Final UI Insertion Text): '{final_text}'")
+
             self.signals.finished.emit(True, final_text, duration, active_mode, app_name, model_used, raw_spoken_text)
 
         except Exception as e:
@@ -1064,6 +1113,7 @@ class GeminiFlowApp:
     ):
         """Back on main Qt UI thread."""
         self.is_busy_processing = False
+        self._busy_start_time = 0.0
         self.hotkey_mgr.set_processing_state(False)
         self.hotkey_mgr.reset_keys()
 
@@ -1186,6 +1236,19 @@ class GeminiFlowApp:
             else:
                 self.hotkey_mgr.check_health()
             self._last_watchdog_time = now
+
+            # Watchdog Processing Recovery: If speech processing is stuck for > 20s, release UI lock
+            if self.is_busy_processing:
+                b_dur = time.time() - getattr(self, '_busy_start_time', 0.0) if getattr(self, '_busy_start_time', 0.0) > 0 else 999.0
+                if b_dur > 20.0:
+                    logger.warning(f"Watchdog: speech processing stuck for {b_dur:.1f}s. Resetting state.")
+                    self.is_busy_processing = False
+                    self._busy_start_time = 0.0
+                    self.hotkey_mgr.set_processing_state(False)
+                    self.hotkey_mgr.reset_keys()
+                    if hasattr(self, 'hud') and self.hud:
+                        self.hud.show_state(FloatingHUD.STATE_READY, "Gemini Flow Ready")
+                    self.tray.update_status("Ready", state="ready")
 
             # 2. Maximum recording duration safety net (supports 4+ hours continuous marathon dictation)
             max_recording_limit = float(self.config.get("max_recording_seconds", 14400.0))

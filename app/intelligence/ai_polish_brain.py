@@ -65,9 +65,77 @@ class AIPolishBrain:
         for pat in ordinal_patterns:
             cleaned = re.sub(pat, '', cleaned, flags=re.IGNORECASE).strip()
 
+        # Also strip leading auxiliary/copula verbs and fragments left over from split
+        cleaned = re.sub(r'^(?:is|was|are|advantage\s+is|advantages\s+are)\s+', '', cleaned, flags=re.IGNORECASE).strip()
+
+        # Clean trailing commas or dangling punctuation before normalizing
+        cleaned = cleaned.rstrip(',;: \t')
+
         if cleaned:
             cleaned = cleaned[0].upper() + cleaned[1:]
         return cleaned
+
+    @classmethod
+    def strip_verbal_fillers(cls, text: str) -> str:
+        """
+        Eliminates conversational vocal fillers ('um', 'uh', 'ah', 'like', 'you know', 'basically')
+        from both beginning and middle of speech.
+        """
+        if not text or not text.strip():
+            return text
+        t = text.strip()
+        t = re.sub(r'^(?:(?:um|uh|ah|like|basically|you\s+know|so)\b[\s,]*)+', '', t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(?:you\s+know|basically|um|uh|ah)\b', '', t, flags=re.IGNORECASE)
+        t = re.sub(r',\s*,', ',', t)
+        t = re.sub(r'[ \t]{2,}', ' ', t).strip()
+        if t:
+            t = t[0].upper() + t[1:]
+        return t
+
+    @classmethod
+    def format_list_items(cls, text: str) -> str:
+        """
+        Detects spoken comma-separated or 'and'-separated item lists (groceries, deliverables, tasks)
+        and converts them into structured bullet points if 3 or more items are dictated.
+        """
+        if not text or "•" in text or "\n" in text:
+            return text
+        
+        m = re.match(r'^(.*?\b(?:buy|pack|need|bring|agenda|items|deliverables|priorities|bugs|steps|include|includes|following)(?:\s+to\s+buy|\s+for\s+the\s+[^:]+)?[:\s]+)(.+)$', text, re.IGNORECASE)
+        if m:
+            prefix = m.group(1).strip()
+            rest = m.group(2).strip()
+            trail_m = re.search(r'\s+(at\s+\d+.*|from\s+.*|for\s+.*|on\s+.*|tomorrow.*|yesterday.*|today.*)[.\s]*$', rest, re.IGNORECASE)
+            trail = ''
+            if trail_m:
+                trail = ' ' + trail_m.group(1).strip()
+                rest = rest[:trail_m.start()].strip()
+
+            parts = [p.strip() for p in re.split(r',\s*|\s+and\s+', rest) if p.strip()]
+            if len(parts) < 3:
+                space_parts = [p.strip() for p in re.split(r'\s+and\s+|\s+', rest) if p.strip()]
+                if len(space_parts) >= 3 and not any(p.lower() in ('the', 'a', 'an', 'to', 'for', 'with', 'in', 'on') for p in space_parts):
+                    parts = space_parts
+
+            if len(parts) >= 3:
+                bullets = "\n".join([f"• {p[0].upper() + p[1:] if p else p}" for p in parts])
+                head = prefix + trail
+                colon_prefix = head if head.endswith(':') else head + ':'
+                return f"{colon_prefix}\n{bullets}"
+        return text
+        
+        # Detect patterns like: "we need to buy milk bread butter and eggs"
+        m = re.match(r'^(.*?\b(?:buy|pack|need|bring|agenda|items|deliverables|priorities|bugs|steps)(?:\s+to\s+buy|\s+for\s+the\s+[^:]+)?[:\s]+)(.+)$', text, re.IGNORECASE)
+        if m:
+            prefix = m.group(1).strip()
+            rest = m.group(2).strip()
+            # Split items on commas or 'and'
+            parts = [p.strip() for p in re.split(r',\s*|\s+and\s+', rest) if p.strip()]
+            if len(parts) >= 3:
+                bullets = "\n".join([f"• {p[0].upper() + p[1:] if p else p}" for p in parts])
+                colon_prefix = prefix if prefix.endswith(":") else prefix + ":"
+                return f"{colon_prefix}\n{bullets}"
+        return text
 
     @classmethod
     def resolve_self_corrections(cls, text: str) -> str:
@@ -161,14 +229,23 @@ class AIPolishBrain:
         )
         result = pat_meeting.sub(r'\1\3', result)
 
+                # Pass 3b: General Time Override ("at 2 p.m. Sorry, 3 p.m." -> "at 3 p.m.")
+        pat_time_gen = re.compile(
+            r'\b(at\s+)?(\d+(?::\d+)?\s*(?:p\.?[mM]\.?|a\.?[mM]\.?|o\'?clock)?)[,\.]?\s*'
+            + cue_pat +
+            r'[\s,\.]+(?:at\s+)?(\d+(?::\d+)?\s*(?:p\.?[mM]\.?|a\.?[mM]\.?|o\'?clock))\b',
+            flags=re.IGNORECASE
+        )
+        result = pat_time_gen.sub(r'\1\3', result)
+
         # Pass 4: Duration, Numerical & Latency SLA Parameter Overrides
         # Handles: "convert this whole data under 4 seconds or no, sorry, under 3 seconds"
         # Handles: "under 4 seconds, no sorry 3 seconds"
         pat_duration = re.compile(
             r'\b((?:convert\s+this\s+(?:whole|hold)\s+data\s+)?(?:under|in|within|for)\s+)'
-            r'(\d+(?:\.\d+)?)\s*(seconds?|minutes?|hours?|ms)[,\.]?\s*'
+            r'(\d+(?:\.\d+)?)\s*(seconds?|minutes?|hours?|ms)(?:[\s,\.\…\—\-])*'
             + cue_pat +
-            r'[\s,\.]+(?:(?:under|in|within|for)\s+)?'
+            r'[\s,\.\…\—\-]+(?:(?:under|in|within|for)\s+)?'
             r'(\d+(?:\.\d+)?)(?:\s*(seconds?|minutes?|hours?|ms))?\b',
             flags=re.IGNORECASE
         )
@@ -179,9 +256,9 @@ class AIPolishBrain:
         # Handles: "Today is Monday. Oh, sorry, today is Tuesday." or "on Monday, wait Tuesday"
         pat_day = re.compile(
             r'\b((?:today\s+is\s+(?:a\s+)?|on\s+|starting\s+on\s+|by\s+|next\s+|this\s+)?)\b'
-            r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[,\.]?\s*'
+            r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:[\s,\.\…\—\-])*'
             + cue_pat +
-            r'[\s,\.]+(?:(?:today\s+is\s+(?:a\s+)?|on\s+|starting\s+on\s+|by\s+|next\s+|this\s+)\s*)?'
+            r'[\s,\.\…\—\-]+(?:(?:today\s+is\s+(?:a\s+)?|on\s+|starting\s+on\s+|by\s+|next\s+|this\s+)\s*)?'
             r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b',
             flags=re.IGNORECASE
         )
@@ -202,9 +279,9 @@ class AIPolishBrain:
         # Pass 6: Standard / Class / Education Overrides
         # Handles: "I am in 11th standard... sorry I am in 12th standard."
         pat_std = re.compile(
-            r'\b(I\s+am\s+in\s+)\d+(?:st|nd|rd|th)?\s+standard[\s,\.\—\-]*'
+            r'\b((?:I\s+am|he\s+is|she\s+is|they\s+are|we\s+are)\s+in\s+)\d+(?:st|nd|rd|th)?\s+standard(?:[\s,\.\…\—\-])*'
             + cue_pat +
-            r'[\s,\.\—\-]+(?:I\s+am\s+in\s+)?(\d+(?:st|nd|rd|th)?\s+standard)\b',
+            r'[\s,\.\…\—\-]+(?:(?:I\s+am|he\s+is|she\s+is|they\s+are|we\s+are)\s+in\s+)?(\d+(?:st|nd|rd|th)?\s+standard)\b',
             flags=re.IGNORECASE
         )
         result = pat_std.sub(r'\1\2', result)
@@ -396,7 +473,49 @@ class AIPolishBrain:
         if not text or not text.strip():
             return text
 
-        # If text already contains bullets, clean any ordinal markers from each bullet line!
+        # Clean stray inline bullet noise like '• application •' while preserving list separation
+        text = re.sub(r'[•\*\-]\s*(?:application|app)\s*[•\*\-]\s*', 'Third is ', text, flags=re.IGNORECASE)
+
+        # 0. Primary: Support sequences introduced by headers like 'Some advantages, Item1. Second is Item2'
+        # when the speaker omitted saying 'first is'
+        if not re.search(r'\b(?:first\s+is|firstly|first\s+point)\b', text, re.IGNORECASE):
+            adv_match = re.search(
+                r'^(.*?)(\b(?:so,?\s+)?(?:I\s+have\s+)?(?:some\s+advantages|advantages|some\s+features|features))[,:\s]+(.*?)(?:\.\s+|\s+)\b(?:second|secondly|second\s+point|second\s+advantage|2nd|second\s+is)[,\s:]+(.*)',
+                text,
+                flags=re.IGNORECASE | re.DOTALL
+            )
+            if adv_match:
+                preamble = adv_match.group(1).strip()
+                header = adv_match.group(2).strip()
+                first_item = adv_match.group(3).strip()
+                remaining = adv_match.group(4).strip()
+                rem_items = re.split(
+                    r'(?:\.\s+|\s+)?\b(?:third|thirdly|3rd|and\s+third|finally|fourth)[,\s:]+|(?:[,\.\s]*\n?•\s+)',
+                    remaining,
+                    flags=re.IGNORECASE
+                )
+                raw_items = [first_item] + [it for it in rem_items if it.strip()]
+                items = [cls.clean_bullet_item(it) for it in raw_items if it.strip()]
+                if len(items) >= 2:
+                    header_l = header.lower().strip()
+                    if "some advantages" in header_l or "advantages" in header_l:
+                        header_clean = "So, I have some advantages:"
+                    else:
+                        header_clean = header[0].upper() + header[1:]
+                        if not header_clean.endswith(':'):
+                            header_clean = header_clean.rstrip('.,; ') + ':'
+                    bullets = [f"• {it.rstrip('.')}." for it in items if it]
+                    bullet_str = "\n".join(bullets)
+                    if preamble:
+                        return f"{preamble} {header_clean}\n{bullet_str}"
+                    else:
+                        return f"{header_clean}\n{bullet_str}"
+
+        # If text contains inline bullets without newlines, split them onto separate lines cleanly
+        if "•" in text and "\n•" not in text:
+            text = re.sub(r'\s*•\s*', '\n• ', text)
+
+        # 1. If text already contains bullets, clean any ordinal markers from each bullet line!
         if "•" in text or "\n* " in text or "\n- " in text:
             lines = text.split('\n')
             out = []
@@ -406,16 +525,17 @@ class AIPolishBrain:
                     if m:
                         body = m.group(2)
                         cleaned_body = cls.clean_bullet_item(body)
-                        out.append(f"• {cleaned_body}")
+                        if cleaned_body:
+                            out.append(f"• {cleaned_body}")
                     else:
                         out.append(line)
                 else:
                     out.append(line)
             return '\n'.join(out)
 
-        # Convert continuous sequential points to bullet format
+        # 2. Convert continuous sequential points with explicit 'first is / first' to bullet format
         seq_match = re.search(
-            r'^(.*?)\b(?:first|firstly|first\s+point\s+is|first\s+advantage\s+is|point\s+one)[,\s:]+(.*)',
+            r'^(.*?)\b(?:first\s+is|first|firstly|first\s+point\s+is|first\s+advantage\s+is|point\s+one)[,\s:]+(.*)',
             text,
             flags=re.IGNORECASE | re.DOTALL
         )
@@ -424,7 +544,7 @@ class AIPolishBrain:
             rest = seq_match.group(2).strip()
 
             raw_items = re.split(
-                r'(?:\.\s+|\s+)?\b(?:second|secondly|second\s+point\s+is|second\s+advantage\s+is|third|thirdly|third\s+point\s+is|fourth|finally|and\s+third|and\s+second)[,\s:]+',
+                r'(?:\.\s+|\s+)?\b(?:second\s+is|second|secondly|second\s+point\s+is|second\s+advantage\s+is|third\s+is|third|thirdly|third\s+point\s+is|fourth\s+is|fourth|finally|and\s+third|and\s+second)[,\s:]+',
                 rest,
                 flags=re.IGNORECASE
             )
@@ -471,6 +591,35 @@ class AIPolishBrain:
             t,
             flags=re.IGNORECASE
         )
+        # 1c. Quantifier noun pluralization: 'many/several/multiple problem' -> 'many/several/multiple problems'
+        t = re.sub(
+            r'\b(many|several|multiple|a\s+few)\s+([a-z]+)\b',
+            lambda m: f"{m.group(1)} {m.group(2)}s" if not m.group(2).endswith(('s', 'sh', 'ch', 'x', 'z', 'y')) and m.group(2).lower() in ('problem', 'bug', 'issue', 'ticket', 'error', 'model', 'feature', 'question', 'item', 'thing', 'change', 'step', 'second', 'minute', 'hour', 'day', 'word') else m.group(0),
+            t,
+            flags=re.IGNORECASE
+        )
+
+        # 1b. Common irregular verb & plural corrections
+        irregular_verbs = {
+            r'\bbuyed\b': 'bought',
+            r'\brunned\b': 'ran',
+            r'\bcatched\b': 'caught',
+            r'\bgoed\b': 'went',
+            r'\bteached\b': 'taught',
+            r'\bthrowed\b': 'threw',
+            r'\bdrawed\b': 'drew',
+            r'\bflyed\b': 'flew',
+            r'\bknowed\b': 'knew',
+            r'\bthinked\b': 'thought',
+            r'\btaked\b': 'took',
+            r'\bsleeped\b': 'slept',
+            r'\bswimmed\b': 'swam',
+        }
+        for pat, repl in irregular_verbs.items():
+            t = re.sub(pat, repl, t, flags=re.IGNORECASE)
+
+        t = re.sub(r'\b(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(apple|egg|banana|orange|server|ticket|minute|dollar|item|problem)\b',
+                   lambda m: f"{m.group(1)} {m.group(2)}s", t, flags=re.IGNORECASE)
 
         # 2. Double negative resolution
         t = re.sub(r'\b(don\'?t|doesn\'?t|didn\'?t|won\'?t|can\'?t|couldn\'?t|hasn\'?t|haven\'?t)\s+know\s+nothing\b', r'\1 know anything', t, flags=re.IGNORECASE)
@@ -582,8 +731,22 @@ class AIPolishBrain:
         if not text or not text.strip():
             return text
 
+        try:
+            from app.vocabulary.vocab_engine import VocabEngine
+            text = VocabEngine.normalize_text(text)
+        except Exception:
+            pass
+
         t = cls.resolve_self_corrections(text)
+        t = cls.strip_verbal_fillers(t)
         t = cls.correct_grammar(t)
         t = cls.intelligent_structure_formatting(t)
         t = cls.smart_bullet_formatter(t)
+        t = cls.format_list_items(t)
+
+        try:
+            from app.vocabulary.vocab_engine import VocabEngine
+            t = VocabEngine.normalize_text(t)
+        except Exception:
+            pass
         return t

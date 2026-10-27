@@ -12,9 +12,12 @@ if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
 # Configure crash-safe log capture for pythonw
-log_dir = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow"
-log_dir.mkdir(parents=True, exist_ok=True)
-startup_log = log_dir / "gemini_flow_startup.log"
+try:
+    log_dir = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    startup_log = log_dir / "gemini_flow_startup.log"
+except Exception:
+    startup_log = Path(CURRENT_DIR) / "gemini_flow_startup.log"
 
 if sys.stdout is None or sys.stderr is None:
     try:

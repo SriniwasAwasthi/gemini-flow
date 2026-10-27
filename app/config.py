@@ -114,12 +114,97 @@ DEFAULT_PROMPTS = {
         "Output ONLY the transcribed text without quotes or commentary."
     )
 }
+GOLDEN_ANCHOR_EXAMPLES = """--- 22 FEW-SHOT GOLDEN ANCHOR DEMONSTRATIONS ---
+[Input]: "yesterday i go to office and seen him"
+[Output]: "Yesterday I went to the office and saw him."
+
+[Input]: "there is many problem with the servers"
+[Output]: "There are many problems with the servers."
+
+[Input]: "she don\'t know nothing about it"
+[Output]: "She doesn\'t know anything about it."
+
+[Input]: "he buyed three apple and runned away"
+[Output]: "He bought three apples and ran away."
+
+[Input]: "um like so basically i think we should meet on friday"
+[Output]: "I think we should meet on Friday."
+
+[Input]: "the thing is you know actually the api is failing with 500 error"
+[Output]: "The API is failing with a 500 error."
+
+[Input]: "buy milk bread eggs butter and apples from store"
+[Output]: "Buy from the store:
+• Milk
+• Bread
+• Eggs
+• Butter
+• Apples"
+
+[Input]: "first install python second setup venv third run the app"
+[Output]: "Here are the steps:
+1. Install Python
+2. Set up venv
+3. Run the app"
+
+[Input]: "agenda today is review sales discuss budget and plan sprint"
+[Output]: "Today\'s agenda:
+• Review sales
+• Discuss budget
+• Plan sprint"
+
+[Input]: "bugs are crash on login missing icon and slow loading"
+[Output]: "Bug report:
+• Crash on login
+• Missing icon
+• Slow loading"
+
+[Input]: "hi sarah thanks for the proposal i reviewed slide four"
+[Output]: "Hi Sarah, thanks for the proposal. I reviewed slide 4."
+
+[Input]: "hey alex can you pull the git branch and test payments"
+[Output]: "Hey Alex, can you pull the Git branch and test payments?"
+
+[Input]: "are you free for a thirty minute zoom call tomorrow at two pm"
+[Output]: "Are you free for a 30-minute Zoom call tomorrow at 2:00 PM?"
+
+[Input]: "total is fifteen hundred dollars with eighteen percent gst"
+[Output]: "The total is $1,500 with 18% GST."
+
+[Input]: "the event is scheduled on november twenty fifth at ten thirty am"
+[Output]: "The event is scheduled on November 25th at 10:30 AM."
+
+[Input]: "run git commit dash m initial commit and push to main"
+[Output]: "Run `git commit -m \"initial commit\"` and push to `main`."
+
+[Input]: "we need sixteen gigabytes ram and an rtx twenty fifty gpu"
+[Output]: "We need 16 GB RAM and an RTX 2050 GPU."
+
+[Input]: "if i was you i would have did the same thing"
+[Output]: "If I were you, I would have done the same thing."
+
+[Input]: "the decision was took by the management yesterday"
+[Output]: "The decision was made by the management yesterday."
+
+[Input]: "let me know once you reach home safe"
+[Output]: "Let me know once you reach home safely."
+
+[Input]: "why you are not answering my messages since morning"
+[Output]: "Why haven\'t you been answering my messages since morning?"
+
+[Input]: "we tested faster whisper and ollama gemma on cuda"
+[Output]: "We tested Faster-Whisper and Ollama Gemma on CUDA."
+"""
+
 
 DEFAULT_DICTIONARY = [
     {"spoken": "Srinivas Awasthi", "replacement": "Sriniwas Awasthi"},
     {"spoken": "Srinivas Avasthi", "replacement": "Sriniwas Awasthi"},
     {"spoken": "Sri Srinivas Awasthi", "replacement": "Sriniwas Awasthi"},
     {"spoken": "Srinivas", "replacement": "Sriniwas"},
+    {"spoken": "Shrinivas", "replacement": "Sriniwas"},
+    {"spoken": "fast whisper", "replacement": "Faster-Whisper"},
+    {"spoken": "olama", "replacement": "Ollama"},
     {"spoken": "Avasthi", "replacement": "Awasthi"},
     {"spoken": "Shriniwas", "replacement": "Sriniwas"},
     {"spoken": "Shreeniwas", "replacement": "Sriniwas"},
@@ -189,8 +274,8 @@ DEFAULT_SAVED_PROMPTS = [
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "api_key": "",
-    "model_name": "gemini-3.5-flash",
-    "model_mode": "gemini-3.5-flash",
+    "model_name": "gemini-3.5-transcribe",
+    "model_mode": "gemini-3.5-transcribe",
     "active_profile": "casual",
     "hotkey": "<ctrl>+<space>",
     "hotkey_display": "Ctrl + Space",
@@ -222,7 +307,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "dictionary": DEFAULT_DICTIONARY,
     "snippets": DEFAULT_SNIPPETS,
     "input_device_index": None,
-    "input_device_name": "Default Microphone",
+    "input_device_name": "Default System Microphone",
     "auto_paste": True,
     "play_sounds": True,
     "hud_position": "bottom_center",  # "bottom_center", "custom"
@@ -244,7 +329,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "auto_prompt_conversion": False,  # If False, voice dictation outputs clean verbatim text everywhere
     "dsp_fan_filter_enabled": True,  # 85 Hz Butterworth High-Pass Filter for AC & Ceiling Fan Hum
     "dsp_noise_gate_enabled": False,  # Disabled by default so quiet speech is never muted (Gemini AI handles noise natively)
-    "dsp_noise_gate_threshold_db": -42.0,  # Noise gate cutoff threshold in dB
+    "dsp_noise_gate_threshold_db": -52.0,  # Noise gate cutoff threshold in dB
     "offline_fallback_enabled": True,  # Offline speech recognition fallback when network drops
     "selected_languages": ["English"],  # Selected spoken languages (defaults to English only, or custom subset of 200+)
     "security": {
@@ -775,6 +860,10 @@ class ConfigManager:
                 base_prompt += f"\n{lang_prompt}"
         except Exception as e:
             logger.debug(f"Language prompt injection note: {e}")
+
+        # 6. Inject 22 Few-Shot Golden Anchor Demonstrations
+        if "FEW-SHOT GOLDEN ANCHOR DEMONSTRATIONS" not in base_prompt:
+            base_prompt += f"\n\n{GOLDEN_ANCHOR_EXAMPLES}"
 
         return base_prompt
 

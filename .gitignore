@@ -35,6 +35,8 @@ app_icon.png
 config.local.json
 config.json
 .credentials.bin
+models/
+runtime/
 *.wav
 !test_audio_sample.wav
 *.mp3

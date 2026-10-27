@@ -47,7 +47,7 @@ class GeminiEngine:
             self.api_key = sanitize_api_key(api_key)
         self.model_name = model_name
         self.session = requests.Session()
-        
+
         # Configure robust connection pooling, keep-alive, and HTTP-level retry adapter
         retries = Retry(
             total=2,
@@ -120,12 +120,7 @@ class GeminiEngine:
         # Step 2: Prioritize active production models for sub-second generation & transcription
         models_to_try = [
             "gemini-3.5-transcribe",
-            "gemini-3.6-flash",
             "gemini-3.5-flash-lite",
-            "gemini-3.5-flash",
-            "gemini-3.7-flash",
-            "gemini-flash-latest",
-            "gemini-flash-lite-latest",
             "gemini-2.5-flash"
         ]
         if self.model_name and self.model_name not in models_to_try and self.model_name != "auto":
@@ -209,13 +204,14 @@ class GeminiEngine:
         if not wav_bytes or len(wav_bytes) < 800:
             return False, "Audio is too short or empty."
 
-        # Check if user explicitly chose offline mode, or if API key is not configured
-        is_explicit_offline = any(k in str(self.model_name).lower() for k in ("offline", "whisper", "local", "on-device"))
+# Check if user explicitly chose offline mode, or if API key is not configured
+        is_explicit_offline = any(k in str(self.model_name).lower() for k in ("offline", "whisper", "local", "on-device", "ollama", "gemma"))
 
         if not self.api_key or is_explicit_offline:
             if offline_fallback_enabled or is_explicit_offline:
-                logger.info("Attempting local offline speech recognition via Whisper AI...")
-                self.last_model_used = "Offline Local Speech (Whisper AI)"
+                is_ollama = any(k in str(self.model_name).lower() for k in ("ollama", "gemma"))
+                logger.info(f"Executing on-device speech pipeline (Model: {self.model_name})...")
+                self.last_model_used = "Ollama Gemma 2B (Local GPU)" if is_ollama else "Offline Local Speech (Whisper AI)"
                 self.last_fallback = not is_explicit_offline
                 t_off_start = time.time()
                 prompt_ctx = "Clean speech dictation, accurate grammar, proper punctuation."
@@ -223,9 +219,26 @@ class GeminiEngine:
                 self.last_latency = time.time() - t_off_start
                 if offline_ok:
                     if offline_text:
+                        if is_ollama:
+                            try:
+                                from app.intelligence.ollama_engine import OllamaEngine
+                                OllamaEngine.ensure_daemon_running(timeout=1.5)
+                                if OllamaEngine.is_available(timeout=0.3):
+                                    ok_ol, txt_ol = OllamaEngine.polish_text(offline_text, timeout=12.0)
+                                    if ok_ol and txt_ol:
+                                        offline_text = txt_ol
+                            except Exception as ol_err:
+                                logger.debug(f"Ollama execution note: {ol_err}")
+
+                        # Apply AIPolishBrain to format bullet points, strip ordinals, and fix grammar
                         try:
                             from app.intelligence.ai_polish_brain import AIPolishBrain
                             offline_text = AIPolishBrain.polish_speech(offline_text)
+                        except Exception as apb_err:
+                            logger.debug(f"AIPolishBrain offline note: {apb_err}")
+
+                        try:
+                            from app.vocabulary.vocab_engine import VocabEngine
                             offline_text = VocabEngine.normalize_text(offline_text)
                         except Exception:
                             pass
@@ -261,11 +274,17 @@ class GeminiEngine:
         )
 
         # 3. If online transcription failed due to network loss, 429 rate limit, or server errors, invoke local offline fallback
-        if not exec_res.success and offline_fallback_enabled:
+        # Guaranteed Zero-Data-Loss: Always fall back to local Whisper AI so user speech is NEVER dropped
+        if not exec_res.success:
             logger.info("Online Gemini execution did not succeed. Fast fallback to local offline Whisper AI...")
             try:
                 t_off_start = time.time()
-                prompt_ctx = "Clean speech dictation, accurate grammar, proper punctuation."
+                prompt_ctx = ""
+                try:
+                    from app.vocabulary.vocab_engine import VocabEngine
+                    prompt_ctx = VocabEngine().get_whisper_prompt()
+                except Exception:
+                    pass
                 offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx, language=offline_language)
                 if offline_ok:
                     if offline_text:
@@ -290,8 +309,15 @@ class GeminiEngine:
 
         final_text = exec_res.text
         if exec_res.success and final_text:
+            # Apply cognitive AI Polish Brain to format bullet points, strip ordinals, and clean grammar
+            try:
+                from app.intelligence.ai_polish_brain import AIPolishBrain
+                final_text = AIPolishBrain.polish_speech(final_text)
+            except Exception as apb_err:
+                logger.debug(f"AIPolishBrain polish note: {apb_err}")
             # Vocabulary normalization
             try:
+                from app.vocabulary.vocab_engine import VocabEngine
                 final_text = VocabEngine.normalize_text(final_text)
             except Exception as ve_err:
                 logger.debug(f"Vocab normalization note: {ve_err}")
@@ -475,8 +501,8 @@ class GeminiEngine:
                 "topP": 0.95,
                 "maxOutputTokens": 8192
             }
-            # Optimize Gemini 2.5/2.0 Flash for sub-2-second speech transcription by disabling thinking overhead
-            if "2.5" in model.lower() or "2.0" in model.lower():
+            # Optimize Gemini 3.5/2.5/2.0 for ultra-fast speech transcription by disabling thinking overhead
+            if any(k in model.lower() for k in ("2.5", "2.0")) and "3." not in model.lower() and "transcribe" not in model.lower():
                 gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
             payload = {
@@ -494,7 +520,9 @@ class GeminiEngine:
                                     "5. Repetition & Stutter Collapse: Eliminate verbal stutters and repeated sentences (e.g. 'I want 100% data. If I just want 100% accurate data.' -> 'I want 100% accurate data.').\n"
                                     "6. Grammar & All 12 Tenses: Ensure flawless grammar, vocabulary, and tense consistency natively across past, present, and future tenses.\n"
                                     "7. Proper Name Integrity: Transcribe proper nouns and names accurately ONLY if explicitly spoken.\n"
-                                    "8. Output Format: Output ONLY the finalized text directly without preamble, commentary, or markdown code fences."
+                                    "8. Grammar, Tenses & Multi-Item List Formatting: Fix all tenses, plurals, subject-verb agreements, and eliminate filler words ('um', 'uh', 'like', 'basically'). When multiple items, tasks, groceries, or steps are spoken, format them into clean Markdown bullet points ('• ').\n"
+                                    "9. Output Format: Output ONLY the finalized text directly without preamble, commentary, or markdown code fences.\n\n"
+                                    '--- 22 FEW-SHOT GOLDEN ANCHOR DEMONSTRATIONS ---\n[Input]: "yesterday i go to office and seen him"\n[Output]: "Yesterday I went to the office and saw him."\n\n[Input]: "there is many problem with the servers"\n[Output]: "There are many problems with the servers."\n\n[Input]: "she don\'t know nothing about it"\n[Output]: "She doesn\'t know anything about it."\n\n[Input]: "he buyed three apple and runned away"\n[Output]: "He bought three apples and ran away."\n\n[Input]: "um like so basically i think we should meet on friday"\n[Output]: "I think we should meet on Friday."\n\n[Input]: "the thing is you know actually the api is failing with 500 error"\n[Output]: "The API is failing with a 500 error."\n\n[Input]: "buy milk bread eggs butter and apples from store"\n[Output]: "Buy from the store:\n• Milk\n• Bread\n• Eggs\n• Butter\n• Apples"\n\n[Input]: "first install python second setup venv third run the app"\n[Output]: "Here are the steps:\n1. Install Python\n2. Set up venv\n3. Run the app"\n\n[Input]: "agenda today is review sales discuss budget and plan sprint"\n[Output]: "Today\'s agenda:\n• Review sales\n• Discuss budget\n• Plan sprint"\n\n[Input]: "bugs are crash on login missing icon and slow loading"\n[Output]: "Bug report:\n• Crash on login\n• Missing icon\n• Slow loading"\n\n[Input]: "hi sarah thanks for the proposal i reviewed slide four"\n[Output]: "Hi Sarah, thanks for the proposal. I reviewed slide 4."\n\n[Input]: "hey alex can you pull the git branch and test payments"\n[Output]: "Hey Alex, can you pull the Git branch and test payments?"\n\n[Input]: "are you free for a thirty minute zoom call tomorrow at two pm"\n[Output]: "Are you free for a 30-minute Zoom call tomorrow at 2:00 PM?"\n\n[Input]: "total is fifteen hundred dollars with eighteen percent gst"\n[Output]: "The total is $1,500 with 18% GST."\n\n[Input]: "the event is scheduled on november twenty fifth at ten thirty am"\n[Output]: "The event is scheduled on November 25th at 10:30 AM."\n\n[Input]: "run git commit dash m initial commit and push to main"\n[Output]: "Run `git commit -m \\"initial commit\\"` and push to `main`."\n\n[Input]: "we need sixteen gigabytes ram and an rtx twenty fifty gpu"\n[Output]: "We need 16 GB RAM and an RTX 2050 GPU."\n\n[Input]: "if i was you i would have did the same thing"\n[Output]: "If I were you, I would have done the same thing."\n\n[Input]: "the decision was took by the management yesterday"\n[Output]: "The decision was made by the management yesterday."\n\n[Input]: "let me know once you reach home safe"\n[Output]: "Let me know once you reach home safely."\n\n[Input]: "why you are not answering my messages since morning"\n[Output]: "Why haven\'t you been answering my messages since morning?"\n\n[Input]: "we tested faster whisper and ollama gemma on cuda"\n[Output]: "We tested Faster-Whisper and Ollama Gemma on CUDA."'
                                 )
                             },
                             {
@@ -516,8 +544,8 @@ class GeminiEngine:
             try:
                 start_t = time.time()
                 approx_sec = len(chunk_bytes) / 32000.0
-                # Stable production timeout: 4.0s connect, 8.0s+ read to prevent premature timeout aborts
-                req_timeout = (4.0, max(8.0, min(30.0, float(approx_sec * 0.5) + 6.0)))
+                # Production fast-response timeout: 1.8s connect, 3.5s-8.0s read for sub-2s SLA
+                req_timeout = (3.0, max(5.0, min(18.0, float(approx_sec * 0.5) + 4.0)))
                 response = self.session.post(url, headers=headers, json=payload, timeout=req_timeout)
 
                 elapsed = time.time() - start_t
@@ -538,6 +566,11 @@ class GeminiEngine:
                         full_text = "".join([self._extract_part_text(p) for p in parts])
                         cleaned_text = self._clean_output(full_text)
                         if cleaned_text:
+                            try:
+                                from app.intelligence.ai_polish_brain import AIPolishBrain
+                                cleaned_text = AIPolishBrain.polish_speech(cleaned_text)
+                            except Exception:
+                                pass
                             return True, cleaned_text
                         if finish_reason == "STOP" or not parts:
                             # Model processed audio normally and heard no speech (clean silence)

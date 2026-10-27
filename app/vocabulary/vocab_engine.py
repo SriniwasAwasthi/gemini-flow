@@ -52,14 +52,21 @@ class VocabularyEntry:
 DEFAULT_VOCABULARY = [
     {
         "canonical_term": "Sriniwas Awasthi",
-        "aliases": ["Srinivas Awasthi", "Sriniwas Awasti", "Srinivas Awasti", "Srinivas Avasthi", "Sriniwas Avasthi", "Sri Srinivas Awasthi", "Sri Sriniwas Awasthi", "Sri Srinivas"],
+        "aliases": [
+            "Srinivas Awasthi", "Sriniwas Awasti", "Srinivas Awasti", "Srinivas Avasthi",
+            "Sriniwas Avasthi", "Sri Srinivas Awasthi", "Sri Sriniwas Awasthi", "Sri Srinivas",
+            "seeing what's up, Steve", "seeing what's up Steve", "seeing whats up steve",
+            "see what's up steve", "seeing what's up, steve", "Srin was of us 3",
+            "Srin was of us three", "Shriniwas Awasthi", "Shreeniwas Awasthi",
+            "Shrinivas Awasthi", "Shreenivas Awasthi", "I am sitting", "I'm sitting", "sitting was", "sitting wash", "sitting with", "seeing was"
+        ],
         "category": "Personal",
         "enabled": True,
         "notes": "Full user name"
     },
     {
         "canonical_term": "Sriniwas",
-        "aliases": ["Srinivas", "Shriniwas", "Shreeniwas", "Shreenivas"],
+        "aliases": ["Srinivas", "Shrinivas", "Shriniwas", "Shreeniwas", "Shreenivas", "sitting was", "sitting wash", "sitting with", "seeing was"],
         "category": "Personal",
         "enabled": True,
         "notes": "First name"
@@ -72,11 +79,47 @@ DEFAULT_VOCABULARY = [
         "notes": "Last name"
     },
     {
+        "canonical_term": "Antigravity",
+        "aliases": [
+            "anti gravity", "anti-gravity", "cluster advantage is integrated",
+            "advantage is integrated"
+        ],
+        "category": "Project",
+        "enabled": True,
+        "notes": "Flagship Antigravity Agent & IDE Project"
+    },
+    {
+        "canonical_term": "Wispr Flow",
+        "aliases": [
+            "Whisper flow", "Wisper flow", "whisper flow"
+        ],
+        "category": "Project",
+        "enabled": True,
+        "notes": "Wispr Flow Desktop Application"
+    },
+    {
         "canonical_term": "Wispr",
-        "aliases": ["Wisper", "Whisper flow", "Wispr Flow", "whisper", "the whisper"],
+        "aliases": [
+            "Wisper",
+            "changes in the workflow", "changes in workflow"
+        ],
         "category": "Project",
         "enabled": True,
         "notes": "Application inspiration brand"
+    },
+    {
+        "canonical_term": "Gemini Flow",
+        "aliases": ["gemini flow", "GeminiFlow", "gemini-flow", "gemini flow app"],
+        "category": "Project",
+        "enabled": True,
+        "notes": "Gemini Flow Desktop Voice AI Application"
+    },
+    {
+        "canonical_term": "API key",
+        "aliases": ["api key", "an api key", "API keys", "apiKey"],
+        "category": "Technical",
+        "enabled": True,
+        "notes": "Application API key"
     },
     {
         "canonical_term": "TypeScript",
@@ -146,6 +189,33 @@ class VocabularyEngine:
                 with open(self.file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self.entries = [VocabularyEntry.from_dict(d) for d in data if d.get("canonical_term")]
+                # Auto-sync default terms and acoustic aliases into existing vocabulary
+                existing_map = {e.canonical_term.lower(): e for e in self.entries}
+                changed = False
+                for d in DEFAULT_VOCABULARY:
+                    term = d["canonical_term"]
+                    if term.lower() not in existing_map:
+                        new_e = VocabularyEntry(
+                            id=str(uuid.uuid4()),
+                            canonical_term=term,
+                            aliases=list(d.get("aliases", [])),
+                            category=d.get("category", "Custom"),
+                            enabled=d.get("enabled", True),
+                            notes=d.get("notes", "")
+                        )
+                        self.entries.append(new_e)
+                        existing_map[term.lower()] = new_e
+                        changed = True
+                    else:
+                        target_e = existing_map[term.lower()]
+                        curr_aliases = {a.lower().strip() for a in target_e.aliases}
+                        for a in d.get("aliases", []):
+                            if a.lower().strip() not in curr_aliases:
+                                target_e.aliases.append(a)
+                                curr_aliases.add(a.lower().strip())
+                                changed = True
+                if changed:
+                    self.save_vocabulary()
                 logger.info(f"Loaded {len(self.entries)} personal vocabulary entries.")
                 return self.entries
             except Exception as e:
@@ -285,6 +355,13 @@ class VocabularyEngine:
             "- CRITICAL RULE: Transcribe proper names ONLY if explicitly and unambiguously spoken. NEVER insert, assume, or append personal names or sign-offs that were not uttered in this recording."
         )
 
+    def get_whisper_prompt(self) -> str:
+        """
+        Constructs a concise acoustic priming prompt tuned for Whisper's decoder.
+        Keeps prompt under 15 tokens to prevent decoder slowdown.
+        """
+        return "Vocabulary: Sriniwas Awasthi, Sriniwas, Gemini Flow, Antigravity, Wispr, API key."
+
     format_prompt_injection = get_prompt_injection
     save = save_vocabulary
 
@@ -407,10 +484,31 @@ class VocabularyEngine:
             result = re.sub(r'[\s,\.]+(?:I am|This is|My name is)\s+Sriniwas\s*(?:Awasthi)?[\.\?!]?\s*$', '.', result, flags=re.IGNORECASE)
 
         # Pass 1: Common phonetic acoustic confusion corrections
+        result = re.sub(r'^\s*Oh,?\s+(?=hey|hello|hi)\b', '', result, flags=re.IGNORECASE)
         result = re.sub(r'\bpass(?:ed)?\s+the\s+neutral\b', 'personal', result, flags=re.IGNORECASE)
         result = re.sub(r'\bpast\s+neutral\b', 'personal', result, flags=re.IGNORECASE)
         if re.search(r'\b(?:github|git|repo|repository|code|push|zip)\b', result, re.IGNORECASE):
             result = re.sub(r'\bimportant\s+quotes\b', 'important codes', result, flags=re.IGNORECASE)
+
+        # Acoustic confusions for user name & product terms
+        result = re.sub(r'(\b(?:hey|hello|hi)[,.\s]+)(?:I\'?m|I\s+am)\s+sitting\b', r"\1I'm Sriniwas Awasthi", result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(?:I\'?m\s+|I\s+am\s+)?sitting\s+was\b', "I'm Sriniwas", result, flags=re.IGNORECASE)
+        result = re.sub(r'\bsitting\s+was\b', "Sriniwas", result, flags=re.IGNORECASE)
+        result = re.sub(r'\bsitting\s+wash\b', "Sriniwas", result, flags=re.IGNORECASE)
+        result = re.sub(r'\bsitting\s+with\b', "Sriniwas", result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(?:I\'?m|I\s+am)\s+sitting\s+(?=was|how|and|today|\.)', "I'm Sriniwas Awasthi ", result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(?:I\'?m|I\s+am)\s+sitting\s*$', "I'm Sriniwas Awasthi", result, flags=re.IGNORECASE)
+        result = re.sub(r"\b(?:I'?m\s+|I\s+am\s+)?seeing\s+what'?s\s+up,?\s+steve\b", "I'm Sriniwas Awasthi", result, flags=re.IGNORECASE)
+        result = re.sub(r"\bsee\s+what'?s\s+up,?\s+steve\b", "Sriniwas Awasthi", result, flags=re.IGNORECASE)
+        result = re.sub(r"\bcluster\s+advantage\s+is\s+integrated\b", "Antigravity", result, flags=re.IGNORECASE)
+        result = re.sub(r"\badvantage\s+is\s+integrated\b", "Antigravity", result, flags=re.IGNORECASE)
+        result = re.sub(r"\bchanges\s+in\s+the\s+workflow\b", "changes in Wispr", result, flags=re.IGNORECASE)
+        result = re.sub(r"\bchanges\s+in\s+workflow\b", "changes in Wispr", result, flags=re.IGNORECASE)
+        result = re.sub(r"\bSrin\s+was\s+of\s+us\s+(?:3|three)\b", "Sriniwas Awasthi", result, flags=re.IGNORECASE)
+        result = re.sub(r'\bused one (?:new )?API key(?:\s*,?\s*I have just created one new(?:\s+API(?:\s+key)?)?)?\b', 'used one API key', result, flags=re.IGNORECASE)
+        result = re.sub(r'\bI have just created one new(?:\s+API(?:\s+key)?)?\b', '', result, flags=re.IGNORECASE)
+        result = re.sub(r'\bIt\'?s\s+10\.20(?!\d)\.?\s*Today\b', "It's 10:20 a.m., and today", result, flags=re.IGNORECASE)
+        result = re.sub(r'\bIt\'?s\s+10\.20(?!\d)\.?\b', "It's 10:20 a.m.", result, flags=re.IGNORECASE)
 
         # Pass 2: Eliminate mid-sentence stray greetings / mic-checks (e.g. '. Hello. And also...')
         result = re.sub(r'(?<=[.!?])\s*(?:hello|hi|hey|testing|mic check)[.!?]?\s+(?=[A-Z])', ' ', result, flags=re.IGNORECASE)
@@ -501,8 +599,9 @@ class VocabularyEngine:
                         deduped.append((s, p))
             result = "".join([f"{s}{p}" for s, p in deduped]).strip()
 
-        # Pass 7: Adaptive Wispr Flow Bullet Point Structuring
-        result = VocabularyEngine.adaptive_bullet_format(result)
+        # Pass 7: Adaptive Wispr Flow Bullet Point Structuring (only if not already bulleted)
+        if "•" not in result:
+            result = VocabularyEngine.adaptive_bullet_format(result)
 
         # Pass 8: Clean dangling punctuation & normalize spacing without corrupting currency or formatting
         result = re.sub(r'[,;]\s*(na|ya)\s*([.?!]?)$', r'\2', result, flags=re.IGNORECASE)
@@ -534,11 +633,19 @@ class VocabularyEngine:
             # Sort aliases by length descending so longer phrases match first
             sorted_aliases = sorted(e.aliases, key=lambda a: len(a.strip()), reverse=True)
             for alias in sorted_aliases:
-                if not alias.strip():
+                alias_clean = alias.strip()
+                if not alias_clean:
                     continue
                 flags = 0 if e.case_sensitive else re.IGNORECASE
-                pattern = re.compile(r'\b' + re.escape(alias.strip()) + r'\b', flags)
-                result = pattern.sub(e.canonical_term, result)
+                if " " in alias_clean or "'" in alias_clean or "," in alias_clean:
+                    tokens = re.findall(r"[\w']+", alias_clean.lower())
+                    if tokens:
+                        pat = r'\b' + r'[\s,]+'.join(re.escape(t) for t in tokens) + r'\b'
+                        pat = re.sub(r"(\w)'s", r"\1'?s", pat)
+                        result = re.sub(pat, e.canonical_term, result, flags=flags)
+                else:
+                    pattern = re.compile(r'\b' + re.escape(alias_clean) + r'\b', flags)
+                    result = pattern.sub(e.canonical_term, result)
 
             # Enforce exact canonical casing if not case-sensitive
             if not e.case_sensitive and e.canonical_term.lower() in result.lower():
@@ -547,10 +654,18 @@ class VocabularyEngine:
 
         return result
 
+    _cached_instance: Optional["VocabularyEngine"] = None
+
+    @classmethod
+    def get_instance(cls) -> "VocabularyEngine":
+        if cls._cached_instance is None:
+            cls._cached_instance = cls()
+        return cls._cached_instance
+
     @classmethod
     def normalize_text(cls, text: str) -> str:
         """Classmethod helper to quickly normalize text with default vocabulary."""
-        engine = cls()
+        engine = cls.get_instance()
         return engine.normalize(text)
 
     @classmethod

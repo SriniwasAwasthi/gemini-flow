@@ -45,28 +45,19 @@ class ExecutionResult:
 
 
 AUDIO_FALLBACK_CHAINS = {
-    "gemini-3.5-transcribe": ["gemini-3.5-transcribe", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-3.5-transcribe", "gemini-flash-latest"],
-    "gemini-3.5-flash": ["gemini-3.5-transcribe", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-3.6-flash": ["gemini-3.5-transcribe", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-2.5-flash": ["gemini-2.5-flash", "gemini-3.5-transcribe", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "auto": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-3.5-transcribe", "gemini-flash-latest"],
-    "gemini-3.7-flash": ["gemini-3.5-transcribe", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-flash-latest": ["gemini-3.5-transcribe", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-flash-lite-latest": ["gemini-3.5-transcribe", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-3-flash-preview": ["gemini-3-flash-preview", "gemini-3.5-transcribe", "gemini-2.5-flash", "gemini-flash-latest"]
+    "gemini-3.5-transcribe": ["gemini-3.5-transcribe", "gemini-3.5-flash-lite"],
+    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-3.5-transcribe"],
+    "auto": ["gemini-3.5-transcribe", "gemini-3.5-flash-lite"],
+    "offline-whisper": ["offline-whisper"],
+    "ollama-gemma2": ["ollama-gemma2", "offline-whisper"]
 }
 
 TEXT_FALLBACK_CHAINS = {
-    "gemini-2.5-flash": ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-3.5-flash-lite": ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-3.6-flash": ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-3.5-flash": ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-3.7-flash": ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-3.7-flash", "gemini-flash-latest"],
-    "gemini-flash-latest": ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-flash-lite-latest": ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-flash-latest"],
-    "gemini-3.5-transcribe": ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-3.6-flash"],
-    "auto": ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-3-flash-preview", "gemini-flash-latest"]
+    "gemini-3.5-transcribe": ["gemini-3.5-transcribe", "gemini-3.5-flash-lite"],
+    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-3.5-transcribe"],
+    "auto": ["gemini-3.5-transcribe", "gemini-3.5-flash-lite"],
+    "offline-whisper": ["offline-whisper"],
+    "ollama-gemma2": ["ollama-gemma2"]
 }
 
 MODEL_FALLBACK_CHAINS = AUDIO_FALLBACK_CHAINS
@@ -142,7 +133,7 @@ class FallbackHandler:
         fallback_occurred = False
         fallback_reason = None
 
-        cutoff_sec = 4.5 if is_audio else 10.0
+        cutoff_sec = 2.0 if is_audio else 10.0
         for idx, model in enumerate(models_to_try):
             # Short-circuit if overall elapsed time exceeds cutoff so offline Whisper engine takes over if cloud is unresponsive
             if time.time() - start_overall > cutoff_sec:
@@ -176,6 +167,27 @@ class FallbackHandler:
                             status_code = int(m.group(1))
 
                         err_type, friendly_msg = cls.classify_error(status_code, text_or_err)
+
+                        # For audio dictation, if ANY cloud failure occurs (429, 503, 500, Timeout), abort cloud retries immediately (< 50ms)
+                        # so pre-warmed local Whisper AI takes over instantly, maintaining the < 2s user latency SLA
+                        if is_audio and (err_type in (APIErrorType.RATE_LIMIT_429, APIErrorType.TIMEOUT, APIErrorType.SERVER_UNAVAILABLE_503, APIErrorType.INTERNAL_SERVER_ERROR_500) or status_code in (429, 503, 500)):
+                            logger.warning(f"Audio cloud error {status_code or err_type.value} on {model}. Aborting cloud retries for immediate local Whisper failover.")
+                            fallback_reason = FallbackReason(
+                                original_model=primary_model,
+                                fallback_model="Offline Local Speech (Whisper AI)",
+                                error_type=err_type,
+                                user_message=friendly_msg
+                            )
+                            return ExecutionResult(
+                                success=False,
+                                text="",
+                                model_used=model,
+                                fallback_occurred=True,
+                                fallback_reason=fallback_reason,
+                                latency_seconds=time.time() - start_overall,
+                                retries_attempted=retries_count,
+                                error_message=friendly_msg
+                            )
 
                         # Instant failover to next model on 429, 503, 500, Timeout, 404, empty transcript, or unsupported model
                         if err_type != APIErrorType.INVALID_KEY and (err_type in (APIErrorType.RATE_LIMIT_429, APIErrorType.SERVER_UNAVAILABLE_503, APIErrorType.TIMEOUT, APIErrorType.INTERNAL_SERVER_ERROR_500) or status_code in (404, 400, 500, 503, 429) or "not found" in text_or_err.lower() or "timeout" in text_or_err.lower() or "empty" in text_or_err.lower()) and idx + 1 < len(models_to_try):
