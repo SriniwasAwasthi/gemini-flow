@@ -1,0 +1,69 @@
+{
+  "model_name": "gemini-2.5-flash",
+  "model_mode": "gemini-2.5-flash",
+  "active_profile": "ai_dictations",
+  "mode_preset": "clean_dictation",
+  "gemini_api_key": "",
+  "api_key": "",
+  "input_device_index": null,
+  "input_device_name": "Default System Microphone",
+  "auto_paste": true,
+  "play_sounds": true,
+  "hud_position": "bottom_center",
+  "hud_custom_x": null,
+  "hud_custom_y": null,
+  "hud_opacity": 0.85,
+  "hud_theme": "dark_glass",
+  "start_with_windows": false,
+  "history_limit": 5000,
+  "max_recording_seconds": 1800,
+  "auto_cost_mode": true,
+  "auto_prompt_conversion": false,
+  "dsp_fan_filter_enabled": false,
+  "dsp_noise_gate_enabled": false,
+  "dsp_noise_gate_threshold_db": -42.0,
+  "offline_fallback_enabled": true,
+  "selected_languages": [
+    "English"
+  ],
+  "custom_vocabulary": [
+    "Gemini Flow",
+    "Python",
+    "PyQt6",
+    "Whisper",
+    "CTranslate2",
+    "TypeScript",
+    "GitHub"
+  ],
+  "dictionary": [
+    {
+      "spoken": "javascript",
+      "replacement": "JavaScript"
+    },
+    {
+      "spoken": "github",
+      "replacement": "GitHub"
+    },
+    {
+      "spoken": "local host",
+      "replacement": "localhost"
+    }
+  ],
+  "snippets": [
+    {
+      "trigger": "my email signature",
+      "content": "Best regards,\nEngineering Team\nGitHub: https://github.com/your-username"
+    },
+    {
+      "trigger": "meeting template",
+      "content": "Agenda:\n1. Project Status & Sprint Updates\n2. Key Blockers & Technical Risks\n3. Action Items & Deadlines"
+    }
+  ],
+  "security": {
+    "encrypt_keys": true,
+    "history_retention_days": 30,
+    "telemetry_enabled": false,
+    "log_redaction": true
+  },
+  "theme_mode": "dark"
+}

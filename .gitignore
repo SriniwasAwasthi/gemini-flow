@@ -49,8 +49,7 @@ runtime/
 config.local.json
 config.json
 settings.json
-!.settings.example.json
-settings.example.json
+!settings.example.json
 .credentials.bin
 *.key
 *.pem
