@@ -76,26 +76,26 @@ INTENT_PATTERNS = [
     (
         rf'^(?:please\s+)?(?:make\s+(?:this|it)\s+(?:more\s+)?professional|make\s+(?:more\s+)?professional|professionalize(?:\s+this)?|make\s+(?:this|it)\s+(?:more\s+)?formal|formalize(?:\s+this)?|executive\s+tone|professional\s+tone|make\s+(?:this|it)\s+sound\s+professional|professional\s+rewrite){DELIM}?(.*)$',
         IntentCategory.PROFESSIONALIZE,
-        "Rewrite the following text in a polished, articulate, and professional style suitable for business or professional communication. Crucially, preserve the author's original voice, perspective, and intent (e.g. if written in first-person 'I', keep it in first-person). Elevate vocabulary, refine sentence flow, and remove colloquial fillers while keeping the genuine human message intact. Never convert personal speech into third-person telemetry, software execution logs, or robotic status reports. Output ONLY the rewritten text.",
+        "Rewrite the following text in a polished, articulate, and professional style suitable for business or professional communication. Crucially, preserve the author's original voice, perspective, and intent (e.g. if written in first-person 'I', keep it in first-person). Preserve all proper names, numbers, dates, and facts without substitution or omission. Correct all informal grammar and verb tenses (e.g. 'I buy' -> 'purchased', 'I come back home' -> 'I returned home'). When the user lists items, groceries, purchases, or tasks (including run-together items), format them into clean bullet points ('• ') on separate lines. Elevate vocabulary, refine sentence flow, and remove colloquial fillers while keeping the genuine human message intact. Never convert personal speech into third-person telemetry, software execution logs, or robotic status reports. Output ONLY the rewritten text.",
         "gemini-3.5-flash-lite"
     ),
     # 2. Make Casual
     (
-        rf'^(?:please\s+)?(?:make\s+(?:this|it)\s+(?:more\s+)?casual|make\s+(?:more\s+)?casual|make\s+(?:this|it)\s+(?:more\s+)?friendly|make\s+(?:this|it)\s+(?:more\s+)?informal|friendly\s+tone|casual\s+tone|informal\s+tone){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:make\s+(?:this|it)\s+(?:more\s+)?casual|make\s+(?:more\s+)?casual|make\s+(?:this|it)\s+(?:more\s+)?friendly|make\s+(?:this|it)\s+(?:more\s+)?informal|make\s+(?:this|it)\s+conversational|conversational\s+tone|friendly\s+tone|casual\s+tone|informal\s+tone|tone\s+down){DELIM}?(.*)$',
         IntentCategory.MAKE_CASUAL,
         "Rephrase the input in a friendly, conversational, and natural casual tone while preserving the essential facts and author perspective. Output ONLY the rewritten text.",
         "gemini-3.5-flash-lite"
     ),
     # 3. Create Prompt
     (
-        rf'^(?:please\s+)?(?:turn\s+this\s+into\s+(?:an?\s+)?(?:ai\s+)?prompt|create\s+(?:an?\s+)?(?:ai\s+)?prompt(?:\s+(?:from|for)\s+this)?|generate\s+(?:an?\s+)?(?:ai\s+)?prompt|make\s+this\s+(?:an?\s+)?(?:ai\s+)?prompt|convert\s+(?:this\s+)?to\s+(?:an?\s+)?(?:ai\s+)?prompt|prompt\s+enhancer|(?:ai\s+)?prompt\s*[:\-—]){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:turn\s+(?:this\s+)?into\s+(?:an?\s+)?(?:ai\s+)?prompt|create\s+(?:an?\s+)?(?:ai\s+)?prompt(?:\s+(?:from|for)\s+this)?|generate\s+(?:an?\s+)?(?:ai\s+)?prompt|make\s+this\s+(?:an?\s+)?(?:ai\s+)?prompt|convert\s+(?:this\s+)?to\s+(?:an?\s+)?(?:ai\s+)?prompt|prompt\s+engineering|prompt\s+enhancer|(?:ai\s+)?prompt\s*[:\-—]|(?:ai\s+)?prompt){DELIM}?(.*)$',
         IntentCategory.CREATE_PROMPT,
         "You are an elite, world-class AI Prompt Architect. Transform the provided text into a comprehensive, production-grade AI Prompt with Role & Objective, Context & Background, Detailed Requirements & Scope, Step-by-Step Instructions, and Expected Output Format. Preserve 100% of all information and technical details without omitting anything. Never inject unrelated names or rules. Output ONLY the finalized prompt directly.",
         "gemini-3.5-flash-lite"
     ),
     # 4. Summarize
     (
-        rf'^(?:please\s+)?(?:summarize(?:\s+this)?|summarise(?:\s+this)?|give\s+me\s+a\s+summary(?:\s+of)?|give\s+a\s+summary(?:\s+of)?|quick\s+summary(?:\s+of)?|brief\s+summary(?:\s+of)?|bullet\s+summary(?:\s+of)?|tldr|tl;dr){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:summarize(?:\s+this)?|summarise(?:\s+this)?|give\s+me\s+a\s+summary(?:\s+of)?|give\s+a\s+summary(?:\s+of)?|quick\s+summary(?:\s+of)?|brief\s+summary(?:\s+of)?|bullet\s+summary(?:\s+of)?|executive\s+summary|tldr|tl;dr){DELIM}?(.*)$',
         IntentCategory.SUMMARIZE,
         "Summarize the provided content into clear, digestible bullet points highlighting key takeaways, action items, and conclusions. Output ONLY the summary bullet points.",
         "gemini-3.5-flash-lite"
@@ -109,56 +109,56 @@ INTENT_PATTERNS = [
     ),
     # 6. Shorten / Concise
     (
-        rf'^(?:please\s+)?(?:make\s+(?:this|it)\s+(?:more\s+)?shorter|shorten(?:\s+this)?|make\s+(?:this|it)\s+(?:more\s+)?concise|make\s+concise|trim(?:\s+this)?|condense(?:\s+this)?|cut\s+(?:the\s+)?fluff){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:make\s+(?:this|it)\s+(?:more\s+)?shorter|shorten(?:\s+this)?|make\s+(?:this|it)\s+(?:more\s+)?concise|make\s+concise|be\s+concise|trim(?:\s+this)?|condense(?:\s+this)?|cut\s+(?:the\s+)?fluff){DELIM}?(.*)$',
         IntentCategory.SHORTEN,
         "Condense the input text into a concise, punchy version without losing vital context or key points. Output ONLY the concise text.",
         "gemini-3.5-flash-lite"
     ),
     # 7. Expand
     (
-        rf'^(?:please\s+)?(?:expand(?:\s+on)?(?:\s+this)?|elaborate(?:\s+on)?(?:\s+this)?|add\s+more\s+details?(?:\s+to)?){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:expand(?:\s+on)?(?:\s+this)?|elaborate(?:\s+on)?(?:\s+this)?|add\s+more\s+details?(?:\s+to)?|give\s+more\s+details?|flesh\s+this\s+out){DELIM}?(.*)$',
         IntentCategory.EXPAND,
         "Expand upon the thoughts and concepts provided, providing thorough elaboration, context, and clear explanatory prose. Output ONLY the expanded content.",
         "gemini-3.5-flash-lite"
     ),
     # 8. Explain
     (
-        rf'^(?:please\s+)?(?:explain(?:\s+this)?|what\s+does\s+this\s+mean|break\s+down(?:\s+this)?|explain\s+what\s+this\s+means|explain\s+to\s+me){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:explain(?:\s+this)?|what\s+does\s+this\s+mean|break\s+down(?:\s+this)?|break\s+this\s+down|explain\s+what\s+this\s+means|explain\s+to\s+me|explain\s+simply|eli5){DELIM}?(.*)$',
         IntentCategory.EXPLAIN,
         "Explain the provided concept, code, or text in clear, step-by-step educational language with intuitive analogies. Output ONLY the explanation.",
         "gemini-3.5-flash-lite"
     ),
     # 9. Translate
     (
-        rf'^(?:please\s+)?(?:translate\s+(?:this\s+)?(?:in|to|into)\s+([A-Za-z]+)|([A-Za-z]+)\s+translation(?:\s+of)?){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:translate\s+(?:this\s+)?(?:in|to|into)\s+([A-Za-z]+)|([A-Za-z]+)\s+translation(?:\s+of)?|translate\s+to\s+([A-Za-z]+)){DELIM}?(.*)$',
         IntentCategory.TRANSLATE,
         "Accurately translate the provided text into the target language, preserving natural idioms and cultural nuances. Output ONLY the translation.",
         "gemini-3.5-flash-lite"
     ),
     # 10. Create Email
     (
-        rf'^(?:please\s+)?(?:create\s+(?:an\s+)?email|draft\s+(?:an\s+)?email|write\s+(?:an\s+)?email|compose\s+(?:an\s+)?email|email\s+draft)(?:\s+(?:to|about))?{DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:create\s+(?:an?\s+)?email|draft\s+(?:an?\s+)?email|write\s+(?:an?\s+)?email|compose\s+(?:an?\s+)?email|email\s+draft)(?:\s+(?:to|about))?{DELIM}?(.*)$',
         IntentCategory.CREATE_EMAIL,
         "Draft a complete, well-structured email with a concise Subject line, professional salutation, clear body paragraphs, and courteous sign-off. Output ONLY the email.",
         "gemini-3.5-flash-lite"
     ),
     # 11. Create GitHub Issue
     (
-        rf'^(?:please\s+)?(?:create\s+(?:a\s+)?(?:github\s+)?issue|new\s+github\s+issue|bug\s+report(?:\s+for)?|file\s+(?:a\s+)?bug(?:\s+report)?){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:create\s+(?:a\s+)?(?:github\s+)?issue|file\s+(?:an?\s+)?(?:github\s+)?issue(?:\s+for)?|file\s+(?:a\s+)?bug(?:\s+report)?|new\s+(?:github\s+)?issue|bug\s+report(?:\s+issue)?|github\s+issue){DELIM}?(.*)$',
         IntentCategory.CREATE_GITHUB_ISSUE,
-        "Format the input into a professional GitHub Issue description with Title, Description, Reproduction Steps, Expected vs Actual Behavior, and Environment. Output ONLY the markdown issue.",
+        "Convert the provided details into a structured GitHub Issue in markdown format with Title, Summary, Steps or Context, Technical Details, and Action Items checklist (- [ ]). Preserve 100% of all technical details, component names, error codes, and notes without omitting anything. Do not repeat the spoken trigger. Output ONLY the markdown issue.",
         "gemini-3.5-flash-lite"
     ),
     # 12. Create GitHub PR Description
     (
-        rf'^(?:please\s+)?(?:create\s+(?:a\s+)?(?:github\s+)?pr|create\s+(?:a\s+)?pull\s+request|pr\s+description(?:\s+for)?|pull\s+request\s+description(?:\s+for)?){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:create\s+(?:a\s+)?(?:github\s+)?pr|create\s+(?:a\s+)?pull\s+request|draft\s+pr(?:\s+description)?|pr\s+description(?:\s+for)?|pr\s+summary|pull\s+request(?:\s+description)?(?:\s+for)?){DELIM}?(.*)$',
         IntentCategory.CREATE_GITHUB_PR,
-        "Draft an exemplary GitHub Pull Request description featuring Summary of Changes, Motivation & Context, Testing Verification, and Checklist. Output ONLY the markdown PR description.",
+        "Convert the following notes into a professional GitHub Pull Request description in markdown format with Summary of Changes, Motivation & Context, Key Details & Branches, and Testing Checklist (- [ ]). Preserve 100% of all technical details, branch names, file paths, issue references, numbers, and notes without omitting anything. Do not repeat the spoken trigger. Output ONLY the markdown PR description.",
         "gemini-3.5-flash-lite"
     ),
     # 13. Create Task List
     (
-        rf'^(?:please\s+)?(?:create\s+(?:a\s+)?task\s+list|create\s+action\s+items|generate\s+(?:a\s+)?(?:todo|to-do)\s+list|make\s+(?:a\s+)?(?:todo|to-do)\s+list|(?:todo|to-do)\s+list|create\s+(?:a\s+)?checklist){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:create\s+(?:a\s+)?task\s+list|create\s+tasks|create\s+action\s+items|action\s+items|generate\s+(?:a\s+)?checklist|generate\s+(?:a\s+)?(?:todo|to-do)\s+list|make\s+(?:a\s+)?(?:todo|to-do)\s+list|(?:todo|to-do)\s+list|create\s+(?:a\s+)?checklist){DELIM}?(.*)$',
         IntentCategory.CREATE_TASK,
         "Extract and organize all implied and explicit action items into a prioritized, actionable markdown checklist with clear ownership and deliverables. Output ONLY the checklist.",
         "gemini-3.5-flash-lite"
@@ -166,33 +166,32 @@ INTENT_PATTERNS = [
     # 14. Generate Code
     (
         rf'^(?:please\s+)?(?:'
-        rf'(?:generate|write|create|give\s+me)\s+(?:an?\s+)?([A-Za-z0-9#+]+)\s+(?:script|function|class|method|code)(?:\s+(?:to|that|for))?|'
+        rf'(?:generate|write|create|give\s+me)\s+(?:an?\s+)?([A-Za-z0-9#+]+)\s+(?:script|function|class|method|code|query)(?:\s+(?:to|that|for))?|'
         rf'(?:generate|write|create|give\s+me)\s+code\s+in\s+([A-Za-z0-9#+]+)(?:\s+(?:to|that|for))?|'
         rf'([A-Za-z0-9#+]+)\s+code\s*[:\-—]\s*|'
         rf'code\s+(?:this\s+)?in\s+([A-Za-z0-9#+]+)|'
-        rf'(?:generate|write|create)\s+(?:an?\s+)?(?:script|function|class|method|code)(?:\s+(?:to|that|for))?'
+        rf'(?:generate|write|create)\s+(?:an?\s+)?(?:script|function|class|method|code|sql\s+query)(?:\s+(?:to|that|for))?|'
+        rf'write\s+code\s+to'
         rf'){DELIM}?(.*)$',
         IntentCategory.GENERATE_CODE,
-        "Write clean, robust, and idiomatic code adhering to modern best practices. Include concise explanatory comments and proper type annotations. Output ONLY the code.",
+        "You are a Senior Staff Software Engineer. Write clean, complete, runnable, and idiomatic code (with functions, classes, data structures, or executable scripts) implementing, modeling, or automating the requirements, logic, workflow, or data in the input text. Always format the output enclosed in markdown code fences (```language ... ```) containing concrete functions, classes, queries, or executable code. Output ONLY the code directly.",
         "gemini-3.5-flash-lite"
     ),
     # 15. Format Text / Table
     (
-        rf'^(?:please\s+)?(?:format\s+(?:this\s+)?(?:into|as)\s+(?:a\s+)?(?:markdown\s+)?table|format\s+into\s+table|format\s+as\s+table|create\s+(?:a\s+)?table(?:\s+from\s+this)?|convert\s+(?:this\s+)?to\s+(?:a\s+)?table|format\s+this){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:format\s+(?:this\s+)?(?:into|as)\s+(?:a\s+)?(?:markdown\s+)?table|format\s+into\s+(?:a\s+)?table|format\s+as\s+(?:a\s+)?table|create\s+(?:a\s+)?(?:markdown\s+)?table(?:\s+from\s+this)?|convert\s+(?:this\s+)?to\s+(?:a\s+)?(?:markdown\s+)?table|table\s+format|markdown\s+table|format\s+this){DELIM}?(.*)$',
         IntentCategory.FORMAT_TEXT,
         "Format the provided data or text cleanly into a structured markdown table according to the user's intent. Output ONLY the markdown table.",
         "gemini-3.5-flash-lite"
     ),
-    # 16. Rewrite
+    # 16. Rewrite / Polish
     (
-        rf'^(?:please\s+)?(?:rewrite(?:\s+this)?|rephrase(?:\s+this)?|polish(?:\s+this)?|improve\s+this|clean\s+up\s+this){DELIM}?(.*)$',
+        rf'^(?:please\s+)?(?:rewrite(?:\s+(?:this|and\s+polish))?|polish(?:\s+this)?|improve\s+this\s+text|rephrase(?:\s+this)?){DELIM}?(.*)$',
         IntentCategory.REWRITE,
-        "Rewrite the text to maximize clarity, elegance, and readability while faithfully preserving the original meaning and author perspective. Output ONLY the rewritten text.",
+        "Rewrite and polish the provided text to maximize clarity, elegance, and natural flow while strictly preserving the author's original meaning and facts. Output ONLY the polished text.",
         "gemini-3.5-flash-lite"
-    )
+    ),
 ]
-
-
 class IntentClassifier:
     """Classifies user speech or text into structured IntentResult."""
 
@@ -209,7 +208,7 @@ class IntentClassifier:
 
         # Check regex patterns
         for pattern_str, intent, instruction, target_model in INTENT_PATTERNS:
-            match = re.search(pattern_str, cleaned, re.IGNORECASE)
+            match = re.search(pattern_str, cleaned, re.IGNORECASE | re.DOTALL)
             if match:
                 groups = [g for g in match.groups() if g is not None]
                 payload = groups[-1].strip() if groups else ""

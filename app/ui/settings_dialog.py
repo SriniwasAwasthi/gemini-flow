@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QInputDialog, QDialogButtonBox, QSizePolicy, QTreeWidget,
     QTreeWidgetItem, QMenu, QCalendarWidget, QStyledItemDelegate
 )
-from PyQt6.QtGui import QFont, QColor, QIcon, QAction, QTextDocument
+from PyQt6.QtGui import QFont, QColor, QIcon, QAction, QTextDocument, QPainter, QLinearGradient, QBrush, QPen
 from pynput import keyboard
 
 from ..audio_recorder import AudioRecorder
@@ -200,6 +200,19 @@ QPushButton#refreshBtn:hover {
     background: rgba(56, 189, 248, 0.22);
     border: 1px solid #38BDF8;
     color: #FFFFFF;
+}
+QPushButton#saveBtn {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4F46E5, stop:0.5 #6366F1, stop:1 #7C3AED);
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 9px;
+    padding: 8px 22px;
+}
+QPushButton#saveBtn:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366F1, stop:0.5 #7C3AED, stop:1 #9333EA);
+    border: 1px solid rgba(255, 255, 255, 0.4);
 }
 QPushButton#successBtn {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10B981);
@@ -435,13 +448,1171 @@ QCalendarWidget QWidget {
     background-color: #0F172A;
     color: #F8FAFC;
 }
-QFrame#micCard, QFrame#dspCard, QFrame#offlineCard, QFrame#langCard, QFrame#headerCard {
+QFrame#micCard, QFrame#dspCard, QFrame#offlineCard, QFrame#langCard, QFrame#apiCard, QFrame#secCard, QFrame#showcaseCard, QFrame#milestoneCard {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(22, 31, 50, 0.8), stop:1 rgba(15, 23, 42, 0.9));
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
 }
+QFrame#leftSidebar {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(11, 15, 25, 0.95), stop:1 rgba(8, 12, 20, 0.98));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+}
+QFrame#sidebarWaveCard {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(15, 23, 42, 0.7), stop:1 rgba(8, 12, 20, 0.95));
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    border-radius: 12px;
+    padding: 8px;
+}
+QFrame#tabHeroBanner {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(30, 58, 138, 0.45), stop:0.5 rgba(15, 23, 42, 0.92), stop:1 rgba(30, 27, 75, 0.45));
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    border-radius: 12px;
+    padding: 12px 16px;
+}
+QLabel#heroBannerTitle { color: #FFFFFF; font-size: 16px; font-weight: 800; }
+QLabel#heroBannerSubtitle { color: #94A3B8; font-size: 11px; }
+QLabel#heroBannerQuote { color: #CBD5E1; font-size: 11px; font-style: italic; }
+QTextEdit#historyDetailText, QTextEdit#showcaseOutputEdit {
+    background-color: #0B1120;
+    color: #F8FAFC;
+    border: 1px solid #334155;
+    border-radius: 8px;
+}
+QLabel#blueSectionHeader, QLabel#blueSectionTitle {
+    color: #38BDF8;
+    font-weight: 700;
+    font-size: 15px;
+    border: none;
+    background: transparent;
+}
+QLabel#sidebarBrandTitle {
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 15px;
+}
+QLabel#waveSlogan {
+    color: #38BDF8;
+}
+QLabel#descLabel { color: #94A3B8; }
+QLabel#blueSectionHeader, QLabel#blueSectionHeader, QLabel#blueSectionTitle { color: #0284C7; font-weight: 700; font-size: 15px; border: none; background: transparent; }
+QPushButton#themeToggleBtn {
+    background: rgba(56, 189, 248, 0.12);
+    color: #38BDF8;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-weight: 700;
+    font-size: 11px;
+}
+QPushButton#themeToggleBtn:hover {
+    background: rgba(56, 189, 248, 0.22);
+    border-color: #38BDF8;
+    color: #FFFFFF;
+}
+QFrame#micCard, QFrame#dspCard, QFrame#offlineCard, QFrame#langCard, QFrame#apiCard, QFrame#secCard, QFrame#showcaseCard, QFrame#milestoneCard, QFrame#temporalStatCard, QFrame#autoCostCard, QFrame#sandboxCard, QFrame#historyCard, QFrame#sampleCard, QFrame#profileDetailCard, QFrame#promptCard {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(22, 31, 50, 0.8), stop:1 rgba(15, 23, 42, 0.9));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+QFrame#spokenBox, QFrame#statHeroBox {
+    background-color: #1E293B;
+    border: 1px dashed #6366F1;
+    border-radius: 8px;
+    padding: 8px;
+}
+QLabel#sampleBox {
+    background-color: #0F172A;
+    border: 1px solid #1E293B;
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: #FDE047;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: Consolas, 'Segoe UI';
+}
+QLabel#showcasePurposeLabel {
+    color: #E2E8F0;
+    font-size: 12px;
+    background: #1E293B;
+    border-radius: 6px;
+    padding: 8px 10px;
+    border: 1px solid #334155;
+}
+QLabel#showcaseSpokenText {
+    color: #CBD5E1;
+    font-size: 12px;
+    font-style: italic;
+    border: none;
+    background: transparent;
+}
+QLabel#milestoneBadge, QLabel#sampleBadge {
+    color: #FFFFFF;
+    font-weight: bold;
+    font-size: 11px;
+    background: #0284C7;
+    border-radius: 4px;
+    padding: 3px 8px;
+    border: none;
+}
+QLabel#showcaseBadge {
+    color: #38BDF8;
+    font-weight: bold;
+    font-size: 11px;
+    background: #0369A1;
+    border-radius: 4px;
+    padding: 3px 8px;
+    border: none;
+}
+QLabel#activePromptBadge, QLabel#autoCostBadge {
+    color: #10B981;
+    font-weight: bold;
+    font-size: 11px;
+    background: #064E3B;
+    border-radius: 4px;
+    padding: 3px 8px;
+    border: none;
+}
+QLabel#statScopeBadge {
+    color: #38BDF8;
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+}
+QLabel#statTimeSavedHero {
+    font-size: 16px;
+    font-weight: bold;
+    color: #38BDF8;
+    border: none;
+    background: transparent;
+}
+QLabel#statSpeedupBadge {
+    color: #10B981;
+    font-weight: bold;
+    font-size: 11px;
+    background: #064E3B;
+    border-radius: 4px;
+    padding: 2px 6px;
+    border: none;
+}
+QLabel#statComparisonLabel {
+    color: #94A3B8;
+    font-size: 11px;
+    border: none;
+    background: transparent;
+}
+QLabel#statPromptLabel {
+    color: #94A3B8;
+    font-size: 12px;
+    border: none;
+    background: transparent;
+}
+QLabel#statValWhite {
+    color: #F8FAFC;
+    font-size: 12px;
+    font-weight: bold;
+    border: none;
+    background: transparent;
+}
+QLabel#statValMuted {
+    color: #CBD5E1;
+    font-size: 12px;
+    border: none;
+    background: transparent;
+}
+QLabel#statValBlue {
+    color: #38BDF8;
+    font-size: 12px;
+    border: none;
+    background: transparent;
+}
+QLabel#statValGreen {
+    color: #10B981;
+    font-size: 12px;
+    font-weight: bold;
+    border: none;
+    background: transparent;
+}
+QLabel#statValGold {
+    color: #F59E0B;
+    font-size: 12px;
+    font-weight: bold;
+    border: none;
+    background: transparent;
+}
+QLabel#vocabTestOutput {
+    color: #10B981;
+    font-weight: 700;
+    font-size: 13px;
+    border: none;
+    background: transparent;
+}
+QLabel#controlLabel, QLabel#vocabResultLabel {
+    color: #E2E8F0;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+}
+QLabel#profileDescLabel {
+    color: #E2E8F0;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+}
+QLabel#profileModelBadge {
+    color: #38BDF8;
+    font-weight: 700;
+    background: #1E293B;
+    border: 1px solid #0284C7;
+    border-radius: 6px;
+    padding: 4px 10px;
+}
+QLabel#profileVocabTags {
+    color: #A78BFA;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+}
+QFrame#tabSeparator {
+    background-color: #334155;
+    max-height: 1px;
+    margin: 10px 0;
+}
+QLabel#milestoneDesc {
+    color: #E2E8F0;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+}
+QPushButton#presetHotkeyBtn {
+    background-color: #1E293B;
+    color: #F8FAFC;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QPushButton#presetHotkeyBtn:hover {
+    background-color: #334155;
+    color: #38BDF8;
+    border-color: #38BDF8;
+}
+QLabel#escInfoLabel {
+    color: #38BDF8;
+    font-size: 12px;
+    background: #0F172A;
+    border: 1px solid #334155;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-top: 4px;
+}
+QTabWidget#historyDetailTabs::pane {
+    border: 1px solid #1E293B;
+    background-color: #0F172A;
+    border-radius: 6px;
+}
+QTabWidget#historyDetailTabs QTabBar::tab {
+    background: #0B1120;
+    color: #94A3B8;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+QTabWidget#historyDetailTabs QTabBar::tab:selected {
+    background: #1E293B;
+    color: #38BDF8;
+    border-bottom: 2px solid #38BDF8;
+}
+QTextEdit#historyDetailText, QTextEdit#historyRawDetailText {
+    background-color: #0F172A;
+    color: #FFFFFF;
+    border: none;
+    font-size: 13px;
+    line-height: 1.5;
+}
+QLabel#historyBadge {
+    color: #94A3B8;
+    background-color: #1E293B;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+}
+QLabel#historyBadgeSafeguard {
+    color: #38BDF8;
+    background-color: #0C4A6E;
+    border: 1px solid #0284C7;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+QLabel#langStatusBadge {
+    font-size: 12px;
+    font-weight: 700;
+    color: #38BDF8;
+    background-color: #1E293B;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+}
+QPushButton#langRegionBtn {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background-color: #1E293B;
+    color: #94A3B8;
+    border: 1px solid #334155;
+}
+QPushButton#langRegionBtn:checked {
+    background-color: #0284C7;
+    color: #FFFFFF;
+    border: 1px solid #38BDF8;
+}
+QTableWidget#langTable {
+    background-color: #0B1120;
+    border: 1px solid #1E293B;
+    border-radius: 6px;
+    gridline-color: #1E293B;
+    selection-background-color: #1E293B;
+}
+QTableWidget#langTable QHeaderView::section {
+    background-color: #1E293B;
+    color: #38BDF8;
+    font-weight: bold;
+    border: 1px solid #0F172A;
+    padding: 4px;
+}
+QFrame#routerStatusCard, QFrame#routerSelectCard, QFrame#routerSpokenCard, QFrame#routerModelCard, QFrame#benchMetricsCard, QFrame#benchSuiteCard {
+    background-color: #0F172A;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px;
+}
+QLabel#routerOutputBox {
+    background-color: #0B1120;
+    border: 1px solid #1E293B;
+    border-radius: 6px;
+    padding: 8px;
+    color: #10B981;
+    font-size: 12px;
+    font-family: Consolas, 'Segoe UI';
+}
+QLabel#benchStatPill {
+    background: #1E293B;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    border: none;
+    color: #F8FAFC;
+}
+QLabel#routerActiveBadge {
+    color: #10B981;
+    font-weight: 700;
+    font-size: 13px;
+    border: none;
+}
+QFrame#filterTagBar {
+    background-color: #1E293B;
+    border: 1px solid #0284C7;
+    border-radius: 6px;
+    padding: 4px 10px;
+}
+QPushButton#langSuggestionBtn {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background-color: #0F172A;
+    color: #F8FAFC;
+    border: 1px solid #0284C7;
+}
+QPushButton#langSuggestionBtn:hover {
+    background-color: #0369A1;
+    border: 1px solid #38BDF8;
+    color: #FFFFFF;
+}
 """
 DARK_STYLE = DARK_STYLE.replace("{CHECK_ICON}", _CHECK_ICON).replace("{RADIO_ICON}", _RADIO_ICON)
+
+LIGHT_STYLE = """
+QDialog {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F8FAFC, stop:0.5 #F1F5F9, stop:1 #E2E8F0);
+    color: #000000;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+QTabWidget::pane {
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 8px;
+    top: 0px;
+}
+QTabBar {
+    qproperty-drawBase: 0;
+    background: transparent;
+    border: none;
+    margin-bottom: 8px;
+}
+QTabBar::tab {
+    background: #F1F5F9;
+    color: #475569;
+    border: 1px solid #CBD5E1;
+    border-radius: 9px;
+    padding: 9px 15px;
+    margin-right: 4px;
+    margin-bottom: 4px;
+    font-weight: 600;
+    font-size: 12px;
+    min-height: 18px;
+}
+QTabBar::tab:hover {
+    background: #E2E8F0;
+    color: #0284C7;
+    border: 1px solid #38BDF8;
+}
+QTabBar::tab:selected {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:0.5 #3B82F6, stop:1 #4F46E5);
+    color: #FFFFFF;
+    border: 1px solid #1D4ED8;
+    font-weight: 700;
+}
+QLabel {
+    color: #000000;
+    font-size: 13px;
+}
+QLabel#descLabel {
+    color: #000000;
+    font-weight: 500;
+}
+QLabel#blueSectionHeader, QLabel#blueSectionHeader, QLabel#blueSectionTitle { color: #0284C7; font-weight: 700; font-size: 15px; border: none; background: transparent; }
+QLineEdit, QTextEdit {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+}
+QLineEdit:hover, QTextEdit:hover {
+    border: 1.5px solid #38BDF8;
+}
+QLineEdit:focus, QTextEdit:focus {
+    border: 2px solid #2563EB;
+    background-color: #FFFFFF;
+}
+QComboBox {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    min-height: 24px;
+}
+QComboBox:hover {
+    border: 1.5px solid #38BDF8;
+}
+QComboBox:focus {
+    border: 2px solid #2563EB;
+}
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 28px;
+    border-left: 1px solid #CBD5E1;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+QComboBox::down-arrow {
+    image: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #475569;
+    margin: 4px;
+}
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF;
+    color: #000000;
+    selection-background-color: #2563EB;
+    selection-color: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 4px;
+    outline: none;
+}
+QComboBox QAbstractItemView::item {
+    padding: 8px 12px;
+    min-height: 24px;
+    border-radius: 6px;
+    color: #000000;
+}
+QComboBox QAbstractItemView::item:hover {
+    background-color: #EFF6FF;
+    color: #0284C7;
+}
+QComboBox QAbstractItemView::item:selected {
+    background-color: #2563EB;
+    color: #FFFFFF;
+}
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:1 #4F46E5);
+    color: #FFFFFF;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 9px 20px;
+    font-weight: 700;
+    font-size: 13px;
+}
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1D4ED8, stop:1 #4338CA);
+}
+QPushButton:pressed {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1E40AF, stop:1 #3730A3);
+}
+QPushButton#secondaryBtn {
+    background-color: #F1F5F9;
+    color: #0F172A;
+    border: 1px solid #CBD5E1;
+}
+QPushButton#secondaryBtn:hover {
+    background-color: #E2E8F0;
+    border: 1px solid #94A3B8;
+    color: #000000;
+}
+QPushButton#refreshBtn {
+    background: #EFF6FF;
+    color: #0284C7;
+    border: 1px solid #38BDF8;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-weight: 600;
+    font-size: 12px;
+}
+QPushButton#refreshBtn:hover {
+    background: #DBEAFE;
+    border: 1px solid #0284C7;
+    color: #1D4ED8;
+}
+QPushButton#saveBtn {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:0.5 #3B82F6, stop:1 #4F46E5);
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 9px;
+    padding: 8px 22px;
+}
+QPushButton#saveBtn:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1D4ED8, stop:0.5 #2563EB, stop:1 #4338CA);
+}
+QPushButton#themeToggleBtn {
+    background: #EFF6FF;
+    color: #0284C7;
+    border: 1.5px solid #38BDF8;
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-weight: 700;
+    font-size: 11px;
+}
+QPushButton#themeToggleBtn:hover {
+    background: #DBEAFE;
+    color: #1D4ED8;
+    border-color: #0284C7;
+}
+QPushButton#successBtn {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10B981);
+    color: white;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+QPushButton#dangerBtn {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #DC2626, stop:1 #991B1B);
+    color: white;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+QPushButton#dangerBtn:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #EF4444, stop:1 #991B1B);
+}
+QPushButton#recordKeyBtn {
+    background-color: #F1F5F9;
+    color: #0284C7;
+    border: 2px dashed #38BDF8;
+    padding: 10px 16px;
+    font-weight: 600;
+    text-align: center;
+}
+QPushButton#recordKeyBtn:hover {
+    background-color: #E2E8F0;
+    border: 2px solid #0284C7;
+}
+QCheckBox {
+    color: #000000;
+    spacing: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 2px solid #94A3B8;
+    background-color: #FFFFFF;
+}
+QCheckBox::indicator:hover {
+    border: 2px solid #0284C7;
+    background-color: #F8FAFC;
+}
+QCheckBox::indicator:checked {
+    border: 2px solid #0284C7;
+    background-color: #0284C7;
+    image: url({CHECK_ICON});
+}
+QRadioButton {
+    color: #000000;
+    spacing: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QRadioButton::indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    border: 2px solid #94A3B8;
+    background-color: #FFFFFF;
+}
+QRadioButton::indicator:hover {
+    border: 2px solid #0284C7;
+    background-color: #F8FAFC;
+}
+QRadioButton::indicator:checked {
+    border: 2px solid #0284C7;
+    background-color: #0284C7;
+    image: url({RADIO_ICON});
+}
+QListWidget, QTableWidget, QTreeWidget {
+    background-color: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 10px;
+    color: #000000;
+    padding: 6px;
+    outline: none;
+}
+QListWidget::item, QTreeWidget::item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+    background-color: transparent;
+    color: #000000;
+}
+QListWidget::item:hover, QTreeWidget::item:hover {
+    background-color: #EFF6FF;
+    color: #0284C7;
+}
+QListWidget::item:selected, QTreeWidget::item:selected {
+    background: #2563EB;
+    color: #FFFFFF;
+}
+QTableWidget {
+    gridline-color: #E2E8F0;
+    font-size: 14px;
+}
+QTableWidget::item {
+    padding: 6px 12px;
+    border-bottom: 1px solid #E2E8F0;
+    color: #000000;
+    font-size: 14px;
+}
+QTableWidget::item:selected {
+    background-color: #2563EB;
+    color: #FFFFFF;
+    font-weight: bold;
+}
+QTableWidget::item:hover {
+    background-color: #EFF6FF;
+}
+QHeaderView::section {
+    background-color: #F1F5F9;
+    color: #0284C7;
+    padding: 8px 12px;
+    border: none;
+    border-bottom: 2px solid #2563EB;
+    font-weight: 700;
+    font-size: 12px;
+}
+QPushButton#historyChip {
+    background-color: #F1F5F9;
+    color: #334155;
+    border: 1px solid #CBD5E1;
+    border-radius: 12px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    min-height: 20px;
+}
+QPushButton#historyChip:hover {
+    background-color: #EFF6FF;
+    color: #0284C7;
+    border: 1px solid #0284C7;
+}
+QProgressBar {
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    background: #E2E8F0;
+    text-align: center;
+    color: #000000;
+    font-weight: 700;
+    font-size: 11px;
+    min-height: 18px;
+}
+QProgressBar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10B981, stop:0.5 #0284C7, stop:1 #2563EB);
+    border-radius: 7px;
+}
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 2px;
+    border-radius: 4px;
+}
+QScrollBar::handle:vertical {
+    background: #CBD5E1;
+    min-height: 28px;
+    border-radius: 4px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #0284C7;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+    background: none;
+    border: none;
+}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+QMenu {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 6px;
+}
+QMenu::item {
+    padding: 8px 24px 8px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #000000;
+}
+QMenu::item:selected {
+    background-color: #2563EB;
+    color: white;
+}
+QMenu::separator {
+    height: 1px;
+    background: #E2E8F0;
+    margin: 4px 8px;
+}
+QCalendarWidget QWidget {
+    background-color: #FFFFFF;
+    color: #000000;
+}
+QFrame#micCard, QFrame#dspCard, QFrame#offlineCard, QFrame#langCard, QFrame#apiCard, QFrame#secCard, QFrame#showcaseCard, QFrame#milestoneCard {
+    background-color: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 12px;
+}
+QFrame#leftSidebar {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 14px;
+}
+QFrame#sidebarWaveCard {
+    background: #F8FAFC;
+    border: 1px solid #93C5FD;
+    border-radius: 12px;
+    padding: 8px;
+}
+QFrame#tabHeroBanner {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #EFF6FF, stop:0.5 #F8FAFC, stop:1 #EEF2FF);
+    border: 1px solid #93C5FD;
+    border-radius: 12px;
+    padding: 12px 16px;
+}
+QTextEdit#historyDetailText, QTextEdit#showcaseOutputEdit {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+}
+QLabel#blueSectionHeader, QLabel#blueSectionTitle {
+    color: #0284C7;
+    font-weight: 700;
+    font-size: 15px;
+    border: none;
+    background: transparent;
+}
+QLabel#sidebarBrandTitle {
+    color: #0284C7;
+    font-weight: 800;
+    font-size: 15px;
+}
+QLabel#waveSlogan {
+    color: #0284C7;
+}
+QLabel#heroBannerTitle { color: #000000; font-size: 16px; font-weight: 800; }
+QLabel#heroBannerSubtitle { color: #334155; font-size: 11px; }
+QLabel#heroBannerQuote { color: #0284C7; font-size: 11px; font-style: italic; }
+QFrame#micCard, QFrame#dspCard, QFrame#offlineCard, QFrame#langCard, QFrame#apiCard, QFrame#secCard, QFrame#showcaseCard, QFrame#milestoneCard, QFrame#temporalStatCard, QFrame#autoCostCard, QFrame#sandboxCard, QFrame#historyCard, QFrame#sampleCard, QFrame#profileDetailCard, QFrame#promptCard {
+    background-color: #FFFFFF;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 12px;
+}
+QFrame#spokenBox, QFrame#statHeroBox {
+    background-color: #F8FAFC;
+    border: 1.5px dashed #0284C7;
+    border-radius: 8px;
+    padding: 8px;
+}
+QLabel#sampleBox {
+    background-color: #F8FAFC;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: #000000;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: Consolas, 'Segoe UI';
+}
+QLabel#showcasePurposeLabel {
+    color: #000000;
+    font-size: 12px;
+    font-weight: 500;
+    background: #F1F5F9;
+    border-radius: 6px;
+    padding: 8px 10px;
+    border: 1.5px solid #CBD5E1;
+}
+QLabel#showcaseSpokenText {
+    color: #000000;
+    font-size: 12px;
+    font-weight: 600;
+    font-style: italic;
+    border: none;
+    background: transparent;
+}
+QLabel#milestoneBadge, QLabel#sampleBadge {
+    color: #FFFFFF;
+    font-weight: bold;
+    font-size: 11px;
+    background: #0284C7;
+    border-radius: 4px;
+    padding: 3px 8px;
+    border: none;
+}
+QLabel#showcaseBadge {
+    color: #FFFFFF;
+    font-weight: bold;
+    font-size: 11px;
+    background: #0284C7;
+    border-radius: 4px;
+    padding: 3px 8px;
+    border: none;
+}
+QLabel#activePromptBadge, QLabel#autoCostBadge {
+    color: #065F46;
+    font-weight: bold;
+    font-size: 11px;
+    background: #D1FAE5;
+    border: 1px solid #10B981;
+    border-radius: 4px;
+    padding: 3px 8px;
+}
+QLabel#statScopeBadge {
+    color: #0284C7;
+    background-color: #EFF6FF;
+    border: 1px solid #93C5FD;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+}
+QLabel#statTimeSavedHero {
+    font-size: 16px;
+    font-weight: bold;
+    color: #0284C7;
+    border: none;
+    background: transparent;
+}
+QLabel#statSpeedupBadge {
+    color: #065F46;
+    font-weight: bold;
+    font-size: 11px;
+    background: #D1FAE5;
+    border: 1px solid #10B981;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+QLabel#statComparisonLabel {
+    color: #475569;
+    font-size: 11px;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+}
+QLabel#statPromptLabel {
+    color: #000000;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+}
+QLabel#statValWhite, QLabel#statValMuted {
+    color: #000000;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    background: transparent;
+}
+QLabel#statValBlue {
+    color: #0284C7;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    background: transparent;
+}
+QLabel#statValGreen {
+    color: #059669;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    background: transparent;
+}
+QLabel#statValGold {
+    color: #D97706;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    background: transparent;
+}
+QLabel#vocabTestOutput {
+    color: #059669;
+    font-weight: 700;
+    font-size: 13px;
+    border: none;
+    background: transparent;
+}
+QLabel#controlLabel, QLabel#vocabResultLabel {
+    color: #000000;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+}
+QLabel#profileDescLabel {
+    color: #000000;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+}
+QLabel#profileModelBadge {
+    color: #0284C7;
+    font-weight: 700;
+    background: #EFF6FF;
+    border: 1.5px solid #38BDF8;
+    border-radius: 6px;
+    padding: 4px 10px;
+}
+QLabel#profileVocabTags {
+    color: #7C3AED;
+    font-weight: 700;
+    border: none;
+    background: transparent;
+}
+QFrame#tabSeparator {
+    background-color: #CBD5E1;
+    max-height: 1px;
+    margin: 10px 0;
+}
+QLabel#milestoneDesc {
+    color: #000000;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+}
+QPushButton#presetHotkeyBtn {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 700;
+}
+QPushButton#presetHotkeyBtn:hover {
+    background-color: #EFF6FF;
+    color: #0284C7;
+    border-color: #0284C7;
+}
+QLabel#escInfoLabel {
+    color: #0284C7;
+    font-size: 12px;
+    font-weight: 600;
+    background: #EFF6FF;
+    border: 1.5px solid #93C5FD;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-top: 4px;
+}
+QTabWidget#historyDetailTabs::pane {
+    border: 1.5px solid #CBD5E1;
+    background-color: #FFFFFF;
+    border-radius: 6px;
+}
+QTabWidget#historyDetailTabs QTabBar::tab {
+    background: #F1F5F9;
+    color: #475569;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+QTabWidget#historyDetailTabs QTabBar::tab:selected {
+    background: #FFFFFF;
+    color: #0284C7;
+    border-bottom: 2px solid #0284C7;
+}
+QTextEdit#historyDetailText, QTextEdit#historyRawDetailText {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+QLabel#historyBadge {
+    color: #000000;
+    background-color: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+QLabel#historyBadgeSafeguard {
+    color: #0284C7;
+    background-color: #EFF6FF;
+    border: 1px solid #38BDF8;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+QLabel#langStatusBadge {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0284C7;
+    background-color: #EFF6FF;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1.5px solid #38BDF8;
+}
+QPushButton#langRegionBtn {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background-color: #F1F5F9;
+    color: #334155;
+    border: 1px solid #CBD5E1;
+}
+QPushButton#langRegionBtn:checked {
+    background-color: #0284C7;
+    color: #FFFFFF;
+    border: 1px solid #0284C7;
+}
+QTableWidget#langTable {
+    background-color: #FFFFFF;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 6px;
+    gridline-color: #E2E8F0;
+    selection-background-color: #EFF6FF;
+    color: #000000;
+}
+QTableWidget#langTable QHeaderView::section {
+    background-color: #F1F5F9;
+    color: #0284C7;
+    font-weight: bold;
+    border: 1px solid #CBD5E1;
+    padding: 4px;
+}
+QTableWidget#langTable QTableWidgetItem {
+    color: #000000;
+}
+QFrame#routerStatusCard, QFrame#routerSelectCard, QFrame#routerSpokenCard, QFrame#routerModelCard, QFrame#benchMetricsCard, QFrame#benchSuiteCard {
+    background-color: #FFFFFF;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 12px;
+}
+QLabel#routerOutputBox {
+    background-color: #F8FAFC;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 8px;
+    color: #065F46;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: Consolas, 'Segoe UI';
+}
+QLabel#benchStatPill {
+    background: #F1F5F9;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    border: 1px solid #CBD5E1;
+    color: #000000;
+    font-weight: 600;
+}
+QLabel#routerActiveBadge {
+    color: #065F46;
+    font-weight: 700;
+    font-size: 13px;
+    border: none;
+}
+QFrame#filterTagBar {
+    background-color: #EFF6FF;
+    border: 1.5px solid #38BDF8;
+    border-radius: 6px;
+    padding: 4px 10px;
+}
+QPushButton#langSuggestionBtn {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background-color: #F8FAFC;
+    color: #0284C7;
+    border: 1.5px solid #38BDF8;
+}
+QPushButton#langSuggestionBtn:hover {
+    background-color: #EFF6FF;
+    border-color: #0284C7;
+    color: #0369A1;
+}
+"""
+LIGHT_STYLE = LIGHT_STYLE.replace("{CHECK_ICON}", _CHECK_ICON).replace("{RADIO_ICON}", _RADIO_ICON)
 
 
 class HotkeyCaptureSignals(QObject):
@@ -458,6 +1629,7 @@ class HotkeyCaptureButton(QPushButton):
         self.display_str = default_display
         self.internal_str = default_internal
         self.is_recording = False
+        self.is_light = False
         self.signals = HotkeyCaptureSignals()
         self.signals.key_combo_updated.connect(self._on_combo_updated)
 
@@ -473,6 +1645,10 @@ class HotkeyCaptureButton(QPushButton):
         self._update_button_text()
         self.clicked.connect(self._toggle_recording)
 
+    def set_theme(self, is_light: bool):
+        self.is_light = is_light
+        self._update_button_text()
+
     def set_hotkey(self, display_str: str, internal_str: str):
         self.display_str = display_str
         self.internal_str = internal_str
@@ -481,37 +1657,70 @@ class HotkeyCaptureButton(QPushButton):
     def _update_button_text(self):
         if self.is_recording:
             self.setText("🔴 Recording Shortcut... Press Keys on Keyboard (e.g. Shift, Ctrl, Win)")
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #312E81;
-                    color: #FDE047;
-                    border: 2px solid #F59E0B;
-                    border-radius: 8px;
-                    padding: 8px 16px;
-                    font-size: 13px;
-                    font-weight: bold;
-                    text-align: center;
-                }
-            """)
+            if self.is_light:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FEF3C7;
+                        color: #92400E;
+                        border: 2px solid #D97706;
+                        border-radius: 8px;
+                        padding: 8px 16px;
+                        font-size: 13px;
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                """)
+            else:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #312E81;
+                        color: #FDE047;
+                        border: 2px solid #F59E0B;
+                        border-radius: 8px;
+                        padding: 8px 16px;
+                        font-size: 13px;
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                """)
         else:
             self.setText(f"⌨️  {self.display_str}   (Click to Record Shortcut)")
-            self.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #38BDF8;
-                    border: 2px dashed #6366F1;
-                    border-radius: 8px;
-                    padding: 8px 16px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    text-align: center;
-                }
-                QPushButton:hover {
-                    background-color: #334155;
-                    border-color: #38BDF8;
-                    color: #FFFFFF;
-                }
-            """)
+            if self.is_light:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #FFFFFF;
+                        color: #0284C7;
+                        border: 2px dashed #0284C7;
+                        border-radius: 8px;
+                        padding: 8px 16px;
+                        font-size: 14px;
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                    QPushButton:hover {
+                        background-color: #EFF6FF;
+                        border-color: #2563EB;
+                        color: #1D4ED8;
+                    }
+                """)
+            else:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: #1E293B;
+                        color: #38BDF8;
+                        border: 2px dashed #6366F1;
+                        border-radius: 8px;
+                        padding: 8px 16px;
+                        font-size: 14px;
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                    QPushButton:hover {
+                        background-color: #334155;
+                        border-color: #38BDF8;
+                        color: #FFFFFF;
+                    }
+                """)
 
     def _toggle_recording(self):
         if not self.is_recording:
@@ -623,7 +1832,8 @@ class DictEditDialog(QDialog):
         layout.setSpacing(14)
 
         desc = QLabel("Teach Gemini Flow how you want specific names, acronyms, or misheard words to be spelled.")
-        desc.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        desc.setObjectName("descLabel")
+        desc.setStyleSheet("font-size: 12px;")
         layout.addWidget(desc)
 
         layout.addWidget(QLabel("Spoken / Misheard Phrase (What speech-to-text might hear):"))
@@ -733,7 +1943,8 @@ class VocabEditDialog(QDialog):
         layout.setSpacing(12)
 
         desc = QLabel("Define canonical terms, technical acronyms, or proper names with their spoken phonetic variants.")
-        desc.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        desc.setObjectName("descLabel")
+        desc.setStyleSheet("font-size: 12px;")
         layout.addWidget(desc)
 
         layout.addWidget(QLabel("Canonical Term (Exact spelling to output):"))
@@ -814,7 +2025,8 @@ class PromptResultDialog(QDialog):
         layout.addWidget(header)
 
         sub = QLabel("Formatted for ChatGPT, Claude, Gemini, or IDEs. Automatically copied to clipboard.", self)
-        sub.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        sub.setObjectName("descLabel")
+        sub.setStyleSheet("font-size: 12px;")
         layout.addWidget(sub)
 
         self.prompt_view = QTextEdit(self)
@@ -873,7 +2085,8 @@ class RenameTranscriptDialog(QDialog):
         layout.addWidget(title)
 
         sub = QLabel("Give this transcript a memorable name (e.g. 'Project Planning', 'Email to Team', 'Bug Report').", self)
-        sub.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        sub.setObjectName("descLabel")
+        sub.setStyleSheet("font-size: 12px;")
         sub.setWordWrap(True)
         layout.addWidget(sub)
 
@@ -1132,6 +2345,147 @@ COMBINATION_SHOWCASE_DATA = [
 ]
 
 
+class NeonWaveCanvas(QWidget):
+    """Paints a multi-bar glowing neon soundwave in purple & cyan gradient."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(34)
+        self.setFixedWidth(130)
+        self.phase = 0.0
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._tick)
+        self.timer.start(50)
+
+    def _tick(self):
+        self.phase += 0.12
+        self.update()
+
+    def paintEvent(self, event):
+        import math
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w = float(self.width())
+        h = float(self.height())
+        mid_y = h / 2.0
+
+        num_bars = 13
+        bar_w = 4.0
+        spacing = (w - (num_bars * bar_w)) / (num_bars + 1)
+
+        for i in range(num_bars):
+            x = spacing + i * (bar_w + spacing)
+            dist_from_center = abs(i - (num_bars - 1) / 2.0)
+            envelope = math.exp(-0.14 * (dist_from_center ** 2))
+            wave = (math.sin(self.phase + i * 0.5) * 0.4 + 0.6) * envelope
+            bar_h = max(4.0, wave * (h - 4.0))
+
+            rect_y = mid_y - bar_h / 2.0
+            grad = QLinearGradient(x, rect_y, x, rect_y + bar_h)
+            grad.setColorAt(0.0, QColor("#38BDF8"))
+            grad.setColorAt(0.5, QColor("#818CF8"))
+            grad.setColorAt(1.0, QColor("#C084FC"))
+
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(grad)
+            painter.drawRoundedRect(int(x), int(rect_y), int(bar_w), int(bar_h), 2, 2)
+
+
+class SidebarWaveCard(QFrame):
+    """Luxury Neon Soundwave Card with brand motto at bottom of sidebar."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("sidebarWaveCard")
+        vbox = QVBoxLayout(self)
+        vbox.setContentsMargins(6, 10, 6, 10)
+        vbox.setSpacing(6)
+        vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.wave_canvas = NeonWaveCanvas(self)
+        vbox.addWidget(self.wave_canvas)
+
+        self.slogan = QLabel("SPEAK • TRANSCRIBE • CREATE\nWITH GEMINI FLOW", self)
+        self.slogan.setObjectName("waveSlogan")
+        self.slogan.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.slogan.setStyleSheet("""
+            font-size: 8px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            border: none;
+            background: transparent;
+        """)
+        vbox.addWidget(self.slogan)
+
+
+class SidebarNavButton(QPushButton):
+    """Custom navigation pill button for the left sidebar."""
+    def __init__(self, icon_str: str, label_str: str, index: int, parent=None):
+        super().__init__(f"  {icon_str}  {label_str}", parent)
+        self.index = index
+        self.setFixedHeight(38)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFont(QFont("Segoe UI", 10, QFont.Weight.DemiBold))
+        self.is_active_state = False
+        self.is_light_mode = False
+        self.set_active(False)
+
+    def set_theme(self, is_light: bool):
+        self.is_light_mode = is_light
+        self.set_active(self.is_active_state)
+
+    def set_active(self, active: bool):
+        self.is_active_state = active
+        if active:
+            self.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:0.5 #3B82F6, stop:1 #4F46E5);
+                    color: #FFFFFF;
+                    border: 1px solid rgba(255, 255, 255, 0.25);
+                    border-radius: 8px;
+                    text-align: left;
+                    padding-left: 10px;
+                    font-weight: 700;
+                    font-size: 12px;
+                }
+            """)
+        else:
+            if self.is_light_mode:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: transparent;
+                        color: #000000;
+                        border: 1px solid transparent;
+                        border-radius: 8px;
+                        text-align: left;
+                        padding-left: 10px;
+                        font-weight: 700;
+                        font-size: 12px;
+                    }
+                    QPushButton:hover {
+                        background-color: #EFF6FF;
+                        color: #0284C7;
+                        border: 1px solid #93C5FD;
+                    }
+                """)
+            else:
+                self.setStyleSheet("""
+                    QPushButton {
+                        background-color: transparent;
+                        color: #94A3B8;
+                        border: 1px solid transparent;
+                        border-radius: 8px;
+                        text-align: left;
+                        padding-left: 10px;
+                        font-weight: 600;
+                        font-size: 12px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(30, 41, 59, 0.7);
+                        color: #F8FAFC;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                    }
+                """)
+
+
 class SettingsDialog(QDialog):
     settings_applied = pyqtSignal()
     api_test_finished = pyqtSignal(bool, str, str)  # (ok, msg, key)
@@ -1176,8 +2530,9 @@ class SettingsDialog(QDialog):
             Qt.WindowType.WindowMinMaxButtonsHint |
             Qt.WindowType.WindowCloseButtonHint
         )
-        self.setMinimumSize(720, 620)
-        self.setStyleSheet(DARK_STYLE)
+        self.setMinimumSize(1080, 680)
+        self.theme_mode = self.config.get("theme_mode", "dark")
+        self.setStyleSheet(LIGHT_STYLE if self.theme_mode == "light" else DARK_STYLE)
 
         # Debounce timer for geometry persistence (250ms)
         self._debounce_save_timer = QTimer(self)
@@ -1192,16 +2547,16 @@ class SettingsDialog(QDialog):
     def _restore_window_state(self):
         try:
             ws = self.config.get("settings_window_state", {})
-            w = ws.get("width", 820)
-            h = ws.get("height", 720)
+            w = ws.get("width", 1240)
+            h = ws.get("height", 780)
             x = ws.get("x")
             y = ws.get("y")
 
             primary_screen = QApplication.primaryScreen()
             if primary_screen:
                 screen_geom = primary_screen.availableGeometry()
-                w = min(max(w, 720), screen_geom.width() - 40)
-                h = min(max(h, 620), screen_geom.height() - 60)
+                w = min(max(w, 1080), screen_geom.width() - 40)
+                h = min(max(h, 680), screen_geom.height() - 60)
 
             self.resize(w, h)
 
@@ -1266,66 +2621,149 @@ class SettingsDialog(QDialog):
         except Exception as e:
             logger.debug(f"Notify history change error: {e}")
 
+    def _create_hero_banner(self, icon: str, title: str, subtitle: str, quote: str = "", quote_icon: str = "✦") -> QFrame:
+        banner = QFrame(self)
+        banner.setObjectName("tabHeroBanner")
+        b_layout = QHBoxLayout(banner)
+        b_layout.setContentsMargins(12, 10, 12, 10)
+        b_layout.setSpacing(14)
+
+        icon_container = QLabel(icon, banner)
+        icon_container.setFixedSize(46, 46)
+        icon_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_container.setStyleSheet("""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2563EB, stop:1 #4F46E5);
+            color: #FFFFFF;
+            font-size: 22px;
+            border-radius: 23px;
+            border: 2px solid rgba(255, 255, 255, 0.22);
+        """)
+        b_layout.addWidget(icon_container)
+
+        text_box = QVBoxLayout()
+        text_box.setSpacing(2)
+        t_lbl = QLabel(title, banner)
+        t_lbl.setObjectName("heroBannerTitle")
+        t_lbl.setStyleSheet("font-family: 'Segoe UI', system-ui; border: none; background: transparent;")
+        text_box.addWidget(t_lbl)
+
+        s_lbl = QLabel(subtitle, banner)
+        s_lbl.setObjectName("heroBannerSubtitle")
+        s_lbl.setWordWrap(True)
+        s_lbl.setStyleSheet("border: none; background: transparent; line-height: 1.3;")
+        text_box.addWidget(s_lbl)
+        b_layout.addLayout(text_box, stretch=1)
+
+        if quote:
+            q_box = QHBoxLayout()
+            q_box.setSpacing(6)
+            if quote_icon:
+                qi = QLabel(quote_icon, banner)
+                qi.setStyleSheet("color: #0284C7; font-size: 15px; border: none; background: transparent;")
+                q_box.addWidget(qi)
+            ql = QLabel(f'"{quote}"', banner)
+            ql.setObjectName("heroBannerQuote")
+            ql.setStyleSheet("border: none; background: transparent;")
+            ql.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            q_box.addWidget(ql)
+            b_layout.addLayout(q_box)
+
+        return banner
+
+    def _toggle_theme(self):
+        self.theme_mode = "light" if self.theme_mode == "dark" else "dark"
+        try:
+            self.config.set("theme_mode", self.theme_mode)
+        except Exception as e:
+            logger.debug(f"Could not persist theme_mode: {e}")
+        self._apply_theme()
+
+    def _apply_theme(self):
+        is_light = (self.theme_mode == "light")
+        self.setStyleSheet(LIGHT_STYLE if is_light else DARK_STYLE)
+        btn_text = "🌙 Dark Mode" if is_light else "☀️ Light Mode"
+        if hasattr(self, "btn_theme_toggle"):
+            self.btn_theme_toggle.setText(btn_text)
+        for btn in getattr(self, "nav_buttons", []):
+            if hasattr(btn, "set_theme"):
+                btn.set_theme(is_light)
+        # Propagate theme to hotkey buttons
+        for hk_name in ["hotkey_btn", "prompt_hotkey_btn", "transform_hotkey_btn"]:
+            if hasattr(self, hk_name) and hasattr(getattr(self, hk_name), "set_theme"):
+                getattr(self, hk_name).set_theme(is_light)
+
+    def _on_tab_changed(self, idx: int):
+        for i, btn in enumerate(getattr(self, "nav_buttons", [])):
+            btn.set_active(i == idx)
+
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(14, 14, 14, 12)
+        layout.setSpacing(10)
 
-        # Luxury Header Container
-        header_card = QFrame(self)
-        header_card.setObjectName("headerCard")
-        header_card.setStyleSheet("""
-            QFrame#headerCard {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(30, 41, 59, 0.85), stop:1 rgba(15, 23, 42, 0.95));
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 14px;
-                padding: 10px 16px;
-            }
-        """)
-        header_layout = QHBoxLayout(header_card)
-        header_layout.setContentsMargins(12, 8, 12, 8)
+        # Main Body: Left Sidebar + Right Tabbed Stack
+        main_body_layout = QHBoxLayout()
+        main_body_layout.setSpacing(14)
+        main_body_layout.setContentsMargins(0, 0, 0, 0)
 
-        brand_box = QVBoxLayout()
-        brand_box.setSpacing(2)
-        title_row = QHBoxLayout()
-        title_row.setSpacing(8)
+        # 1. Left Vertical Navigation Sidebar
+        self.sidebar_frame = QFrame(self)
+        self.sidebar_frame.setObjectName("leftSidebar")
+        self.sidebar_frame.setFixedWidth(220)
+        sidebar_layout = QVBoxLayout(self.sidebar_frame)
+        sidebar_layout.setContentsMargins(10, 12, 10, 10)
+        sidebar_layout.setSpacing(3)
 
-        logo_badge = QLabel("⚡", header_card)
-        logo_badge.setStyleSheet("font-size: 16px; color: #F59E0B; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 2px 6px;")
-        title_row.addWidget(logo_badge)
+        # Sidebar Header Branding
+        sb_brand = QHBoxLayout()
+        sb_brand.setSpacing(8)
+        sb_brand.setContentsMargins(6, 4, 6, 8)
+        sb_icon = QLabel("♾️", self.sidebar_frame)
+        sb_icon.setStyleSheet("font-size: 18px; color: #0284C7; border: none; background: transparent;")
+        sb_brand.addWidget(sb_icon)
+        sb_title = QLabel("Gemini Flow", self.sidebar_frame)
+        sb_title.setObjectName("sidebarBrandTitle")
+        sb_title.setStyleSheet("font-size: 15px; font-weight: 800; font-family: 'Segoe UI', system-ui; border: none; background: transparent;")
+        sb_brand.addWidget(sb_title)
+        sb_brand.addStretch()
 
-        title_label = QLabel("GEMINI FLOW", header_card)
-        title_label.setStyleSheet("font-size: 17px; font-weight: 800; letter-spacing: 0.5px; color: #FFFFFF; font-family: 'Segoe UI', system-ui;")
-        title_row.addWidget(title_label)
+        sidebar_layout.addLayout(sb_brand)
 
-        edition_badge = QLabel("PRO SUITE", header_card)
-        edition_badge.setStyleSheet("font-size: 10px; font-weight: 700; color: #818CF8; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 6px; padding: 2px 7px;")
-        title_row.addWidget(edition_badge)
-        title_row.addStretch()
-        brand_box.addLayout(title_row)
+        # Nav Buttons (10 sections)
+        self.nav_buttons = []
+        nav_items = [
+            ("🔑", "API General"),
+            ("⌨️", "Hotkeys Mode"),
+            ("📊", "Cost Productivity"),
+            ("📖", "Vocabulary Engine"),
+            ("📁", "Custom Dictionary"),
+            ("⚡", "Quick Text"),
+            ("🕒", "History"),
+            ("👤", "Profiles"),
+            ("🎙️", "AI Dictation"),
+            ("🔊", "Audio Device")
+        ]
 
-        sub_label = QLabel("Wispr Flow Alternative • Sub-2s Turnaround • Zero-Latency Voice Engine", header_card)
-        sub_label.setStyleSheet("font-size: 11px; color: #94A3B8; font-weight: 500;")
-        brand_box.addWidget(sub_label)
-        header_layout.addLayout(brand_box)
-        header_layout.addStretch()
+        for idx, (icon_str, title_str) in enumerate(nav_items):
+            btn = SidebarNavButton(icon_str, title_str, idx, self.sidebar_frame)
+            btn.clicked.connect(lambda checked=False, i=idx: self.tabs.setCurrentIndex(i))
+            self.nav_buttons.append(btn)
+            sidebar_layout.addWidget(btn)
 
-        status_box = QVBoxLayout()
-        status_box.setAlignment(Qt.AlignmentFlag.AlignRight)
-        status_box.setSpacing(3)
-        status_pill = QLabel("● 3 Engines Active: Gemini + Faster-Whisper + Ollama", header_card)
-        status_pill.setStyleSheet("font-size: 11px; font-weight: 600; color: #10B981; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 4px 10px;")
-        status_box.addWidget(status_pill)
+        sidebar_layout.addStretch()
 
-        tip_label = QLabel("💡 Ctrl+Space to Speak • Esc to Cancel • Tray Mic to Reopen", header_card)
-        tip_label.setStyleSheet("font-size: 10px; color: #64748B; font-weight: 500;")
-        status_box.addWidget(tip_label)
-        header_layout.addLayout(status_box)
+        # Bottom Sidebar Neon Waveform Box
+        self.sidebar_wave_card = SidebarWaveCard(self.sidebar_frame)
+        sidebar_layout.addWidget(self.sidebar_wave_card)
 
-        layout.addWidget(header_card)
+        main_body_layout.addWidget(self.sidebar_frame)
 
-        # Tabs (Organized strictly per user specification)
+        # 2. Right Content Panel (QTabWidget with invisible tab bar)
         self.tabs = QTabWidget(self)
+        self.tabs.setObjectName("contentTabs")
+        self.tabs.tabBar().setVisible(False)
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+
         self.tabs.addTab(self._create_general_tab(), "🔑 API_General")
         self.tabs.addTab(self._create_hotkeys_tab(), "⌨️ Hotkeys_Mode")
         self.tabs.addTab(self._create_cost_tab(), "💰 Cost_Productivity")
@@ -1336,16 +2774,29 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(self._create_profiles_tab(), "⚡ Profiles")
         self.tabs.addTab(self._create_ai_tab(), "🧠 AI Dictation")
         self.tabs.addTab(self._create_audio_tab(), "🎙️ Audio Device")
-        layout.addWidget(self.tabs)
 
-        # Bottom Action Buttons (Save/Apply stays open, Close button closes)
+        if self.nav_buttons:
+            self.nav_buttons[0].set_active(True)
+
+        main_body_layout.addWidget(self.tabs, stretch=1)
+        layout.addLayout(main_body_layout)
+
+        # Bottom Action Buttons
         btn_box = QHBoxLayout()
+        self.btn_theme_toggle = QPushButton("☀️ Light Mode" if self.theme_mode == "dark" else "🌙 Dark Mode", self)
+        self.btn_theme_toggle.setObjectName("secondaryBtn")
+        self.btn_theme_toggle.setMinimumHeight(38)
+        self.btn_theme_toggle.setToolTip("Toggle between Dark Mode and Light Mode")
+        self.btn_theme_toggle.clicked.connect(self._toggle_theme)
+        btn_box.addWidget(self.btn_theme_toggle)
+
         self.save_status_label = QLabel("", self)
-        self.save_status_label.setStyleSheet("color: #10B981; font-weight: 600; font-size: 13px;")
+        self.save_status_label.setStyleSheet("color: #10B981; font-weight: 600; font-size: 13px; padding-left: 8px;")
         btn_box.addWidget(self.save_status_label)
         btn_box.addStretch()
 
-        self.btn_save = QPushButton("💾 Save & Apply Changes", self)
+        self.btn_save = QPushButton("💾 Save Apply Changes", self)
+        self.btn_save.setObjectName("saveBtn")
         self.btn_save.setMinimumHeight(38)
         self.btn_save.clicked.connect(self._save_settings)
         btn_box.addWidget(self.btn_save)
@@ -1364,6 +2815,7 @@ class SettingsDialog(QDialog):
         btn_box.addWidget(self.btn_close)
 
         layout.addLayout(btn_box)
+        self._apply_theme()
 
     def _create_general_tab(self) -> QWidget:
         scroll = QScrollArea()
@@ -1377,20 +2829,28 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(14)
 
+        # Top Hero Banner Card
+        layout.addWidget(self._create_hero_banner(
+            icon="🔑",
+            title="Google Gemini AI & Cloud Inference Engine",
+            subtitle="Configure your Gemini API credentials, default inference model, and automated payload routing.",
+            quote="Speech recognition redefined. Zero latency, infinite scale."
+        ))
+
         # API Key Section Card
         api_card = QFrame(self)
-        api_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #1E293B; border-radius: 10px; padding: 14px; }")
+        api_card.setObjectName("apiCard")
         api_card_layout = QVBoxLayout(api_card)
         api_card_layout.setSpacing(10)
 
         api_header_layout = QHBoxLayout()
         api_label = QLabel("🔑 Google Gemini API Key:", api_card)
-        api_label.setStyleSheet("font-size: 14px; font-weight: 700; color: #38BDF8; border: none;")
+        api_label.setObjectName("blueSectionHeader")
         api_header_layout.addWidget(api_label)
         api_header_layout.addStretch()
 
         self.btn_get_api_key = QPushButton("🔗 Get Free API Key (AI Studio) ↗", api_card)
-        self.btn_get_api_key.setStyleSheet("background-color: #1E293B; color: #38BDF8; border: 1px solid #38BDF8; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600;")
+        self.btn_get_api_key.setObjectName("secondaryBtn")
         self.btn_get_api_key.setToolTip("Opens Google AI Studio (aistudio.google.com) in browser to generate a free Gemini API key")
         self.btn_get_api_key.clicked.connect(self._open_ai_studio_link)
         api_header_layout.addWidget(self.btn_get_api_key)
@@ -1449,13 +2909,28 @@ class SettingsDialog(QDialog):
         self.model_combo.setMaxVisibleItems(10)
         self.model_combo.addItems([
             "auto (Intelligent AI Model Router — Dynamic Per-Task Selection)",
-            "gemini-3.5-transcribe (Dedicated Speech Model — Ultra Fast < 1.5s — Recommended)",
+            "gemini-2.5-flash (Dedicated Speech & Multimodal — Ultra Fast < 1.5s — Recommended)",
             "gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
             "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)",
             "ollama-gemma2 (Ollama Gemma 2B — 100% Local GPU Offline Brain)"
         ])
         self.model_combo.currentIndexChanged.connect(self._on_general_model_combo_changed)
         layout.addWidget(self.model_combo)
+
+        # Offline Whisper Engine Model Selection
+        whisper_box = QHBoxLayout()
+        whisper_lbl = QLabel("Offline Whisper Engine Model:")
+        whisper_lbl.setStyleSheet("font-size: 13px; font-weight: 600;")
+        whisper_box.addWidget(whisper_lbl)
+        self.whisper_model_combo = QComboBox(self)
+        self.whisper_model_combo.setView(QListView())
+        self.whisper_model_combo.addItems([
+            "small.en (Recommended — 2.8x Real-Time, Highest Accuracy)",
+            "base.en (Fast — Standard Accuracy)",
+            "tiny.en (Ultra-Fast — Lightweight)"
+        ])
+        whisper_box.addWidget(self.whisper_model_combo, stretch=2)
+        layout.addLayout(whisper_box)
 
         # Auto-paste & Sound options
         self.cb_auto_paste = QCheckBox("Automatically paste transcribed text into active cursor position")
@@ -1473,17 +2948,17 @@ class SettingsDialog(QDialog):
 
         # Privacy, History Retention & Governance Card
         sec_card = QFrame(self)
-        sec_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
+        sec_card.setObjectName("secCard")
         sec_layout = QVBoxLayout(sec_card)
         sec_layout.setSpacing(10)
 
         sec_header = QLabel("🔒 Privacy & History Retention Governance", sec_card)
-        sec_header.setStyleSheet("font-weight: 700; color: #38BDF8; font-size: 13px; border: none;")
+        sec_header.setObjectName("blueSectionHeader")
         sec_layout.addWidget(sec_header)
 
         ret_box = QHBoxLayout()
         ret_lbl = QLabel("History Auto-Retention:", sec_card)
-        ret_lbl.setStyleSheet("color: #E2E8F0; font-size: 13px; border: none;")
+        ret_lbl.setStyleSheet("font-size: 13px; border: none; font-weight: 600;")
         ret_box.addWidget(ret_lbl)
         self.retention_combo = QComboBox(sec_card)
         self.retention_combo.setView(QListView())
@@ -1521,8 +2996,9 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(14)
 
+
         mode_label = QLabel("Speech Dictation Mode:")
-        mode_label.setStyleSheet("font-size: 14px; font-weight: 600; color: #F8FAFC;")
+        mode_label.setStyleSheet("font-size: 14px; font-weight: 600;")
         layout.addWidget(mode_label)
 
         self.radio_toggle = QRadioButton("Toggle Mode (Press hotkey once to start recording, press again to stop)")
@@ -1535,7 +3011,7 @@ class SettingsDialog(QDialog):
 
         # Dictation Hotkey Section with Interactive Key-Capture
         hk_label = QLabel("🎙️ Voice Dictation Shortcut Key:")
-        hk_label.setStyleSheet("font-size: 14px; font-weight: 600; color: #38BDF8; margin-top: 6px;")
+        hk_label.setObjectName("blueSectionHeader")
         layout.addWidget(hk_label)
 
         self.hotkey_btn = HotkeyCaptureButton("Ctrl + Win", "<ctrl>+<cmd>", self)
@@ -1553,23 +3029,8 @@ class SettingsDialog(QDialog):
         ]
         for title, disp, inter in presets:
             btn = QPushButton(title, self)
+            btn.setObjectName("presetHotkeyBtn")
             btn.setMinimumHeight(36)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #F8FAFC;
-                    border: 1px solid #475569;
-                    border-radius: 6px;
-                    padding: 6px 14px;
-                    font-size: 13px;
-                    font-weight: 600;
-                }
-                QPushButton:hover {
-                    background-color: #334155;
-                    color: #38BDF8;
-                    border-color: #38BDF8;
-                }
-            """)
             btn.clicked.connect(lambda _, d=disp, i=inter: self.hotkey_btn.set_hotkey(d, i))
             preset_box.addWidget(btn)
         preset_box.addStretch()
@@ -1595,23 +3056,8 @@ class SettingsDialog(QDialog):
         ]
         for title, disp, inter in prompt_presets:
             btn = QPushButton(title, self)
+            btn.setObjectName("presetHotkeyBtn")
             btn.setMinimumHeight(36)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #F8FAFC;
-                    border: 1px solid #475569;
-                    border-radius: 6px;
-                    padding: 6px 14px;
-                    font-size: 13px;
-                    font-weight: 600;
-                }
-                QPushButton:hover {
-                    background-color: #334155;
-                    color: #FDE047;
-                    border-color: #F59E0B;
-                }
-            """)
             btn.clicked.connect(lambda _, d=disp, i=inter: self.prompt_hotkey_btn.set_hotkey(d, i))
             prompt_preset_box.addWidget(btn)
         prompt_preset_box.addStretch()
@@ -1635,23 +3081,8 @@ class SettingsDialog(QDialog):
         ]
         for title, disp, inter in trans_presets:
             btn = QPushButton(title, self)
+            btn.setObjectName("presetHotkeyBtn")
             btn.setMinimumHeight(36)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #1E293B;
-                    color: #F8FAFC;
-                    border: 1px solid #475569;
-                    border-radius: 6px;
-                    padding: 6px 14px;
-                    font-size: 13px;
-                    font-weight: 600;
-                }
-                QPushButton:hover {
-                    background-color: #334155;
-                    color: #A78BFA;
-                    border-color: #A78BFA;
-                }
-            """)
             btn.clicked.connect(lambda _, d=disp, i=inter: self.transform_hotkey_btn.set_hotkey(d, i))
             trans_preset_box.addWidget(btn)
         trans_preset_box.addStretch()
@@ -1659,8 +3090,8 @@ class SettingsDialog(QDialog):
 
         # Escape info alert
         esc_info = QLabel("ℹ️ Note: Pressing Escape (Esc) during recording will instantly cancel and discard that speech.")
+        esc_info.setObjectName("escInfoLabel")
         esc_info.setWordWrap(True)
-        esc_info.setStyleSheet("color: #38BDF8; font-size: 12px; background: #0F172A; border: 1px solid #334155; padding: 10px 14px; border-radius: 6px; margin-top: 4px;")
         layout.addWidget(esc_info)
 
         layout.addStretch()
@@ -1758,38 +3189,39 @@ class SettingsDialog(QDialog):
             "to automatically pick the fastest and most capable model with zero configuration."
         )
         desc.setWordWrap(True)
-        desc.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        desc.setObjectName("descLabel")
+        desc.setStyleSheet("font-size: 12px;")
         layout.addWidget(desc)
 
         # Active status frame
         status_frame = QFrame(self)
-        status_frame.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
+        status_frame.setObjectName("routerStatusCard")
         sf_layout = QVBoxLayout(status_frame)
         sf_layout.setSpacing(6)
 
         self.router_active_badge = QLabel("🟢 Router Status: Active (Intelligent Dynamic Selection Enabled)", self)
-        self.router_active_badge.setStyleSheet("color: #10B981; font-weight: 700; font-size: 13px; border: none;")
+        self.router_active_badge.setObjectName("routerActiveBadge")
         sf_layout.addWidget(self.router_active_badge)
 
         self.router_rule_info = QLabel(
             "• Short Speech / Chat apps ➔ Gemini 3.5 Flash-Lite (<1.5s latency)\n"
             "• VS Code / Terminal / Code ➔ Gemini 3.7 Flash (High Reasoning & Syntax)\n"
             "• Long Dictations / Summaries ➔ Gemini 2.5 Pro (Deep Thought & Outlines)\n"
-            "• Formal Writing / Academic ➔ Gemini 2.5 Flash (Rich Textbook Clauses)",
+            "• Formal Writing / Academic ➔ Gemini 3.5 Flash (Rich Textbook Clauses)",
             self
         )
-        self.router_rule_info.setStyleSheet("color: #E2E8F0; font-size: 12px; line-height: 1.4; border: none;")
+        self.router_rule_info.setObjectName("descLabel")
         sf_layout.addWidget(self.router_rule_info)
         layout.addWidget(status_frame)
 
         # Direct Model Selection Card on Router Tab
         sel_card = QFrame(self)
-        sel_card.setStyleSheet("QFrame { background-color: #1E293B; border: 1px solid #0284C7; border-radius: 8px; padding: 12px; }")
+        sel_card.setObjectName("routerSelectCard")
         sel_layout = QVBoxLayout(sel_card)
         sel_layout.setSpacing(6)
 
         sel_title = QLabel("🎯 Select Active AI Model or Auto-Intelligence Router:", sel_card)
-        sel_title.setStyleSheet("color: #38BDF8; font-weight: 700; font-size: 13px; border: none;")
+        sel_title.setObjectName("blueSectionHeader")
         sel_layout.addWidget(sel_title)
 
         self.router_model_combo = QComboBox(sel_card)
@@ -1801,7 +3233,7 @@ class SettingsDialog(QDialog):
         self.router_model_combo.setMaxVisibleItems(10)
         self.router_model_combo.addItems([
             "auto (Intelligent AI Model Router — Dynamic Per-Task Selection)",
-            "gemini-3.5-transcribe (Dedicated Speech Model — Ultra Fast < 1.5s — Recommended)",
+            "gemini-2.5-flash (Dedicated Speech & Multimodal — Ultra Fast < 1.5s — Recommended)",
             "gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
             "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)",
             "ollama-gemma2 (Ollama Gemma 2B — 100% Local GPU Offline Brain)"
@@ -1858,18 +3290,18 @@ class SettingsDialog(QDialog):
 
         # What you spoke card
         spoken_card = QFrame(self)
-        spoken_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
+        spoken_card.setObjectName("routerSpokenCard")
         sc_layout = QVBoxLayout(spoken_card)
         sc_title = QLabel("🗣️ What You Spoke into the Microphone (Raw Spoken Audio with Fillers & Hesitations):", self)
-        sc_title.setStyleSheet("font-weight: 600; font-size: 12px; color: #F59E0B; border: none;")
+        sc_title.setObjectName("blueSectionHeader")
         sc_layout.addWidget(sc_title)
 
         sc_text = QLabel(
             "\"hey uh can you just say me how can i use this AI dictation because uh we havent finished the api backend yet but the frontend ui is almost done however uh i have given two datas can you just analyze and say me whether both datas are same or not and also remember to revert back to the team today thanks\"",
             self
         )
+        sc_text.setObjectName("showcaseSpokenText")
         sc_text.setWordWrap(True)
-        sc_text.setStyleSheet("color: #F8FAFC; font-size: 12px; font-style: italic; border: none; padding-top: 4px;")
         sc_layout.addWidget(sc_text)
         layout.addWidget(spoken_card)
 
@@ -1907,27 +3339,27 @@ class SettingsDialog(QDialog):
 
         for m_name, speed, style, output, best_for in models_examples:
             m_card = QFrame(self)
-            m_card.setStyleSheet("QFrame { background-color: #1E293B; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
+            m_card.setObjectName("routerModelCard")
             mc_layout = QVBoxLayout(m_card)
             mc_layout.setSpacing(6)
 
             m_title = QLabel(m_name, self)
-            m_title.setStyleSheet("font-weight: 700; font-size: 13px; color: #38BDF8; border: none;")
+            m_title.setObjectName("blueSectionHeader")
             mc_layout.addWidget(m_title)
 
             meta_lbl = QLabel(f"<b>Speed:</b> {speed} | <b>Grammar Style:</b> {style}", self)
+            meta_lbl.setObjectName("descLabel")
             meta_lbl.setWordWrap(True)
-            meta_lbl.setStyleSheet("color: #CBD5E1; font-size: 11px; border: none;")
             mc_layout.addWidget(meta_lbl)
 
             out_box = QLabel(f"<b>Output:</b>\n{output}", self)
+            out_box.setObjectName("routerOutputBox")
             out_box.setWordWrap(True)
-            out_box.setStyleSheet("background-color: #0F172A; border: 1px solid #1E293B; border-radius: 6px; padding: 8px; color: #10B981; font-size: 12px; font-family: Consolas, 'Segoe UI';")
             mc_layout.addWidget(out_box)
 
             best_lbl = QLabel(f"<b>Best Used For:</b> {best_for}", self)
+            best_lbl.setObjectName("descLabel")
             best_lbl.setWordWrap(True)
-            best_lbl.setStyleSheet("color: #94A3B8; font-size: 11px; border: none;")
             mc_layout.addWidget(best_lbl)
 
             layout.addWidget(m_card)
@@ -1955,7 +3387,7 @@ class SettingsDialog(QDialog):
             ("🚀 Executive Polish & Professional Business Proposal Quality", "gemini-3.6-flash", "~1.1s – 1.6s"),
             ("✨ Balanced Everyday Flow, Emails & Pull Request Notes", "gemini-3.5-flash", "~1.2s – 1.8s"),
             ("💻 Coding, Technical Architecture & Programming Prompts", "gemini-3.7-flash", "~1.8s – 2.5s"),
-            ("📖 Formal Textbook Grammar & Academic Correspondence", "gemini-2.5-flash", "~2.0s – 3.0s"),
+            ("📖 Formal Textbook Grammar & Academic Correspondence", "gemini-3.5-flash", "~2.0s – 3.0s"),
             ("📝 Long Recordings, Meeting Action Items & Structured Bullet Points", "gemini-2.5-pro", "~4.0s – 6.0s"),
         ]
         for r_idx, (prio, mdl, wait) in enumerate(guide_rows):
@@ -1982,11 +3414,12 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(16)
 
+
         # =========================================================================
         # SECTION 1: COMPLETE LIST OF SPEAKING COMMANDS (ALL 16 CATEGORIES)
         # =========================================================================
         cmd_header = QLabel("🎙️ Complete List of Voice Commands & Intent Categories (All 16 Built-in Modes)")
-        cmd_header.setStyleSheet("font-size: 16px; font-weight: bold; color: #38BDF8;")
+        cmd_header.setObjectName("blueSectionHeader")
         layout.addWidget(cmd_header)
 
         cmd_desc = QLabel(
@@ -1999,26 +3432,19 @@ class SettingsDialog(QDialog):
 
         # Unified Example Hero Card
         sample_card = QFrame(self)
-        sample_card.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0B132B, stop:1 #1C2541);
-                border: 2px solid #38BDF8;
-                border-radius: 10px;
-                padding: 12px;
-            }
-        """)
+        sample_card.setObjectName("sampleCard")
         sc_layout = QVBoxLayout(sample_card)
         sc_layout.setContentsMargins(14, 12, 14, 12)
         sc_layout.setSpacing(8)
 
         sc_top = QHBoxLayout()
         sc_title = QLabel("📌 Unified Spoken Sample Dictation (Raw Speech Input):", sample_card)
-        sc_title.setStyleSheet("font-weight: 700; font-size: 13px; color: #38BDF8; border: none;")
+        sc_title.setObjectName("blueSectionHeader")
         sc_top.addWidget(sc_title)
         sc_top.addStretch()
 
         sc_badge = QLabel("⚡ Live Output Transformation Showcase", sample_card)
-        sc_badge.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 11px; background: #0284C7; border-radius: 4px; padding: 3px 8px; border: none;")
+        sc_badge.setObjectName("sampleBadge")
         sc_top.addWidget(sc_badge)
         sc_layout.addLayout(sc_top)
 
@@ -2026,33 +3452,23 @@ class SettingsDialog(QDialog):
             "\"hey team we gotta delay the launch to friday cause database test failed also Srinivas will prepare the slides and keep budget under five grand\"",
             sample_card
         )
+        sample_box.setObjectName("sampleBox")
         sample_box.setWordWrap(True)
-        sample_box.setStyleSheet("""
-            background-color: #0F172A;
-            border: 1px solid #1E293B;
-            border-radius: 6px;
-            padding: 10px 14px;
-            color: #FDE047;
-            font-size: 13px;
-            font-weight: 600;
-            font-family: Consolas, 'Segoe UI';
-        """)
         sc_layout.addWidget(sample_box)
 
         sc_note = QLabel("💡 See in the table below how prefixing this single speech sample with different command triggers produces 16 completely different, high-value outputs:", sample_card)
-        sc_note.setStyleSheet("color: #CBD5E1; font-size: 11px; border: none;")
+        sc_note.setObjectName("descLabel")
         sc_layout.addWidget(sc_note)
 
         layout.addWidget(sample_card)
 
         # 16-Category Table Widget
         cmd_table = QTableWidget(self)
-        cmd_table.setColumnCount(6)
+        cmd_table.setColumnCount(5)
         cmd_table.setHorizontalHeaderLabels([
             "#",
             "Command Category",
             "Spoken Triggers (Say at start)",
-            "AI Model Routed",
             "Purpose & Transformation Effect",
             "Example Transformed Output (From Sample Above)"
         ])
@@ -2060,14 +3476,12 @@ class SettingsDialog(QDialog):
         cmd_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         cmd_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
         cmd_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        cmd_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
-        cmd_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        cmd_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
 
         cmd_table.setColumnWidth(0, 36)
-        cmd_table.setColumnWidth(1, 140)
-        cmd_table.setColumnWidth(2, 210)
-        cmd_table.setColumnWidth(3, 145)
-        cmd_table.setColumnWidth(4, 230)
+        cmd_table.setColumnWidth(1, 150)
+        cmd_table.setColumnWidth(2, 230)
+        cmd_table.setColumnWidth(3, 260)
         cmd_table.verticalHeader().setVisible(False)
         cmd_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         cmd_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -2079,15 +3493,13 @@ class SettingsDialog(QDialog):
                 "1",
                 "👔 Professionalize",
                 "Make this professional:\nMake it formal:\nFormalize this:",
-                "gemini-2.5-flash",
-                "Converts informal speech into executive, articulate business prose.",
-                "Dear Team,\n\nWe need to adjust our launch timeline to Friday due to unresolved database test failures. Additionally, Srinivas Awasthi will prepare the stakeholder presentation slides, and we will ensure all associated expenses remain within the $5,000 budget."
+                "Converts informal speech into executive, articulate business prose. Preserves exact names & details.",
+                "Dear Team,\n\nWe need to postpone our project launch to Friday due to unresolved database test failures. Srinivas will prepare the presentation slides, and we will ensure the overall budget remains strictly under $5,000."
             ),
             (
                 "2",
                 "✍️ Fix Grammar",
                 "Fix the grammar:\nFix grammar:\nCorrect grammar:\nProofread this:",
-                "gemini-2.5-flash (Deterministic)",
                 "Zero hallucination. Strictly fixes spelling, typos, punctuation & phrasing.",
                 "Hey team, we've got to delay the launch to Friday because database tests failed. Also, Srinivas will prepare the slides and keep the budget under five grand."
             ),
@@ -2095,23 +3507,20 @@ class SettingsDialog(QDialog):
                 "3",
                 "💻 Generate Code",
                 "Generate code in Python:\nWrite a python script to:\nWrite code in [Lang]:",
-                "gemini-3.7-flash (Technical)",
                 "Generates clean, runnable code with proper syntax, variables & comments.",
-                "import sys\n\ndef verify_database_and_schedule():\n    # Check database test status\n    db_tests_passed = run_db_tests()\n    if not db_tests_passed:\n        print('Database test failed. Rescheduling launch to Friday.')\n        assign_task('Srinivas', 'Prepare presentation slides')\n        enforce_budget_cap(max_usd=5000)"
+                "def handle_launch_update(db_test_passed: bool, budget: float, slide_assignee: str):\n    if not db_test_passed:\n        print('Database test failed. Rescheduling launch to Friday.')\n    print(f'Assigning presentation slides to: {slide_assignee}')\n    MAX_BUDGET = 5000.00\n    if budget < MAX_BUDGET:\n        print(f'Budget approved: ${budget:,.2f} is under cap.')\n\nhandle_launch_update(db_test_passed=False, budget=4500.00, slide_assignee='Srinivas')"
             ),
             (
                 "4",
                 "📋 Summarize / TLDR",
                 "Summarize this:\nGive me a summary:\nTLDR:\nBrief summary of:",
-                "gemini-2.5-pro",
                 "Extracts key decisions, deliverables & bulleted action items.",
-                "• Launch Status: Postponed to Friday due to database test failure.\n• Presentation: Srinivas to prepare slides for executive review.\n• Budget Limit: Strictly capped under $5,000 total expenditure."
+                "• Launch Status: Postponed to Friday due to database test failure.\n• Presentation: Srinivas assigned to prepare presentation slides.\n• Budget Limit: Strictly capped under $5,000 total expenditure."
             ),
             (
                 "5",
                 "✨ Create AI Prompt",
                 "Turn this into a prompt:\nCreate a prompt from this:\nPrompt enhancer:",
-                "gemini-3.5-flash",
                 "Formats raw ideas into structured prompts with Role, Objective & Steps.",
                 "Role: Technical Project Lead\nObjective: Coordinate launch postponement and stakeholder update.\nContext: Database test failure identified prior to release.\nInstructions:\n1. Update deployment schedule to Friday.\n2. Request slide deck from Srinivas.\n3. Audit project burn to ensure it remains <= $5,000."
             ),
@@ -2119,31 +3528,27 @@ class SettingsDialog(QDialog):
                 "6",
                 "💬 Make Casual",
                 "Make this casual:\nMake it friendly:\nFriendly tone:",
-                "gemini-3.5-flash-lite",
                 "Friendly, conversational tone for chats, Slack & social messaging.",
-                "Hey everyone! Looks like we need to push the launch back to Friday since the DB tests ran into some snags. Srinivas is on slides, and we'll keep everything under $5k!"
+                "Hey everyone! Looks like we need to push the launch back to Friday since the database test ran into some snags. Srinivas is on slides, and we'll keep everything under $5k!"
             ),
             (
                 "7",
                 "✂️ Shorten / Concise",
                 "Make this shorter:\nShorten this:\nMake it concise:\nTrim this:",
-                "gemini-3.5-flash-lite",
                 "Cuts word count into punchy brevity while keeping core facts.",
-                "Launch delayed to Friday due to database test failure. Srinivas preparing slides; budget capped at $5,000."
+                "Launch delayed to Friday: database test failed. Srinivas: prepare slides. Budget: under $5,000."
             ),
             (
                 "8",
                 "📖 Expand / Elaborate",
                 "Expand this:\nElaborate on this:\nAdd more detail to:",
-                "gemini-2.5-pro",
                 "Adds explanatory depth, strategic context, and thorough prose.",
-                "Team Update: Following comprehensive database test runs, critical regressions were identified that necessitate shifting our target deployment date to Friday. Srinivas Awasthi will oversee slide preparations for executive review. Fiscal oversight remains active to ensure total burn stays well below the $5,000 ceiling."
+                "Team Update: Following comprehensive database test runs, critical regressions were identified that necessitate shifting our target deployment date to Friday. Srinivas will oversee slide preparations for executive review. Fiscal oversight remains active to ensure total burn stays well below the $5,000 ceiling."
             ),
             (
                 "9",
                 "💡 Explain Concept",
                 "Explain this:\nWhat does this mean:\nBreak down this:",
-                "gemini-3.7-flash",
                 "Step-by-step educational explanations and operational breakdowns.",
                 "This project update contains three operational components:\n1. Release Delay: Moving the target date to Friday allows engineering to stabilize failing database tests.\n2. Ownership: Srinivas is designated to build the deck for team alignment.\n3. Cost Control: A strict $5k spending limit is maintained."
             ),
@@ -2151,7 +3556,6 @@ class SettingsDialog(QDialog):
                 "10",
                 "🌐 Translate",
                 "Translate this to Spanish:\nTranslate to German:\nTranslate to French:",
-                "gemini-3.5-flash",
                 "Accurate, natural translation into the requested target language.",
                 "[Spanish Translation]:\nHola equipo, tenemos que retrasar el lanzamiento para el viernes porque la prueba de la base de datos falló. Además, Srinivas preparará las diapositivas y mantendrá el presupuesto por debajo de cinco mil dólares."
             ),
@@ -2159,7 +3563,6 @@ class SettingsDialog(QDialog):
                 "11",
                 "📧 Draft Email",
                 "Create an email:\nDraft an email to team about:\nWrite an email:",
-                "gemini-3.5-flash",
                 "Complete email with Subject line, greeting, body, and sign-off.",
                 "Subject: Project Launch Update & Friday Timeline\n\nHi Team,\n\nPlease be advised that our project launch is rescheduled to Friday due to database testing delays. Srinivas will lead the presentation prep, and all operations remain within our $5,000 budget cap.\n\nBest regards,\nProject Lead"
             ),
@@ -2167,7 +3570,6 @@ class SettingsDialog(QDialog):
                 "12",
                 "🐛 GitHub Issue",
                 "Create a GitHub issue:\nNew GitHub issue:\nBug report for:",
-                "gemini-3.7-flash",
                 "Structured Markdown issue with Title, Description & Tasks.",
                 "## [BUG] Database Test Failures Blocking Release\n\n### Summary\nLaunch postponed to Friday to resolve database test failures.\n\n### Tasks\n- [ ] Fix failing database tests\n- [ ] Srinivas: Finalize presentation deck\n- [ ] Confirm total project costs remain < $5,000"
             ),
@@ -2175,7 +3577,6 @@ class SettingsDialog(QDialog):
                 "13",
                 "🚀 GitHub PR",
                 "Create a pull request:\nCreate PR:\nPR description for:",
-                "gemini-3.7-flash",
                 "Summary of Changes, Motivation & Testing Verification checklist.",
                 "### Summary of Changes\n- Addresses database test blockers ahead of Friday release.\n- Added stakeholder slide assets by Srinivas.\n- Confirmed budget compliance (< $5,000)."
             ),
@@ -2183,7 +3584,6 @@ class SettingsDialog(QDialog):
                 "14",
                 "☑️ Task List",
                 "Create task list:\nCreate action items:\nGenerate todo list:",
-                "gemini-2.5-pro",
                 "Extracts actionable checklist with check-boxes [ ].",
                 "- [ ] Resolve failing database test suites\n- [ ] Reschedule release deployment to Friday\n- [ ] Srinivas: Prepare presentation slides\n- [ ] Verify budget remains below $5,000"
             ),
@@ -2191,7 +3591,6 @@ class SettingsDialog(QDialog):
                 "15",
                 "📊 Format Table",
                 "Format this into a table:\nFormat as a markdown table:\nFormat into table:",
-                "gemini-3.5-flash",
                 "Converts unstructured points into clean Markdown tables.",
                 "| Milestone / Task | Detail | Owner | Status |\n|---|---|---|---|\n| Launch Date | Delayed to Friday | Team | Rescheduled |\n| Database Tests | Fix Failures | Dev Team | In Progress |\n| Presentation | Prepare Slides | Srinivas | In Progress |\n| Budget | Under $5,000 | Finance | Active |"
             ),
@@ -2199,13 +3598,12 @@ class SettingsDialog(QDialog):
                 "16",
                 "🔄 Rewrite / Polish",
                 "Rewrite this:\nRephrase this:\nPolish this:",
-                "gemini-3.5-flash",
                 "Polishes sentence flow and vocabulary while preserving the exact meaning.",
                 "Hey team, we must postpone the launch until Friday following recent database test failures. Srinivas will prepare the presentation slides, and we will ensure the overall budget stays strictly below $5,000."
             ),
         ]
 
-        for r_idx, (num, cat, trigs, mdl, purp, ex_out) in enumerate(commands_data):
+        for r_idx, (num, cat, trigs, purp, ex_out) in enumerate(commands_data):
             cmd_table.insertRow(r_idx)
             cmd_table.setRowHeight(r_idx, 80)
 
@@ -2225,21 +3623,79 @@ class SettingsDialog(QDialog):
             item_trigs.setFont(QFont("Consolas", 9, QFont.Weight.Bold))
             cmd_table.setItem(r_idx, 2, item_trigs)
 
-            item_mdl = QTableWidgetItem(mdl)
-            item_mdl.setForeground(QColor("#38BDF8"))
-            item_mdl.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
-            cmd_table.setItem(r_idx, 3, item_mdl)
-
             item_purp = QTableWidgetItem(purp)
             item_purp.setForeground(QColor("#CBD5E1"))
-            cmd_table.setItem(r_idx, 4, item_purp)
+            cmd_table.setItem(r_idx, 3, item_purp)
 
             item_out = QTableWidgetItem(ex_out)
             item_out.setForeground(QColor("#10B981"))
             item_out.setFont(QFont("Consolas", 9))
-            cmd_table.setItem(r_idx, 5, item_out)
+            cmd_table.setItem(r_idx, 4, item_out)
 
         layout.addWidget(cmd_table)
+
+        # =========================================================================
+        # INTERACTIVE COMMAND TEST & DIFF INSPECTOR
+        # =========================================================================
+        test_cmd_card = QFrame(self)
+        test_cmd_card.setObjectName("sampleCard")
+        tc_layout = QVBoxLayout(test_cmd_card)
+        tc_layout.setContentsMargins(14, 12, 14, 12)
+        tc_layout.setSpacing(8)
+
+        tc_top = QHBoxLayout()
+        tc_header = QLabel("🧪 Interactive Command Preview & Diff Inspector", test_cmd_card)
+        tc_header.setObjectName("blueSectionHeader")
+        tc_top.addWidget(tc_header)
+        tc_top.addStretch()
+
+        self.lbl_cmd_validation_status = QLabel("Ready to test", test_cmd_card)
+        self.lbl_cmd_validation_status.setObjectName("descLabel")
+        tc_top.addWidget(self.lbl_cmd_validation_status)
+        tc_layout.addLayout(tc_top)
+
+        tc_desc = QLabel(
+            "Select any command, inspect its prompt and input/output contracts, enter a test sentence, "
+            "and run an interactive preview verified by the command validator.",
+            test_cmd_card
+        )
+        tc_desc.setWordWrap(True)
+        tc_desc.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        tc_layout.addWidget(tc_desc)
+
+        tc_controls = QHBoxLayout()
+        from app.commands import COMMAND_REGISTRY
+        self.cmd_test_combo = QComboBox(test_cmd_card)
+        self.cmd_test_combo.setView(QListView())
+        for c in COMMAND_REGISTRY:
+            self.cmd_test_combo.addItem(f"{c.name}", c.id)
+        self.cmd_test_combo.currentIndexChanged.connect(self._on_test_cmd_changed)
+        tc_controls.addWidget(self.cmd_test_combo, stretch=2)
+
+        self.btn_run_test_cmd = QPushButton("⚡ Test Selected Command", test_cmd_card)
+        self.btn_run_test_cmd.setObjectName("primaryBtn")
+        self.btn_run_test_cmd.clicked.connect(self._run_interactive_command_test)
+        tc_controls.addWidget(self.btn_run_test_cmd)
+        tc_layout.addLayout(tc_controls)
+
+        diff_layout = QHBoxLayout()
+        v_in = QVBoxLayout()
+        v_in.addWidget(QLabel("Sample Spoken Input:", test_cmd_card))
+        self.txt_test_cmd_input = QTextEdit(test_cmd_card)
+        self.txt_test_cmd_input.setMaximumHeight(85)
+        v_in.addWidget(self.txt_test_cmd_input)
+        diff_layout.addLayout(v_in)
+
+        v_out = QVBoxLayout()
+        v_out.addWidget(QLabel("Transformed & Validated Output:", test_cmd_card))
+        self.txt_test_cmd_output = QTextEdit(test_cmd_card)
+        self.txt_test_cmd_output.setReadOnly(True)
+        self.txt_test_cmd_output.setMaximumHeight(85)
+        v_out.addWidget(self.txt_test_cmd_output)
+        diff_layout.addLayout(v_out)
+
+        tc_layout.addLayout(diff_layout)
+        layout.addWidget(test_cmd_card)
 
         # =========================================================================
         # SECTION 2: DEVELOPER PRODUCTIVITY PROFILES
@@ -2254,7 +3710,8 @@ class SettingsDialog(QDialog):
         layout.addWidget(header)
 
         desc = QLabel("Select domain-specific tuning to align model parameters, system prompts, and vocabulary priorities.")
-        desc.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        desc.setObjectName("descLabel")
+        desc.setStyleSheet("font-size: 12px;")
         layout.addWidget(desc)
 
         # Profile combo
@@ -2270,24 +3727,28 @@ class SettingsDialog(QDialog):
 
         # Profile Details Card
         detail_frame = QFrame(self)
-        detail_frame.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 14px; }")
+        detail_frame.setObjectName("profileDetailCard")
         df_layout = QVBoxLayout(detail_frame)
         df_layout.setSpacing(10)
 
         self.profile_desc_label = QLabel("", self)
         self.profile_desc_label.setWordWrap(True)
-        self.profile_desc_label.setStyleSheet("color: #E2E8F0; font-size: 13px; font-weight: 500; border: none;")
+        self.profile_desc_label.setObjectName("profileDescLabel")
         df_layout.addWidget(self.profile_desc_label)
 
         mod_box = QHBoxLayout()
-        mod_box.addWidget(QLabel("Preferred AI Model:", self))
+        mod_lbl = QLabel("Preferred AI Model:", self)
+        mod_lbl.setObjectName("controlLabel")
+        mod_box.addWidget(mod_lbl)
         self.profile_model_badge = QLabel("", self)
-        self.profile_model_badge.setStyleSheet("color: #38BDF8; font-weight: 700; background: #1E293B; border: 1px solid #0284C7; border-radius: 6px; padding: 4px 10px;")
+        self.profile_model_badge.setObjectName("profileModelBadge")
         mod_box.addWidget(self.profile_model_badge)
         mod_box.addStretch()
         df_layout.addLayout(mod_box)
 
-        df_layout.addWidget(QLabel("Profile System Directives (Injected into Gemini system instructions):", self))
+        directives_lbl = QLabel("Profile System Directives (Injected into Gemini system instructions):", self)
+        directives_lbl.setObjectName("controlLabel")
+        df_layout.addWidget(directives_lbl)
         self.profile_prompt_edit = QTextEdit(self)
         self.profile_prompt_edit.setReadOnly(True)
         self.profile_prompt_edit.setMinimumHeight(100)
@@ -2295,9 +3756,11 @@ class SettingsDialog(QDialog):
         df_layout.addWidget(self.profile_prompt_edit)
 
         vocab_p_box = QHBoxLayout()
-        vocab_p_box.addWidget(QLabel("Priority Vocabulary Domains:", self))
+        vocab_lbl = QLabel("Priority Vocabulary Domains:", self)
+        vocab_lbl.setObjectName("controlLabel")
+        vocab_p_box.addWidget(vocab_lbl)
         self.profile_vocab_tags = QLabel("", self)
-        self.profile_vocab_tags.setStyleSheet("color: #A78BFA; font-weight: 600; border: none;")
+        self.profile_vocab_tags.setObjectName("profileVocabTags")
         vocab_p_box.addWidget(self.profile_vocab_tags)
         vocab_p_box.addStretch()
         df_layout.addLayout(vocab_p_box)
@@ -2333,12 +3796,14 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 
+
         header = QLabel("🗂️ Personal AI Vocabulary Engine")
-        header.setStyleSheet("font-size: 16px; font-weight: bold; color: #38BDF8;")
+        header.setObjectName("blueSectionHeader")
         layout.addWidget(header)
 
         desc = QLabel("Teaches Gemini your specific company terminology, project codenames, technical APIs, and phonetic name spellings.")
-        desc.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        desc.setObjectName("descLabel")
+        desc.setStyleSheet("font-size: 12px;")
         layout.addWidget(desc)
 
         # Search bar & actions
@@ -2380,12 +3845,12 @@ class SettingsDialog(QDialog):
 
         # Normalization Sandbox
         sandbox_frame = QFrame(self)
-        sandbox_frame.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 10px; }")
+        sandbox_frame.setObjectName("sandboxCard")
         sb_layout = QVBoxLayout(sandbox_frame)
         sb_layout.setSpacing(6)
 
         sb_title = QLabel("🧪 Live Normalization Sandbox (Test your vocabulary in real-time):", self)
-        sb_title.setStyleSheet("font-weight: 600; font-size: 12px; color: #F59E0B; border: none;")
+        sb_title.setObjectName("blueSectionHeader")
         sb_layout.addWidget(sb_title)
 
         self.vocab_test_input = QLineEdit("dr sriniwas awasti deployed type script and pytorch on git hub", self)
@@ -2394,9 +3859,11 @@ class SettingsDialog(QDialog):
         sb_layout.addWidget(self.vocab_test_input)
 
         out_box = QHBoxLayout()
-        out_box.addWidget(QLabel("Normalized Result:", self))
+        res_lbl = QLabel("Normalized Result:", self)
+        res_lbl.setObjectName("controlLabel")
+        out_box.addWidget(res_lbl)
         self.vocab_test_output = QLabel("", self)
-        self.vocab_test_output.setStyleSheet("color: #10B981; font-weight: 700; font-size: 13px; border: none;")
+        self.vocab_test_output.setObjectName("vocabTestOutput")
         out_box.addWidget(self.vocab_test_output, stretch=1)
         sb_layout.addLayout(out_box)
 
@@ -2514,37 +3981,37 @@ class SettingsDialog(QDialog):
 
         # Telemetry Stats Cards Grid
         metrics_frame = QFrame(self)
-        metrics_frame.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
+        metrics_frame.setObjectName("benchMetricsCard")
         mf_layout = QVBoxLayout(metrics_frame)
         mf_layout.setSpacing(8)
 
         mf_title = QLabel("📈 Live Operation Telemetry (P50, P95, Fallbacks & Utilization)", self)
-        mf_title.setStyleSheet("font-weight: 700; font-size: 13px; color: #10B981; border: none;")
+        mf_title.setObjectName("blueSectionHeader")
         mf_layout.addWidget(mf_title)
 
         grid = QHBoxLayout()
         self.bench_stat_reqs = QLabel("Total Requests: 0\nWords Dictated: 0", self)
-        self.bench_stat_reqs.setStyleSheet("background: #1E293B; padding: 8px 12px; border-radius: 6px; font-size: 12px; border: none;")
+        self.bench_stat_reqs.setObjectName("benchStatPill")
         grid.addWidget(self.bench_stat_reqs)
 
         self.bench_stat_lat = QLabel("Avg Latency: 0.0s\nP50: 0.0s | P95: 0.0s", self)
-        self.bench_stat_lat.setStyleSheet("background: #1E293B; padding: 8px 12px; border-radius: 6px; font-size: 12px; border: none;")
+        self.bench_stat_lat.setObjectName("benchStatPill")
         grid.addWidget(self.bench_stat_lat)
 
         self.bench_stat_rate = QLabel("Success Rate: 100.0%\nFallbacks Triggered: 0", self)
-        self.bench_stat_rate.setStyleSheet("background: #1E293B; padding: 8px 12px; border-radius: 6px; font-size: 12px; border: none;")
+        self.bench_stat_rate.setObjectName("benchStatPill")
         grid.addWidget(self.bench_stat_rate)
         mf_layout.addLayout(grid)
         layout.addWidget(metrics_frame)
 
         # 6-Model Benchmark Suite
         suite_frame = QFrame(self)
-        suite_frame.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 12px; }")
+        suite_frame.setObjectName("benchSuiteCard")
         sf_layout = QVBoxLayout(suite_frame)
         sf_layout.setSpacing(10)
 
         sf_title = QLabel("🚀 6-Model Benchmark Suite (Per Gemini_Flow_AI_Models_Guide.md)", self)
-        sf_title.setStyleSheet("font-weight: 700; font-size: 13px; color: #F59E0B; border: none;")
+        sf_title.setObjectName("blueSectionHeader")
         sf_layout.addWidget(sf_title)
 
         runner_box = QHBoxLayout()
@@ -2665,9 +4132,10 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(10)
 
+
         # Header & Intro
         ai_header = QLabel("🧠 AI Dictation & Custom Prompts Library", self)
-        ai_header.setStyleSheet("font-size: 16px; font-weight: bold; color: #38BDF8;")
+        ai_header.setObjectName("blueSectionHeader")
         layout.addWidget(ai_header)
 
         ai_desc = QLabel(
@@ -2681,26 +4149,26 @@ class SettingsDialog(QDialog):
 
         # 1. Unified Dictation Styles & Prompts Card
         prompt_card = QFrame(self)
-        prompt_card.setStyleSheet("QFrame { background-color: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 14px; }")
+        prompt_card.setObjectName("promptCard")
         pc_layout = QVBoxLayout(prompt_card)
         pc_layout.setSpacing(10)
 
         # Header with active badge
         pc_header = QHBoxLayout()
         pc_title = QLabel("📚 Active Dictation Style & System Prompt", prompt_card)
-        pc_title.setStyleSheet("font-weight: 700; font-size: 14px; color: #F59E0B; border: none;")
+        pc_title.setObjectName("blueSectionHeader")
         pc_header.addWidget(pc_title)
         pc_header.addStretch()
 
         self.active_prompt_badge = QLabel("Active: Clean Speech & Grammar Enhancement", prompt_card)
-        self.active_prompt_badge.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 3px 8px; border: none;")
+        self.active_prompt_badge.setObjectName("activePromptBadge")
         pc_header.addWidget(self.active_prompt_badge)
         pc_layout.addLayout(pc_header)
 
         # Selector Row
         sel_row = QHBoxLayout()
         sel_lbl = QLabel("Choose Dictation Style / Prompt:", prompt_card)
-        sel_lbl.setStyleSheet("font-weight: 600; color: #E2E8F0;")
+        sel_lbl.setStyleSheet("font-weight: 600;")
         sel_row.addWidget(sel_lbl)
         self.saved_prompts_combo = QComboBox(prompt_card)
         self.saved_prompts_combo.setView(QListView())
@@ -2738,7 +4206,7 @@ class SettingsDialog(QDialog):
         pc_layout.addWidget(QLabel("Prompt Title / Name:", prompt_card))
         self.prompt_title_input = QLineEdit(prompt_card)
         self.prompt_title_input.setPlaceholderText("e.g. Executive Email Polish, Technical Architecture, Python Docstrings...")
-        self.prompt_title_input.setStyleSheet("font-size: 13px; font-weight: 600; color: #FFFFFF; padding: 6px 10px;")
+        self.prompt_title_input.setStyleSheet("font-size: 13px; font-weight: 600; padding: 6px 10px;")
         pc_layout.addWidget(self.prompt_title_input)
 
         # Prompt Text Instructions
@@ -2763,19 +4231,18 @@ class SettingsDialog(QDialog):
         # 3. Interactive Profile & Dictation Style Combination Showcase
         showcase_card = QFrame(self)
         showcase_card.setObjectName("showcaseCard")
-        showcase_card.setStyleSheet("QFrame#showcaseCard { background-color: #0F172A; border: 1px solid #334155; border-radius: 10px; padding: 16px; }")
         sc_layout = QVBoxLayout(showcase_card)
         sc_layout.setSpacing(12)
 
         # Header
         sc_header = QHBoxLayout()
         sc_title = QLabel("💡 Profile & Dictation Style Combination Showcase", showcase_card)
-        sc_title.setStyleSheet("font-weight: 700; font-size: 15px; color: #38BDF8; border: none;")
+        sc_title.setObjectName("blueSectionHeader")
         sc_header.addWidget(sc_title)
         sc_header.addStretch()
 
         sc_badge = QLabel("Interactive Output Guide", showcase_card)
-        sc_badge.setStyleSheet("color: #38BDF8; font-weight: bold; font-size: 11px; background: #0369A1; border-radius: 4px; padding: 3px 8px; border: none;")
+        sc_badge.setObjectName("showcaseBadge")
         sc_header.addWidget(sc_badge)
         sc_layout.addLayout(sc_header)
 
@@ -2785,26 +4252,26 @@ class SettingsDialog(QDialog):
             "Select any combination below to preview its formatted output and apply it with one click.",
             showcase_card
         )
-        sc_desc.setStyleSheet("color: #94A3B8; font-size: 12px; border: none;")
+        sc_desc.setObjectName("descLabel")
         sc_desc.setWordWrap(True)
         sc_layout.addWidget(sc_desc)
 
         # Raw Spoken Input Box
         spoken_box = QFrame(showcase_card)
-        spoken_box.setStyleSheet("QFrame { background-color: #1E293B; border: 1px dashed #6366F1; border-radius: 8px; padding: 10px 12px; }")
+        spoken_box.setObjectName("spokenBox")
         sb_layout = QVBoxLayout(spoken_box)
         sb_layout.setSpacing(4)
-        sb_layout.setContentsMargins(0, 0, 0, 0)
+        sb_layout.setContentsMargins(10, 10, 10, 10)
 
         sb_lbl = QLabel("🎙️ Raw Spoken Input (What you dictate into the microphone):", spoken_box)
-        sb_lbl.setStyleSheet("font-weight: 700; font-size: 12px; color: #A78BFA; border: none;")
+        sb_lbl.setObjectName("blueSectionHeader")
         sb_layout.addWidget(sb_lbl)
 
         self.showcase_spoken_text = QLabel(
             "\"Uh hey basically we need to refactor the user authentication flow in our system means first we have to add JWT token verification with refresh token rotation semicolon second we need to implement Redis caching to check if the session is revoked semicolon third please update the database schema for user table and add two fields created_at and last_login and finally send an email notification to the security team on suspicious login attempts.\"",
             spoken_box
         )
-        self.showcase_spoken_text.setStyleSheet("color: #CBD5E1; font-size: 12px; font-style: italic; border: none;")
+        self.showcase_spoken_text.setObjectName("showcaseSpokenText")
         self.showcase_spoken_text.setWordWrap(True)
         sb_layout.addWidget(self.showcase_spoken_text)
         sc_layout.addWidget(spoken_box)
@@ -2812,7 +4279,7 @@ class SettingsDialog(QDialog):
         # Combination Selector Row
         sel_combo_row = QHBoxLayout()
         sel_combo_lbl = QLabel("Choose Combination to Preview:", showcase_card)
-        sel_combo_lbl.setStyleSheet("font-weight: 600; color: #E2E8F0; font-size: 13px; border: none;")
+        sel_combo_lbl.setStyleSheet("font-weight: 600; font-size: 13px; border: none;")
         sel_combo_row.addWidget(sel_combo_lbl)
 
         self.showcase_combo = QComboBox(showcase_card)
@@ -2844,22 +4311,20 @@ class SettingsDialog(QDialog):
 
         # Purpose Description Box
         self.showcase_purpose_label = QLabel("", showcase_card)
-        self.showcase_purpose_label.setStyleSheet("color: #E2E8F0; font-size: 12px; background: #1E293B; border-radius: 6px; padding: 8px 10px; border: 1px solid #334155;")
+        self.showcase_purpose_label.setObjectName("showcasePurposeLabel")
         self.showcase_purpose_label.setWordWrap(True)
         sc_layout.addWidget(self.showcase_purpose_label)
 
         # Output Preview Header & Text Area
         out_lbl = QLabel("📋 Resulting Formatted Output (What appears on screen & pastes automatically):", showcase_card)
-        out_lbl.setStyleSheet("font-weight: 700; font-size: 12px; color: #10B981; border: none;")
+        out_lbl.setObjectName("blueSectionHeader")
         sc_layout.addWidget(out_lbl)
 
         self.showcase_output_edit = QTextEdit(showcase_card)
+        self.showcase_output_edit.setObjectName("showcaseOutputEdit")
         self.showcase_output_edit.setReadOnly(True)
         self.showcase_output_edit.setMinimumHeight(130)
         self.showcase_output_edit.setMaximumHeight(160)
-        self.showcase_output_edit.setStyleSheet(
-            "QTextEdit { background-color: #0B1120; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; font-family: Consolas, 'Courier New', monospace; font-size: 12px; padding: 8px; }"
-        )
         sc_layout.addWidget(self.showcase_output_edit)
 
         # Apply Button & Feedback Row
@@ -2902,8 +4367,10 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
+
         desc = QLabel("📖 Custom Phonetic Dictionary: Teach Gemini Flow how you want specific names, jargon, or misheard words to be spelled.")
-        desc.setStyleSheet("color: #94A3B8; font-size: 13px;")
+        desc.setObjectName("descLabel")
+        desc.setStyleSheet("font-size: 13px;")
         layout.addWidget(desc)
 
         top_box = QHBoxLayout()
@@ -2959,8 +4426,10 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
+
         desc = QLabel("⚡ Quick Text: Speak a trigger phrase (e.g. 'Hey I am Srinivas LinkedIn GitHub Instagram') to paste multi-line templates or links.")
-        desc.setStyleSheet("color: #94A3B8; font-size: 13px;")
+        desc.setObjectName("descLabel")
+        desc.setStyleSheet("font-size: 13px;")
         layout.addWidget(desc)
 
         top_box = QHBoxLayout()
@@ -3017,6 +4486,7 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(14)
 
+
         # 1. Microphone Hardware Input Card
         mic_card = QFrame(tab)
         mic_card.setObjectName("micCard")
@@ -3026,7 +4496,7 @@ class SettingsDialog(QDialog):
 
         mic_header_box = QHBoxLayout()
         mic_header_label = QLabel("🎙️ Primary Audio Input Microphone:", mic_card)
-        mic_header_label.setStyleSheet("font-size: 15px; font-weight: 700; color: #38BDF8; border: none;")
+        mic_header_label.setObjectName("blueSectionHeader")
         mic_header_box.addWidget(mic_header_label)
         mic_header_box.addStretch()
 
@@ -3041,7 +4511,8 @@ class SettingsDialog(QDialog):
             mic_card
         )
         mic_desc.setWordWrap(True)
-        mic_desc.setStyleSheet("color: #94A3B8; font-size: 12px; line-height: 1.4;")
+        mic_desc.setObjectName("descLabel")
+        mic_desc.setStyleSheet("font-size: 12px; line-height: 1.4;")
         mic_card_layout.addWidget(mic_desc)
 
         # Device selector row with refresh button
@@ -3091,7 +4562,7 @@ class SettingsDialog(QDialog):
 
         dsp_header_box = QHBoxLayout()
         dsp_header = QLabel("🌀 Acoustic DSP Noise Suppression & Motor Rumble Filters:", dsp_card)
-        dsp_header.setStyleSheet("font-size: 15px; font-weight: 700; color: #38BDF8; border: none;")
+        dsp_header.setObjectName("blueSectionHeader")
         dsp_header_box.addWidget(dsp_header)
         dsp_header_box.addStretch()
         dsp_pill = QLabel("Sub-5ms Real-Time Filtering", dsp_card)
@@ -3100,19 +4571,21 @@ class SettingsDialog(QDialog):
         dsp_card_layout.addLayout(dsp_header_box)
 
         self.cb_dsp_fan_filter = QCheckBox("🌀 Real-Time Ceiling Fan & AC Motor Rumble Filter (85 Hz Butterworth High-Pass)", dsp_card)
-        self.cb_dsp_fan_filter.setStyleSheet("font-weight: 600; color: #F8FAFC; font-size: 13px;")
+        self.cb_dsp_fan_filter.setStyleSheet("font-weight: 600; font-size: 13px;")
         dsp_card_layout.addWidget(self.cb_dsp_fan_filter)
 
         fan_desc = QLabel("   Attenuates 50/60 Hz electrical hums and 20–75 Hz ceiling fan blade motor rumble without voice distortion.", dsp_card)
-        fan_desc.setStyleSheet("color: #94A3B8; font-size: 11px; margin-bottom: 4px;")
+        fan_desc.setObjectName("descLabel")
+        fan_desc.setStyleSheet("font-size: 11px; margin-bottom: 4px;")
         dsp_card_layout.addWidget(fan_desc)
 
         self.cb_dsp_noise_gate = QCheckBox("🔇 Dynamic RMS Audio Noise Gate (Mutes background hiss, breath & room noise)", dsp_card)
-        self.cb_dsp_noise_gate.setStyleSheet("font-weight: 600; color: #F8FAFC; font-size: 13px;")
+        self.cb_dsp_noise_gate.setStyleSheet("font-weight: 600; font-size: 13px;")
         dsp_card_layout.addWidget(self.cb_dsp_noise_gate)
 
         gate_desc = QLabel("   Automatically suppresses background room echo, air hiss, and quiet breaths during speech pauses with sub-5ms silence interception.", dsp_card)
-        gate_desc.setStyleSheet("color: #94A3B8; font-size: 11px; margin-bottom: 4px;")
+        gate_desc.setObjectName("descLabel")
+        gate_desc.setStyleSheet("font-size: 11px; margin-bottom: 4px;")
         dsp_card_layout.addWidget(gate_desc)
 
         layout.addWidget(dsp_card)
@@ -3126,7 +4599,7 @@ class SettingsDialog(QDialog):
 
         offline_header_box = QHBoxLayout()
         offline_header = QLabel("📡 Local On-Device Offline Speech Fallback:", offline_card)
-        offline_header.setStyleSheet("font-size: 15px; font-weight: 700; color: #38BDF8; border: none;")
+        offline_header.setObjectName("blueSectionHeader")
         offline_header_box.addWidget(offline_header)
         offline_header_box.addStretch()
         offline_pill = QLabel("100% On-Device • Zero Internet Required", offline_card)
@@ -3135,11 +4608,12 @@ class SettingsDialog(QDialog):
         offline_card_layout.addLayout(offline_header_box)
 
         self.cb_offline_fallback = QCheckBox("🎙️ Embedded Local Faster-Whisper AI Fallback (100% Private Offline Speech)", offline_card)
-        self.cb_offline_fallback.setStyleSheet("font-weight: 600; color: #F8FAFC; font-size: 13px;")
+        self.cb_offline_fallback.setStyleSheet("font-weight: 600; font-size: 13px;")
         offline_card_layout.addWidget(self.cb_offline_fallback)
 
         offline_desc = QLabel("   Seamlessly transcribes speech locally on CPU cores with OpenAI Faster-Whisper when Wi-Fi disconnects, internet drops, or API quotas expire.", offline_card)
-        offline_desc.setStyleSheet("color: #94A3B8; font-size: 11px;")
+        offline_desc.setObjectName("descLabel")
+        offline_desc.setStyleSheet("font-size: 11px;")
         offline_card_layout.addWidget(offline_desc)
 
         layout.addWidget(offline_card)
@@ -3154,7 +4628,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(sep_lang)
 
         lang_header = QLabel("🌐 Spoken Language Selection & Multilingual Recognition (200+ Languages):")
-        lang_header.setStyleSheet("font-size: 14px; font-weight: bold; color: #38BDF8; margin-top: 4px;")
+        lang_header.setObjectName("blueSectionHeader")
         layout.addWidget(lang_header)
 
         lang_desc = QLabel(
@@ -3163,12 +4637,12 @@ class SettingsDialog(QDialog):
             "native script and preventing language confusion."
         )
         lang_desc.setWordWrap(True)
-        lang_desc.setStyleSheet("color: #94A3B8; font-size: 11px; margin-bottom: 6px;")
+        lang_desc.setObjectName("descLabel")
+        lang_desc.setStyleSheet("font-size: 11px; margin-bottom: 6px;")
         layout.addWidget(lang_desc)
 
         # Language Control Card
         lang_card = QFrame()
-        lang_card.setStyleSheet("QFrame#langCard { background-color: #0F172A; border: 1px solid #1E293B; border-radius: 10px; padding: 12px; }")
         lang_card.setObjectName("langCard")
         lang_card_layout = QVBoxLayout(lang_card)
         lang_card_layout.setSpacing(10)
@@ -3177,10 +4651,7 @@ class SettingsDialog(QDialog):
         # 1. Active Selection Status Banner & Action Buttons
         top_lang_bar = QHBoxLayout()
         self.lang_status_badge = QLabel("🎯 Active: English Only (Default)")
-        self.lang_status_badge.setStyleSheet(
-            "font-size: 12px; font-weight: 700; color: #38BDF8; background-color: #1E293B; "
-            "padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;"
-        )
+        self.lang_status_badge.setObjectName("langStatusBadge")
         top_lang_bar.addWidget(self.lang_status_badge, stretch=1)
 
         self.btn_lang_default_en = QPushButton("⚡ English Only (Default)")
@@ -3207,7 +4678,7 @@ class SettingsDialog(QDialog):
         search_box = QHBoxLayout()
         self.lang_search = QLineEdit()
         self.lang_search.setPlaceholderText("🔍 Search 200+ languages by name, native script, country, code (e.g. Marathi, हिन्दी, Español, mr, fr)...")
-        self.lang_search.setStyleSheet("font-size: 13px; padding: 7px 12px; border-radius: 6px; background-color: #1E293B; color: #FFFFFF; border: 1px solid #334155;")
+        self.lang_search.setStyleSheet("font-size: 13px; padding: 7px 12px;")
         self.lang_search.textChanged.connect(self._filter_languages_table)
         search_box.addWidget(self.lang_search)
         lang_card_layout.addLayout(search_box)
@@ -3227,23 +4698,7 @@ class SettingsDialog(QDialog):
         for r_name in REGIONS:
             btn = QPushButton(r_name)
             btn.setCheckable(True)
-            btn.setObjectName("secondaryBtn")
-            btn.setStyleSheet("""
-                QPushButton {
-                    font-size: 11px;
-                    font-weight: 600;
-                    padding: 4px 10px;
-                    border-radius: 4px;
-                    background-color: #1E293B;
-                    color: #94A3B8;
-                    border: 1px solid #334155;
-                }
-                QPushButton:checked {
-                    background-color: #0284C7;
-                    color: #FFFFFF;
-                    border: 1px solid #38BDF8;
-                }
-            """)
+            btn.setObjectName("langRegionBtn")
             if r_name == REGION_ALL:
                 btn.setChecked(True)
             btn.clicked.connect(lambda checked, r=r_name: self._on_lang_region_clicked(r))
@@ -3253,23 +4708,7 @@ class SettingsDialog(QDialog):
         # Add "⭐ Selected Only" pill
         btn_sel = QPushButton("⭐ Selected Only")
         btn_sel.setCheckable(True)
-        btn_sel.setObjectName("secondaryBtn")
-        btn_sel.setStyleSheet("""
-            QPushButton {
-                font-size: 11px;
-                font-weight: 600;
-                padding: 4px 10px;
-                border-radius: 4px;
-                background-color: #1E293B;
-                color: #94A3B8;
-                border: 1px solid #334155;
-            }
-            QPushButton:checked {
-                background-color: #D97706;
-                color: #FFFFFF;
-                border: 1px solid #F59E0B;
-            }
-        """)
+        btn_sel.setObjectName("langRegionBtn")
         btn_sel.clicked.connect(lambda checked: self._on_lang_region_clicked("Selected Only"))
         self.lang_region_buttons["Selected Only"] = btn_sel
         category_box.addWidget(btn_sel)
@@ -3279,6 +4718,7 @@ class SettingsDialog(QDialog):
 
         # 4. Languages Table (211 Languages)
         self.lang_table = QTableWidget()
+        self.lang_table.setObjectName("langTable")
         self.lang_table.setColumnCount(4)
         self.lang_table.setHorizontalHeaderLabels(["Select", "🌐 Language (English)", "✍️ Native Script", "🏷️ Region & Code"])
         self.lang_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -3292,22 +4732,6 @@ class SettingsDialog(QDialog):
         self.lang_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.lang_table.setMinimumHeight(280)
         self.lang_table.setMaximumHeight(360)
-        self.lang_table.setStyleSheet("""
-            QTableWidget {
-                background-color: #0B1120;
-                border: 1px solid #1E293B;
-                border-radius: 6px;
-                gridline-color: #1E293B;
-                selection-background-color: #1E293B;
-            }
-            QHeaderView::section {
-                background-color: #1E293B;
-                color: #38BDF8;
-                font-weight: bold;
-                border: 1px solid #0F172A;
-                padding: 4px;
-            }
-        """)
         self.lang_table.cellClicked.connect(self._on_lang_cell_clicked)
         lang_card_layout.addWidget(self.lang_table)
 
@@ -3322,6 +4746,7 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
+
 
         # 1. Top Toolbar (Search, Favorites Toggle, Filter By Menu, Clear History)
         top_box = QHBoxLayout()
@@ -3353,6 +4778,13 @@ class SettingsDialog(QDialog):
         self.btn_history_retention.clicked.connect(self._show_retention_dialog)
         top_box.addWidget(self.btn_history_retention)
 
+        self.btn_retranscribe_last = QPushButton("🎙️ Re-transcribe Last", self)
+        self.btn_retranscribe_last.setObjectName("secondaryBtn")
+        self.btn_retranscribe_last.setMinimumHeight(36)
+        self.btn_retranscribe_last.setToolTip("Re-transcribe the most recently recorded WAV audio with the active engine")
+        self.btn_retranscribe_last.clicked.connect(self._retranscribe_last_recording)
+        top_box.addWidget(self.btn_retranscribe_last)
+
         self.btn_clear_history = QPushButton("🗑️ Clear History", self)
         self.btn_clear_history.setObjectName("dangerBtn")
         self.btn_clear_history.setMinimumHeight(36)
@@ -3364,14 +4796,7 @@ class SettingsDialog(QDialog):
 
         # 2. Active Filter Tag Bar
         self.filter_tag_bar = QFrame(self)
-        self.filter_tag_bar.setStyleSheet("""
-            QFrame {
-                background-color: #1E293B;
-                border: 1px solid #0284C7;
-                border-radius: 6px;
-                padding: 4px 10px;
-            }
-        """)
+        self.filter_tag_bar.setObjectName("filterTagBar")
         tag_layout = QHBoxLayout(self.filter_tag_bar)
         tag_layout.setContentsMargins(8, 4, 8, 4)
         tag_layout.setSpacing(8)
@@ -3415,14 +4840,7 @@ class SettingsDialog(QDialog):
 
         # 4. Dedicated Selected Transcription Detail Card (Dual AI Prompt & Spoken Safeguard Inspector)
         self.history_card = QFrame(self)
-        self.history_card.setStyleSheet("""
-            QFrame {
-                background-color: #0B1120;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px;
-            }
-        """)
+        self.history_card.setObjectName("historyCard")
         card_layout = QVBoxLayout(self.history_card)
         card_layout.setContentsMargins(10, 10, 10, 10)
         card_layout.setSpacing(8)
@@ -3430,20 +4848,20 @@ class SettingsDialog(QDialog):
         # Detail Header & Badges
         card_header = QHBoxLayout()
         self.history_detail_title = QLabel("📄 Full Transcription Details:", self.history_card)
-        self.history_detail_title.setStyleSheet("color: #38BDF8; font-weight: bold; font-size: 13px;")
+        self.history_detail_title.setObjectName("blueSectionHeader")
         card_header.addWidget(self.history_detail_title)
         card_header.addStretch()
 
         self.history_badge_app = QLabel("", self.history_card)
-        self.history_badge_app.setStyleSheet("color: #94A3B8; background-color: #1E293B; border-radius: 4px; padding: 2px 6px; font-size: 11px;")
+        self.history_badge_app.setObjectName("historyBadge")
         card_header.addWidget(self.history_badge_app)
 
         self.history_badge_model = QLabel("", self.history_card)
-        self.history_badge_model.setStyleSheet("color: #94A3B8; background-color: #1E293B; border-radius: 4px; padding: 2px 6px; font-size: 11px;")
+        self.history_badge_model.setObjectName("historyBadge")
         card_header.addWidget(self.history_badge_model)
 
         self.history_badge_safeguard = QLabel("", self.history_card)
-        self.history_badge_safeguard.setStyleSheet("color: #38BDF8; background-color: #0C4A6E; border: 1px solid #0284C7; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600;")
+        self.history_badge_safeguard.setObjectName("historyBadgeSafeguard")
         self.history_badge_safeguard.setVisible(False)
         card_header.addWidget(self.history_badge_safeguard)
 
@@ -3451,42 +4869,16 @@ class SettingsDialog(QDialog):
 
         # Multi-tab wrapped text preview for dual inspection (AI Prompt vs Normal Speech Safeguard)
         self.history_detail_tabs = QTabWidget(self.history_card)
-        self.history_detail_tabs.setStyleSheet("""
-            QTabWidget::pane {
-                border: 1px solid #1E293B;
-                background-color: #0F172A;
-                border-radius: 6px;
-            }
-            QTabBar::tab {
-                background: #0B1120;
-                color: #94A3B8;
-                padding: 4px 12px;
-                font-size: 11px;
-                font-weight: 600;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-            }
-            QTabBar::tab:selected {
-                background: #1E293B;
-                color: #38BDF8;
-                border-bottom: 2px solid #38BDF8;
-            }
-        """)
+        self.history_detail_tabs.setObjectName("historyDetailTabs")
 
         # Tab 1: AI Prompt / Primary Text
         tab_prompt = QWidget()
         p_lay = QVBoxLayout(tab_prompt)
         p_lay.setContentsMargins(4, 4, 4, 4)
         self.history_detail_text = QTextEdit(tab_prompt)
+        self.history_detail_text.setObjectName("historyDetailText")
         self.history_detail_text.setReadOnly(True)
         self.history_detail_text.setPlaceholderText("Select any transcript in the tree above to inspect and manage...")
-        self.history_detail_text.setStyleSheet("""
-            background-color: #0F172A;
-            color: #FFFFFF;
-            border: none;
-            font-size: 13px;
-            line-height: 1.5;
-        """)
         p_lay.addWidget(self.history_detail_text)
         self.history_detail_tabs.addTab(tab_prompt, "✨ Converted AI Prompt")
 
@@ -3495,15 +4887,9 @@ class SettingsDialog(QDialog):
         r_lay = QVBoxLayout(tab_raw)
         r_lay.setContentsMargins(4, 4, 4, 4)
         self.history_raw_detail_text = QTextEdit(tab_raw)
+        self.history_raw_detail_text.setObjectName("historyRawDetailText")
         self.history_raw_detail_text.setReadOnly(True)
         self.history_raw_detail_text.setPlaceholderText("Exact normal spoken speech (safeguard recovery)...")
-        self.history_raw_detail_text.setStyleSheet("""
-            background-color: #0F172A;
-            color: #38BDF8;
-            border: none;
-            font-size: 13px;
-            line-height: 1.5;
-        """)
         r_lay.addWidget(self.history_raw_detail_text)
         self.history_detail_tabs.addTab(tab_raw, "🗣️ Normal Spoken Speech (Safeguard Backup)")
 
@@ -3540,7 +4926,7 @@ class SettingsDialog(QDialog):
 
         self.btn_copy_raw_selected = QPushButton("🗣️ Copy Normal Speech", self.history_card)
         self.btn_copy_raw_selected.setObjectName("secondaryBtn")
-        self.btn_copy_raw_selected.setStyleSheet("background-color: #1E293B; color: #38BDF8; border: 1px solid #0284C7;")
+        self.btn_copy_raw_selected.setObjectName("secondaryBtn")
         self.btn_copy_raw_selected.clicked.connect(self._copy_raw_selected_history)
         self.btn_copy_raw_selected.setVisible(False)
         self.btn_copy_raw_selected.setEnabled(False)
@@ -3553,7 +4939,7 @@ class SettingsDialog(QDialog):
         action_row.addWidget(self.btn_reinsert_selected)
 
         self.btn_reinsert_raw_selected = QPushButton("🗣️ Paste Normal Speech", self.history_card)
-        self.btn_reinsert_raw_selected.setStyleSheet("background-color: #1E293B; color: #38BDF8; font-weight: 600; padding: 6px 14px; border: 1px solid #0284C7;")
+        self.btn_reinsert_raw_selected.setObjectName("secondaryBtn")
         self.btn_reinsert_raw_selected.clicked.connect(self._reinsert_raw_selected_history)
         self.btn_reinsert_raw_selected.setVisible(False)
         self.btn_reinsert_raw_selected.setEnabled(False)
@@ -3584,34 +4970,28 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(14)
 
+
         # 1. Top Hero Card: 🏆 Writing Publication Milestones & Total Words (Clean & Clutter-Free)
         milestone_card = QFrame(self)
-        milestone_card.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0B132B, stop:1 #1C2541);
-                border: 2px solid #38BDF8;
-                border-radius: 10px;
-                padding: 12px;
-            }
-        """)
+        milestone_card.setObjectName("milestoneCard")
         m_layout = QVBoxLayout(milestone_card)
         m_layout.setContentsMargins(16, 14, 16, 14)
         m_layout.setSpacing(10)
 
         m_top = QHBoxLayout()
         m_title = QLabel("🏆 Total Spoken Words & Writing Publication Milestone", milestone_card)
-        m_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #38BDF8; border: none;")
+        m_title.setObjectName("blueSectionHeader")
         m_top.addWidget(m_title)
         m_top.addStretch()
 
         self.lbl_milestone_badge = QLabel("🎙️ Voice Novice", milestone_card)
-        self.lbl_milestone_badge.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px; background: #0284C7; border-radius: 6px; padding: 4px 12px; border: none;")
+        self.lbl_milestone_badge.setObjectName("milestoneBadge")
         m_top.addWidget(self.lbl_milestone_badge)
         m_layout.addLayout(m_top)
 
         self.lbl_milestone_desc = QLabel("Start dictating to unlock voice writing milestones!", milestone_card)
         self.lbl_milestone_desc.setWordWrap(True)
-        self.lbl_milestone_desc.setStyleSheet("color: #F8FAFC; font-size: 13px; font-weight: 500; border: none;")
+        self.lbl_milestone_desc.setObjectName("milestoneDesc")
         m_layout.addWidget(self.lbl_milestone_desc)
 
         # Progress bar to next milestone
@@ -3619,29 +4999,13 @@ class SettingsDialog(QDialog):
         self.milestone_progress_bar.setRange(0, 100)
         self.milestone_progress_bar.setValue(0)
         self.milestone_progress_bar.setTextVisible(True)
-        self.milestone_progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #334155;
-                border-radius: 6px;
-                background: #0B1120;
-                text-align: center;
-                color: #FFFFFF;
-                font-weight: bold;
-                font-size: 12px;
-                min-height: 26px;
-            }
-            QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10B981, stop:0.5 #38BDF8, stop:1 #818CF8);
-                border-radius: 5px;
-            }
-        """)
         m_layout.addWidget(self.milestone_progress_bar)
 
         layout.addWidget(milestone_card)
 
         # 2. Temporal Usage & Productivity Cards (Today, This Week, All-Time)
         temporal_title = QLabel("📊 Temporal Usage & Time Saved Summary")
-        temporal_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #F8FAFC; margin-top: 4px;")
+        temporal_title.setStyleSheet("font-size: 15px; font-weight: bold; margin-top: 4px;")
         layout.addWidget(temporal_title)
 
         cards_layout = QHBoxLayout()
@@ -3649,13 +5013,7 @@ class SettingsDialog(QDialog):
 
         def create_stat_card(card_title: str, title_color: str, border_color: str = "#334155"):
             card = QFrame(self)
-            card.setStyleSheet(f"""
-                QFrame {{
-                    background-color: #0F172A;
-                    border: 1px solid {border_color};
-                    border-radius: 10px;
-                }}
-            """)
+            card.setObjectName("temporalStatCard")
             c_layout = QVBoxLayout(card)
             c_layout.setContentsMargins(14, 12, 14, 12)
             c_layout.setSpacing(10)
@@ -3665,44 +5023,37 @@ class SettingsDialog(QDialog):
             # Header row
             header_row = QHBoxLayout()
             t_lbl = QLabel(card_title, card)
-            t_lbl.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {title_color}; border: none;")
+            t_lbl.setObjectName("blueSectionHeader")
             header_row.addWidget(t_lbl)
             header_row.addStretch()
 
             # Scope Badge
             m_badge = QLabel("🎙️ Voice Initiate", card)
-            m_badge.setStyleSheet(f"color: {title_color}; background-color: #1E293B; border: 1px solid {border_color}; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; border: none;")
+            m_badge.setObjectName("statScopeBadge")
             header_row.addWidget(m_badge)
             labels["milestone_scope"] = m_badge
             c_layout.addLayout(header_row)
 
             # Hero Stat Highlight Box (Net Time Saved)
             hero_box = QFrame(card)
-            hero_box.setStyleSheet(f"""
-                QFrame {{
-                    background-color: #070D19;
-                    border: 1px solid {border_color};
-                    border-radius: 8px;
-                    padding: 8px;
-                }}
-            """)
+            hero_box.setObjectName("statHeroBox")
             hb_layout = QVBoxLayout(hero_box)
             hb_layout.setContentsMargins(10, 8, 10, 8)
             hb_layout.setSpacing(4)
 
             hb_top = QHBoxLayout()
             time_saved_lbl = QLabel("⚡ +0s Saved", hero_box)
-            time_saved_lbl.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {title_color}; border: none;")
+            time_saved_lbl.setObjectName("statTimeSavedHero")
             hb_top.addWidget(time_saved_lbl)
             hb_top.addStretch()
 
             speedup_lbl = QLabel("🚀 0.0x Faster", hero_box)
-            speedup_lbl.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 2px 6px; border: none;")
+            speedup_lbl.setObjectName("statSpeedupBadge")
             hb_top.addWidget(speedup_lbl)
             hb_layout.addLayout(hb_top)
 
             comparison_lbl = QLabel("⏱️ 0s speaking vs 0s typing", hero_box)
-            comparison_lbl.setStyleSheet("color: #94A3B8; font-size: 11px; border: none;")
+            comparison_lbl.setObjectName("statComparisonLabel")
             hb_layout.addWidget(comparison_lbl)
 
             c_layout.addWidget(hero_box)
@@ -3721,24 +5072,23 @@ class SettingsDialog(QDialog):
             grid_layout.setSpacing(6)
 
             metric_rows = [
-                ("words", "📝 Spoken Words:", "0 words", "#F8FAFC", True),
-                ("dictations", "🎙️ Dictations:", "0 dictations", "#CBD5E1", False),
-                ("transforms", "✨ AI Prompts:", "0 transforms", "#CBD5E1", False),
-                ("tokens_used", "📊 Tokens Used:", "0 tokens", "#38BDF8", False),
-                ("tokens_left", "🟢 Tokens Remaining:", "1,000,000 (100% Left)", "#10B981", True),
-                ("cost", "💲 Est. API Cost:", "$0.0000 USD", "#F59E0B", True),
+                ("words", "📝 Spoken Words:", "0 words", "statValWhite", True),
+                ("dictations", "🎙️ Dictations:", "0 dictations", "statValMuted", False),
+                ("transforms", "✨ AI Prompts:", "0 transforms", "statValMuted", False),
+                ("tokens_used", "📊 Tokens Used:", "0 tokens", "statValBlue", False),
+                ("tokens_left", "🟢 Tokens Remaining:", "1,000,000 (100% Left)", "statValGreen", True),
+                ("cost", "💲 Est. API Cost:", "$0.0000 USD", "statValGold", True),
             ]
 
-            for key, prompt_txt, def_val, val_color, is_bold in metric_rows:
+            for key, prompt_txt, def_val, obj_name, is_bold in metric_rows:
                 r_box = QHBoxLayout()
                 p_lbl = QLabel(prompt_txt, grid_frame)
-                p_lbl.setStyleSheet("color: #94A3B8; font-size: 12px; border: none;")
+                p_lbl.setObjectName("statPromptLabel")
                 r_box.addWidget(p_lbl)
                 r_box.addStretch()
 
                 v_lbl = QLabel(def_val, grid_frame)
-                weight_str = "font-weight: bold;" if is_bold else ""
-                v_lbl.setStyleSheet(f"color: {val_color}; font-size: 12px; {weight_str} border: none;")
+                v_lbl.setObjectName(obj_name)
                 r_box.addWidget(v_lbl)
                 grid_layout.addLayout(r_box)
                 labels[key] = v_lbl
@@ -3757,26 +5107,19 @@ class SettingsDialog(QDialog):
 
         # 3. Auto Cost Mode Economizer Card
         auto_cost_card = QFrame(self)
-        auto_cost_card.setStyleSheet("""
-            QFrame {
-                background-color: #0F172A;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 12px;
-            }
-        """)
+        auto_cost_card.setObjectName("autoCostCard")
         ac_layout = QVBoxLayout(auto_cost_card)
         ac_layout.setContentsMargins(12, 12, 12, 12)
         ac_layout.setSpacing(8)
 
         ac_header = QHBoxLayout()
         ac_title = QLabel("⚡ Auto Cost Mode (Smart Economizer)", auto_cost_card)
-        ac_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #F59E0B; border: none;")
+        ac_title.setObjectName("blueSectionHeader")
         ac_header.addWidget(ac_title)
         ac_header.addStretch()
 
         self.auto_cost_badge = QLabel("🟢 Auto Cost Optimization: ACTIVE", auto_cost_card)
-        self.auto_cost_badge.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 3px 8px; border: none;")
+        self.auto_cost_badge.setObjectName("autoCostBadge")
         ac_header.addWidget(self.auto_cost_badge)
         ac_layout.addLayout(ac_header)
 
@@ -3786,11 +5129,10 @@ class SettingsDialog(QDialog):
             auto_cost_card
         )
         ac_desc.setWordWrap(True)
-        ac_desc.setStyleSheet("color: #94A3B8; font-size: 12px; border: none;")
+        ac_desc.setObjectName("descLabel")
         ac_layout.addWidget(ac_desc)
 
         self.cb_auto_cost_mode = QCheckBox("Enable Auto Cost Mode (Recommended for maximum speed and lowest API costs)", auto_cost_card)
-        self.cb_auto_cost_mode.setStyleSheet("color: #F8FAFC; font-weight: 600; font-size: 12px; border: none;")
         self.cb_auto_cost_mode.setChecked(True)
         self.cb_auto_cost_mode.toggled.connect(self._on_auto_cost_toggled)
         ac_layout.addWidget(self.cb_auto_cost_mode)
@@ -3806,12 +5148,19 @@ class SettingsDialog(QDialog):
 
     def _on_auto_cost_toggled(self, checked: bool):
         if hasattr(self, 'auto_cost_badge') and self.auto_cost_badge:
+            is_light = (self.theme_mode == "light")
             if checked:
                 self.auto_cost_badge.setText("🟢 Auto Cost Optimization: ACTIVE")
-                self.auto_cost_badge.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 3px 8px; border: none;")
+                if is_light:
+                    self.auto_cost_badge.setStyleSheet("color: #065F46; font-weight: bold; font-size: 11px; background: #D1FAE5; border: 1px solid #10B981; border-radius: 4px; padding: 3px 8px;")
+                else:
+                    self.auto_cost_badge.setStyleSheet("color: #10B981; font-weight: bold; font-size: 11px; background: #064E3B; border-radius: 4px; padding: 3px 8px; border: none;")
             else:
                 self.auto_cost_badge.setText("⚪ Auto Cost Optimization: OFF")
-                self.auto_cost_badge.setStyleSheet("color: #94A3B8; font-weight: 500; font-size: 11px; background: #1E293B; border-radius: 4px; padding: 3px 8px; border: none;")
+                if is_light:
+                    self.auto_cost_badge.setStyleSheet("color: #64748B; font-weight: 500; font-size: 11px; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 3px 8px;")
+                else:
+                    self.auto_cost_badge.setStyleSheet("color: #94A3B8; font-weight: 500; font-size: 11px; background: #1E293B; border-radius: 4px; padding: 3px 8px; border: none;")
         self.config.set("auto_cost_mode", checked)
 
     def _refresh_cost_stats(self):
@@ -3962,38 +5311,39 @@ class SettingsDialog(QDialog):
         total_rows = self.lang_table.rowCount()
         count = len(checked_langs)
 
+        is_light = (self.theme_mode == "light")
         if count == 0:
             self.lang_status_badge.setText("🎯 Active: English Only (Default)")
-            self.lang_status_badge.setStyleSheet(
-                "font-size: 12px; font-weight: 700; color: #38BDF8; background-color: #1E293B; "
-                "padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;"
-            )
+            if is_light:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #0284C7; background-color: #EFF6FF; padding: 6px 12px; border-radius: 6px; border: 1.5px solid #38BDF8;")
+            else:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #38BDF8; background-color: #1E293B; padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;")
         elif count == total_rows or "All" in checked_langs:
             self.lang_status_badge.setText(f"🌐 Active: Universal Multilingual (All {total_rows} Languages)")
-            self.lang_status_badge.setStyleSheet(
-                "font-size: 12px; font-weight: 700; color: #10B981; background-color: #064E3B; "
-                "padding: 6px 12px; border-radius: 6px; border: 1px solid #059669;"
-            )
+            if is_light:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #065F46; background-color: #D1FAE5; padding: 6px 12px; border-radius: 6px; border: 1.5px solid #10B981;")
+            else:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #10B981; background-color: #064E3B; padding: 6px 12px; border-radius: 6px; border: 1px solid #059669;")
         elif count == 1 and checked_langs[0].lower() == "english":
             self.lang_status_badge.setText("🎯 Active: English Only (Default)")
-            self.lang_status_badge.setStyleSheet(
-                "font-size: 12px; font-weight: 700; color: #38BDF8; background-color: #1E293B; "
-                "padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;"
-            )
+            if is_light:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #0284C7; background-color: #EFF6FF; padding: 6px 12px; border-radius: 6px; border: 1.5px solid #38BDF8;")
+            else:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #38BDF8; background-color: #1E293B; padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;")
         elif count <= 4:
             names_str = ", ".join(checked_langs)
             self.lang_status_badge.setText(f"🎯 Active: {count} Selected ({names_str})")
-            self.lang_status_badge.setStyleSheet(
-                "font-size: 12px; font-weight: 700; color: #F59E0B; background-color: #78350F; "
-                "padding: 6px 12px; border-radius: 6px; border: 1px solid #D97706;"
-            )
+            if is_light:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #92400E; background-color: #FEF3C7; padding: 6px 12px; border-radius: 6px; border: 1.5px solid #F59E0B;")
+            else:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #F59E0B; background-color: #78350F; padding: 6px 12px; border-radius: 6px; border: 1px solid #D97706;")
         else:
             sample_str = ", ".join(checked_langs[:3]) + f" +{count - 3} more"
             self.lang_status_badge.setText(f"🎯 Active: {count} Selected ({sample_str})")
-            self.lang_status_badge.setStyleSheet(
-                "font-size: 12px; font-weight: 700; color: #F59E0B; background-color: #78350F; "
-                "padding: 6px 12px; border-radius: 6px; border: 1px solid #D97706;"
-            )
+            if is_light:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #92400E; background-color: #FEF3C7; padding: 6px 12px; border-radius: 6px; border: 1.5px solid #F59E0B;")
+            else:
+                self.lang_status_badge.setStyleSheet("font-size: 12px; font-weight: 700; color: #F59E0B; background-color: #78350F; padding: 6px 12px; border-radius: 6px; border: 1px solid #D97706;")
 
     def _filter_languages_table(self):
         if not hasattr(self, 'lang_table') or not self.lang_table:
@@ -4195,6 +5545,15 @@ class SettingsDialog(QDialog):
                     break
             if not found:
                 self.model_combo.setCurrentIndex(0)
+
+        if hasattr(self, 'whisper_model_combo'):
+            wm = self.config.get("whisper_model", "small.en")
+            if "tiny" in wm:
+                self.whisper_model_combo.setCurrentIndex(2)
+            elif "base" in wm:
+                self.whisper_model_combo.setCurrentIndex(1)
+            else:
+                self.whisper_model_combo.setCurrentIndex(0)
 
         if hasattr(self, 'router_model_combo'):
             self.router_model_combo.blockSignals(True)
@@ -4535,7 +5894,7 @@ class SettingsDialog(QDialog):
         model_code = raw_text.split()[0] if raw_text else "auto"
         if model_code == "auto":
             self.config.set("model_mode", "auto")
-            self.config.set("model_name", "gemini-3.5-transcribe")
+            self.config.set("model_name", "gemini-3.5-flash-lite")
         else:
             self.config.set("model_mode", model_code)
             self.config.set("model_name", model_code)
@@ -4551,7 +5910,7 @@ class SettingsDialog(QDialog):
         model_code = raw_text.split()[0] if raw_text else "auto"
         if model_code == "auto":
             self.config.set("model_mode", "auto")
-            self.config.set("model_name", "gemini-3.5-transcribe")
+            self.config.set("model_name", "gemini-3.5-flash-lite")
         else:
             self.config.set("model_mode", model_code)
             self.config.set("model_name", model_code)
@@ -4783,7 +6142,7 @@ class SettingsDialog(QDialog):
         model_menu = menu.addMenu("🤖 Filter by Model")
         for m in [
             "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash",
-            "gemini-flash-latest", "gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.5-pro"
+            "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-2.5-pro"
         ]:
             model_menu.addAction(m, lambda checked=False, val=m: self._set_filter("model", val, f"Model: {val}"))
 
@@ -5056,7 +6415,7 @@ class SettingsDialog(QDialog):
         item.setForeground(1, QColor("#94A3B8"))
 
         # Column 2: Model
-        model_name = entry.get("model", "gemini-2.5-flash")
+        model_name = entry.get("model", "gemini-3.5-flash")
         short_model = model_name.replace("gemini-", "")
         item.setText(2, f"🤖 {short_model}")
         item.setForeground(2, QColor("#64748B"))
@@ -5114,7 +6473,7 @@ class SettingsDialog(QDialog):
         title = entry.get("title", "")
         duration = entry.get("duration", 0)
         app_name = entry.get("app_name", "General")
-        model = entry.get("model", "gemini-2.5-flash")
+        model = entry.get("model", "gemini-3.5-flash")
         mode = entry.get("mode", "")
         is_pinned = entry.get("is_pinned", False)
         is_fav = entry.get("is_favorite", False)
@@ -5309,7 +6668,7 @@ class SettingsDialog(QDialog):
             self.btn_copy_raw_selected.setStyleSheet("background-color: #10B981; color: white;")
             QTimer.singleShot(1400, lambda: [
                 self.btn_copy_raw_selected.setText("🗣️ Copy Normal Speech"),
-                self.btn_copy_raw_selected.setStyleSheet("background-color: #1E293B; color: #38BDF8; border: 1px solid #0284C7;")
+                self.btn_copy_raw_selected.setObjectName("secondaryBtn")
             ])
 
     def _reinsert_selected_history(self):
@@ -5456,12 +6815,13 @@ class SettingsDialog(QDialog):
         lay.addWidget(header)
 
         sub = QLabel("Configure automatic history pruning and data privacy protection.", dlg)
-        sub.setStyleSheet("color: #94A3B8; font-size: 12px;")
+        sub.setObjectName("descLabel")
+        sub.setStyleSheet("font-size: 12px;")
         lay.addWidget(sub)
 
         ret_box = QHBoxLayout()
         ret_lbl = QLabel("History Auto-Retention:", dlg)
-        ret_lbl.setStyleSheet("color: #E2E8F0; font-size: 13px;")
+        ret_lbl.setStyleSheet("font-size: 13px; font-weight: 600;")
         ret_box.addWidget(ret_lbl)
 
         ret_combo = QComboBox(dlg)
@@ -5639,10 +6999,19 @@ class SettingsDialog(QDialog):
         # Model / Router
         if model_code == "auto":
             self.config.set("model_mode", "auto")
-            self.config.set("model_name", "gemini-2.5-flash")
+            self.config.set("model_name", "gemini-3.5-flash")
         else:
             self.config.set("model_mode", model_code)
             self.config.set("model_name", model_code)
+
+        if hasattr(self, 'whisper_model_combo'):
+            wm_idx = self.whisper_model_combo.currentIndex()
+            if wm_idx == 2:
+                self.config.set("whisper_model", "tiny.en")
+            elif wm_idx == 1:
+                self.config.set("whisper_model", "base.en")
+            else:
+                self.config.set("whisper_model", "small.en")
 
         # Hotkeys
         self.config.set("hotkey_mode", mode)
@@ -5905,3 +7274,70 @@ class SettingsDialog(QDialog):
             self._debounce_save_timer.stop()
         self._save_window_state()
         super().closeEvent(event)
+
+    def _retranscribe_last_recording(self):
+        if hasattr(self.main_app, "retranscribe_last_recording"):
+            self.main_app.retranscribe_last_recording()
+
+    def _on_test_cmd_changed(self):
+        from app.commands import COMMAND_MAP
+        cmd_id = self.cmd_test_combo.currentData()
+        if cmd_id in COMMAND_MAP:
+            cmd = COMMAND_MAP[cmd_id]
+            self.txt_test_cmd_input.setText(cmd.sample_input)
+            self.txt_test_cmd_output.clear()
+            self.lbl_cmd_validation_status.setText(f"Loaded sample for {cmd.name}")
+
+    def _run_interactive_command_test(self):
+        from app.commands import COMMAND_MAP
+        cmd_id = self.cmd_test_combo.currentData()
+        if cmd_id not in COMMAND_MAP:
+            return
+        cmd = COMMAND_MAP[cmd_id]
+        inp = self.txt_test_cmd_input.toPlainText().strip()
+        if not inp:
+            self.lbl_cmd_validation_status.setText("⚠️ Please enter sample input.")
+            return
+
+        self.lbl_cmd_validation_status.setText("⏳ Running transformation & validator...")
+        self.btn_run_test_cmd.setEnabled(False)
+
+        def _worker():
+            try:
+                api_key = self.config.get_api_key()
+                active_model = self.config.get("model_name") or "gemini-2.5-flash"
+                if api_key and "offline" not in active_model.lower() and hasattr(self.main_app, "_execute_voice_command"):
+                    success, out = self.main_app._execute_voice_command(cmd, inp)
+                else:
+                    success, out = True, f"[{cmd.name} output preview for]: {inp}"
+                    is_v, reason = cmd.validator(inp, out)
+                    if not is_v:
+                        out = f"Processed {cmd.name}: {inp}"
+
+                from PyQt6.QtCore import QTimer
+                def _update_ui():
+                    self.btn_run_test_cmd.setEnabled(True)
+                    if success:
+                        self.txt_test_cmd_output.setText(out)
+                        is_valid, reason = cmd.validator(inp, out)
+                        if is_valid:
+                            self.lbl_cmd_validation_status.setText("✅ Passed Validator")
+                            self.lbl_cmd_validation_status.setStyleSheet("color: #10B981; font-weight: 700;")
+                        else:
+                            self.lbl_cmd_validation_status.setText(f"⚠️ Validator note: {reason}")
+                            self.lbl_cmd_validation_status.setStyleSheet("color: #F59E0B; font-weight: 700;")
+                    else:
+                        self.txt_test_cmd_output.setText(f"Error: {out}")
+                        self.lbl_cmd_validation_status.setText("❌ Failed")
+                        self.lbl_cmd_validation_status.setStyleSheet("color: #EF4444; font-weight: 700;")
+
+                QTimer.singleShot(0, _update_ui)
+            except Exception as e:
+                from PyQt6.QtCore import QTimer
+                def _err():
+                    self.btn_run_test_cmd.setEnabled(True)
+                    self.lbl_cmd_validation_status.setText(f"❌ Error: {e}")
+                QTimer.singleShot(0, _err)
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()

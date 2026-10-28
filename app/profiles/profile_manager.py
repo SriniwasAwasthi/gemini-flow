@@ -128,9 +128,8 @@ BUILTIN_PROFILES: Dict[str, Profile] = {
         description="Optimized for voice commands, prompt engineering, code generation requests, and AI workflows.",
         preferred_model="gemini-3.5-flash-lite",
         system_prompt_addition=(
-            "You are an elite AI Dictation and Voice Command specialist. Execute user commands "
-            "(e.g., 'generate code', 'fix my grammar', 'make it professional', 'summarize') with 100% precision. "
-            "Preserve all facts, technical terms, and intended logic without omission or hallucination."
+            "Transcribe user speech accurately and cleanly, preserving spoken command triggers, "
+            "technical terms, names, numbers, and intended logic verbatim without executing commands during transcription."
         ),
         vocabulary_categories=["Commands", "AI", "Prompts", "Programming"],
         temperature=0.1,

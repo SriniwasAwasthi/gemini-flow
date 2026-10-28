@@ -1,0 +1,567 @@
+{
+  "timestamp": 1793163160.9437962,
+  "phase_a": {
+    "gemini-3.5-flash-lite": {
+      "model_id": "gemini-3.5-flash-lite",
+      "label": "Gemini 3.5 Flash Lite (Model #2)",
+      "phase": "Phase A",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate": 100.0,
+      "avg_wer": 0.0431,
+      "accuracy_pct": 95.7,
+      "formatting_rate_pct": 100.0,
+      "order_consistency_pct": 100.0,
+      "avg_latency_sec": 2.11,
+      "runs_sample": [
+        {
+          "sample_id": 100,
+          "category": "self_corrections",
+          "status": "PASS",
+          "latency_sec": 2.59,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Today is Tuesday Furthermore, the team is tracking this item...."
+        },
+        {
+          "sample_id": 101,
+          "category": "self_corrections",
+          "status": "PASS",
+          "latency_sec": 4.46,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The client meeting is scheduled at 3pm furthermore. The team is tracking this it..."
+        },
+        {
+          "sample_id": 102,
+          "category": "self_corrections",
+          "status": "PASS",
+          "latency_sec": 2.75,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The total project budget was $750.  Furthermore the team is tracking this item...."
+        },
+        {
+          "sample_id": 103,
+          "category": "self_corrections",
+          "status": "PASS",
+          "latency_sec": 2.77,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Convert this whole data under 3 seconds furthermore, the team is tracking this i..."
+        },
+        {
+          "sample_id": 104,
+          "category": "self_corrections",
+          "status": "PASS",
+          "latency_sec": 2.77,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The package was sent on January 20th furthermore, the team is tracking this item..."
+        }
+      ]
+    },
+    "offline-whisper": {
+      "model_id": "offline-whisper",
+      "label": "Faster-Whisper Flow (Model #3)",
+      "phase": "Phase A",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate": 100.0,
+      "avg_wer": 0.0094,
+      "accuracy_pct": 99.1,
+      "formatting_rate_pct": 100.0,
+      "order_consistency_pct": 100.0,
+      "avg_latency_sec": 1.48,
+      "runs_sample": [
+        {
+          "sample_id": 200,
+          "category": "numbers_currency",
+          "status": "PASS",
+          "latency_sec": 1.55,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The total invoice amount is $1,500 with 18% tax additionally. Please ensure this..."
+        },
+        {
+          "sample_id": 201,
+          "category": "numbers_currency",
+          "status": "PASS",
+          "latency_sec": 1.61,
+          "wer": 0.0667,
+          "accuracy_pct": 93.3,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The event is scheduled on November 25 at 10.30am additionally, please ensure thi..."
+        },
+        {
+          "sample_id": 202,
+          "category": "numbers_currency",
+          "status": "PASS",
+          "latency_sec": 1.57,
+          "wer": 0.0556,
+          "accuracy_pct": 94.4,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "We configured the workstation with 32 GB of RAM and a RTX GPU additionally, plea..."
+        },
+        {
+          "sample_id": 203,
+          "category": "numbers_currency",
+          "status": "PASS",
+          "latency_sec": 1.4,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The file size is 450 MB across 6 partitions additionally, please ensure this is ..."
+        },
+        {
+          "sample_id": 204,
+          "category": "numbers_currency",
+          "status": "PASS",
+          "latency_sec": 1.57,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Our server response time improved from 1.5 seconds to under 800 milliseconds add..."
+        }
+      ]
+    },
+    "ollama-gemma2": {
+      "model_id": "ollama-gemma2",
+      "label": "Ollama Gemma 2B (Model #4)",
+      "phase": "Phase A",
+      "total_runs": 100,
+      "passed_runs": 91,
+      "pass_rate": 91.0,
+      "avg_wer": 0.2127,
+      "accuracy_pct": 78.7,
+      "formatting_rate_pct": 100.0,
+      "order_consistency_pct": 98.0,
+      "avg_latency_sec": 5.31,
+      "runs_sample": [
+        {
+          "sample_id": 300,
+          "category": "noisy_audio",
+          "status": "PASS",
+          "latency_sec": 5.01,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Echo cancellation prevents microphone feedback during conference presentations...."
+        },
+        {
+          "sample_id": 301,
+          "category": "noisy_audio",
+          "status": "PASS",
+          "latency_sec": 5.11,
+          "wer": 0.2857,
+          "accuracy_pct": 71.4,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Spectral subtraction effectively attenuates stationary background noises...."
+        },
+        {
+          "sample_id": 302,
+          "category": "noisy_audio",
+          "status": "PASS",
+          "latency_sec": 5.22,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The audio buffer captures speech with 16-bit depth and 16 kHz sample rate...."
+        },
+        {
+          "sample_id": 303,
+          "category": "noisy_audio",
+          "status": "PASS",
+          "latency_sec": 4.85,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Acoustic model benchmarks evaluate transcription robustness across noise levels...."
+        },
+        {
+          "sample_id": 304,
+          "category": "noisy_audio",
+          "status": "PASS",
+          "latency_sec": 4.98,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Clean audio processing ensures zero dropped syllables during voice dictation...."
+        }
+      ]
+    },
+    "gemini-2.5-flash": {
+      "model_id": "gemini-2.5-flash",
+      "label": "Gemini 2.5 Flash (Model #1)",
+      "phase": "Phase A",
+      "total_runs": 100,
+      "passed_runs": 92,
+      "pass_rate": 92.0,
+      "avg_wer": 0.3197,
+      "accuracy_pct": 68.0,
+      "formatting_rate_pct": 82.0,
+      "order_consistency_pct": 100.0,
+      "avg_latency_sec": 2.82,
+      "runs_sample": [
+        {
+          "sample_id": 0,
+          "category": "lists_bullets",
+          "status": "PASS",
+          "latency_sec": 4.15,
+          "wer": 0.0714,
+          "accuracy_pct": 92.9,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "We need to buy: \u2022 Milk \u2022 Bread \u2022 Eggs \u2022 Butter \u2022 Fresh apples From the store...."
+        },
+        {
+          "sample_id": 1,
+          "category": "lists_bullets",
+          "status": "PASS",
+          "latency_sec": 2.92,
+          "wer": 0.7778,
+          "accuracy_pct": 22.2,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Today's agenda covers three items: \u2022 Review quarterly sales \u2022 Discuss hiring bud..."
+        },
+        {
+          "sample_id": 2,
+          "category": "lists_bullets",
+          "status": "PASS",
+          "latency_sec": 3.97,
+          "wer": 0.4,
+          "accuracy_pct": 60.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Bug report includes: \u2022 Crash on login \u2022 Missing settings icon \u2022 Slow loading tim..."
+        },
+        {
+          "sample_id": 3,
+          "category": "lists_bullets",
+          "status": "PASS",
+          "latency_sec": 2.78,
+          "wer": 0.8889,
+          "accuracy_pct": 11.1,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Here are the steps: \u2022 Install Python \u2022 Set up a virtual environment \u2022 Run the se..."
+        },
+        {
+          "sample_id": 4,
+          "category": "lists_bullets",
+          "status": "PASS",
+          "latency_sec": 3.77,
+          "wer": 0.5,
+          "accuracy_pct": 50.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "We have three main goals: \u2022 Deploy the model by Friday \u2022 Fix Windows latency \u2022 P..."
+        }
+      ]
+    }
+  },
+  "phase_b": {
+    "gemini-3.5-flash-lite": {
+      "model_id": "gemini-3.5-flash-lite",
+      "label": "Gemini 3.5 Flash Lite (Model #2)",
+      "phase": "Phase B",
+      "total_runs": 50,
+      "passed_runs": 50,
+      "pass_rate": 100.0,
+      "avg_wer": 0.0408,
+      "accuracy_pct": 95.9,
+      "formatting_rate_pct": 100.0,
+      "order_consistency_pct": 100.0,
+      "avg_latency_sec": 2.11,
+      "runs_sample": [
+        {
+          "sample_id": 150,
+          "category": "grammar_tenses",
+          "status": "PASS",
+          "latency_sec": 1.96,
+          "wer": 0.2353,
+          "accuracy_pct": 76.5,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Neither the front and nor the back end was affected by the outage additionally, ..."
+        },
+        {
+          "sample_id": 151,
+          "category": "grammar_tenses",
+          "status": "PASS",
+          "latency_sec": 2.18,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Every student in the classroom has submitted their assignment on time additional..."
+        },
+        {
+          "sample_id": 152,
+          "category": "grammar_tenses",
+          "status": "PASS",
+          "latency_sec": 2.14,
+          "wer": 0.0588,
+          "accuracy_pct": 94.1,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "She had finished the documentation before the poll request was merged additional..."
+        },
+        {
+          "sample_id": 153,
+          "category": "grammar_tenses",
+          "status": "PASS",
+          "latency_sec": 2.07,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "If the pipeline fails, The automated webhook will notify the team channel additi..."
+        },
+        {
+          "sample_id": 154,
+          "category": "grammar_tenses",
+          "status": "PASS",
+          "latency_sec": 1.98,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The microservices communicate asynchronously via Kafka message brokers additiona..."
+        }
+      ]
+    },
+    "offline-whisper": {
+      "model_id": "offline-whisper",
+      "label": "Faster-Whisper Flow (Model #3)",
+      "phase": "Phase B",
+      "total_runs": 50,
+      "passed_runs": 50,
+      "pass_rate": 100.0,
+      "avg_wer": 0.002,
+      "accuracy_pct": 99.8,
+      "formatting_rate_pct": 100.0,
+      "order_consistency_pct": 100.0,
+      "avg_latency_sec": 2.08,
+      "runs_sample": [
+        {
+          "sample_id": 250,
+          "category": "speed_accents",
+          "status": "PASS",
+          "latency_sec": 2.0,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Please listen carefully to this fast dictation benchmark test additionally, plea..."
+        },
+        {
+          "sample_id": 251,
+          "category": "speed_accents",
+          "status": "PASS",
+          "latency_sec": 1.99,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The quick brown fox jumps gracefully over the lazy dog additionally, please ensu..."
+        },
+        {
+          "sample_id": 252,
+          "category": "speed_accents",
+          "status": "PASS",
+          "latency_sec": 2.09,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "We observed steady progress across all engineering departments this quarter addi..."
+        },
+        {
+          "sample_id": 253,
+          "category": "speed_accents",
+          "status": "PASS",
+          "latency_sec": 2.14,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Artificial intelligence models require high quality training data for optimal pe..."
+        },
+        {
+          "sample_id": 254,
+          "category": "speed_accents",
+          "status": "PASS",
+          "latency_sec": 2.0,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Speech recognition systems must handle varying accents and background noise seam..."
+        }
+      ]
+    },
+    "ollama-gemma2": {
+      "model_id": "ollama-gemma2",
+      "label": "Ollama Gemma 2B (Model #4)",
+      "phase": "Phase B",
+      "total_runs": 50,
+      "passed_runs": 43,
+      "pass_rate": 86.0,
+      "avg_wer": 0.2482,
+      "accuracy_pct": 75.2,
+      "formatting_rate_pct": 100.0,
+      "order_consistency_pct": 98.0,
+      "avg_latency_sec": 6.65,
+      "runs_sample": [
+        {
+          "sample_id": 350,
+          "category": "technical_coding",
+          "status": "PASS",
+          "latency_sec": 14.86,
+          "wer": 0.1538,
+          "accuracy_pct": 84.6,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Train the neural network using PyTorch with Atom Optimizer and Cosign Learning R..."
+        },
+        {
+          "sample_id": 351,
+          "category": "technical_coding",
+          "status": "PASS",
+          "latency_sec": 6.23,
+          "wer": 0.3,
+          "accuracy_pct": 70.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Deploy the container image to Cuba or Netz cluster using Helm charts...."
+        },
+        {
+          "sample_id": 352,
+          "category": "technical_coding",
+          "status": "PASS",
+          "latency_sec": 6.3,
+          "wer": 0.0,
+          "accuracy_pct": 100.0,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The function sorts the array in O(N log n) time complexity...."
+        },
+        {
+          "sample_id": 353,
+          "category": "technical_coding",
+          "status": "PASS",
+          "latency_sec": 6.1,
+          "wer": 0.2222,
+          "accuracy_pct": 77.8,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Solve the dynamic programming problem using memoization...."
+        },
+        {
+          "sample_id": 354,
+          "category": "technical_coding",
+          "status": "PASS",
+          "latency_sec": 6.32,
+          "wer": 0.2727,
+          "accuracy_pct": 72.7,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Use camelCase for variable names and snake underscore case for Python function d..."
+        }
+      ]
+    },
+    "gemini-2.5-flash": {
+      "model_id": "gemini-2.5-flash",
+      "label": "Gemini 2.5 Flash (Model #1)",
+      "phase": "Phase B",
+      "total_runs": 50,
+      "passed_runs": 44,
+      "pass_rate": 88.0,
+      "avg_wer": 0.1902,
+      "accuracy_pct": 81.0,
+      "formatting_rate_pct": 90.0,
+      "order_consistency_pct": 100.0,
+      "avg_latency_sec": 2.95,
+      "runs_sample": [
+        {
+          "sample_id": 50,
+          "category": "lists_bullets",
+          "status": "PASS",
+          "latency_sec": 3.32,
+          "wer": 0.3846,
+          "accuracy_pct": 61.5,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Please buy: \u2022 Oranges \u2022 Bananas \u2022 Strawberries \u2022 Blueberries \u2022 Grapes For breakf..."
+        },
+        {
+          "sample_id": 51,
+          "category": "lists_bullets",
+          "status": "PASS",
+          "latency_sec": 3.18,
+          "wer": 0.1667,
+          "accuracy_pct": 83.3,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "The advantages are zero latency: \u2022 High privacy, local offline inference and no ..."
+        },
+        {
+          "sample_id": 52,
+          "category": "lists_bullets",
+          "status": "PASS",
+          "latency_sec": 2.8,
+          "wer": 0.2667,
+          "accuracy_pct": 73.3,
+          "formatting_ok": true,
+          "order_ok": true,
+          "output_preview": "Meeting topics include: \u2022 Marketing roadmap \u2022 Product launch date \u2022 Budget alloc..."
+        },
+        {
+          "sample_id": 53,
+          "category": "lists_bullets",
+          "status": "FAIL",
+          "latency_sec": 4.14,
+          "wer": 0.5,
+          "accuracy_pct": 50.0,
+          "formatting_ok": false,
+          "order_ok": true,
+          "output_preview": "The system architecture consists of API Gateway, Authentication Service and Mess..."
+        },
+        {
+          "sample_id": 54,
+          "category": "lists_bullets",
+          "status": "PASS",
+          "latency_sec": 2.81,
+          "wer": 0.2353,
+          "accuracy_pct": 76.5,
+          "formatting_ok": false,
+          "order_ok": true,
+          "output_preview": "Next Sprint goals are refactor database queries, add integration tests and optim..."
+        }
+      ]
+    }
+  }
+}

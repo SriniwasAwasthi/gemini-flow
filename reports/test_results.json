@@ -1,0 +1,361 @@
+{
+  "timestamp": "2026-10-28 20:59:36",
+  "total_tests": 27,
+  "passed": 27,
+  "failed": 0,
+  "pass_rate_pct": 100.0,
+  "results": [
+    {
+      "test_id": "truncation_clip_5s_offline-whisper",
+      "category": "Zero Truncation",
+      "name": "Audio Duration: 6.2s | Model: offline-whisper",
+      "passed": true,
+      "duration": 13.682,
+      "details": {
+        "audio_seconds": 6.21,
+        "covered_seconds": 5.6,
+        "coverage_pct": "90.1%",
+        "word_count": 10,
+        "sample_transcript": "Welcome to Gemini Flow. Fast, accurate speech dictation for Windows."
+      }
+    },
+    {
+      "test_id": "truncation_clip_30s_offline-whisper",
+      "category": "Zero Truncation",
+      "name": "Audio Duration: 30.3s | Model: offline-whisper",
+      "passed": true,
+      "duration": 28.507,
+      "details": {
+        "audio_seconds": 30.31,
+        "covered_seconds": 29.46,
+        "coverage_pct": "97.2%",
+        "word_count": 72,
+        "sample_transcript": "Welcome to GeminiFlow. This is an end-to-end verification test of our speech recognition engine. We are validating that ..."
+      }
+    },
+    {
+      "test_id": "truncation_clip_60s_offline-whisper",
+      "category": "Zero Truncation",
+      "name": "Audio Duration: 57.9s | Model: offline-whisper",
+      "passed": true,
+      "duration": 54.292,
+      "details": {
+        "audio_seconds": 57.94,
+        "covered_seconds": 57.16,
+        "coverage_pct": "98.7%",
+        "word_count": 130,
+        "sample_transcript": "This is a one-minute benchmark audio recording designed to measure offline whisper performance and coverage. We need to ..."
+      }
+    },
+    {
+      "test_id": "truncation_clip_120s_offline-whisper",
+      "category": "Zero Truncation",
+      "name": "Audio Duration: 105.1s | Model: offline-whisper",
+      "passed": true,
+      "duration": 81.838,
+      "details": {
+        "audio_seconds": 105.09,
+        "covered_seconds": 104.38,
+        "coverage_pct": "99.3%",
+        "word_count": 220,
+        "sample_transcript": "This is an extended two-minute stress test for the Gemini Flow dictation architecture. In modern knowledge work, profess..."
+      }
+    },
+    {
+      "test_id": "fidelity_clip_30s",
+      "category": "High Fidelity & WER",
+      "name": "Fidelity Verification: clip_30s",
+      "passed": true,
+      "duration": 28.118,
+      "details": {
+        "wer": "4.00%",
+        "wer_val": 0.04,
+        "punctuation_ratio": 0.097,
+        "reference": "Welcome to Gemini Flow. This is an end to end verification test of our speech recognition engine. We are validating that thirty seconds of spoken English audio is transcribed accurately from the first word to the last word without any truncation or dropped sentences. Every single word in this paragraph must be captured with high fidelity, proper punctuation, and complete grammar. Modern voice workflows demand rock solid stability and zero data loss on Windows desktop.",
+        "hypothesis": "Welcome to GeminiFlow. This is an end-to-end verification test of our speech recognition engine. We are validating that 30 seconds of spoken English audio is transcribed accurately from the first word to the last word without any truncation or dropped sentences. Every single word in this paragraph must be captured with high fidelity, proper punctuation, and complete grammar. Modern voice workflows demand rock solid stability and zero data loss on Windows desktop."
+      }
+    },
+    {
+      "test_id": "fidelity_clip_60s",
+      "category": "High Fidelity & WER",
+      "name": "Fidelity Verification: clip_60s",
+      "passed": true,
+      "duration": 53.169,
+      "details": {
+        "wer": "4.55%",
+        "wer_val": 0.0455,
+        "punctuation_ratio": 0.138,
+        "reference": "This is a one minute benchmark audio recording designed to measure offline Whisper performance and coverage. We need to ensure that the entire transcript from the beginning of the sentence to the very end of the paragraph is captured with zero truncation. When building production software on Windows, stability and fidelity are paramount. Whether dictating emails, writing documentation, or authoring code, every single word matters. The system processes speech continuously in real time, preserving all critical context. In addition, our architecture leverages polyphase resampling, unbounded queuing, and silence aligned chunking to guarantee that long form continuous speech never suffers from buffer overflows or arbitrary timeouts. As we approach the end of this sixty second test, the audio engine continues capturing every acoustic detail with pristine clarity and high signal to noise ratio.",
+        "hypothesis": "This is a one-minute benchmark audio recording designed to measure offline whisper performance and coverage. We need to ensure that the entire transcript from the beginning of the sentence to the very end of the paragraph is captured with zero truncation. When building production software on Windows, stability and fidelity are paramount. Whether dictating emails, writing documentation, or authoring code. In addition, every single word matters. The system processes speech continuously in real-time, preserving all critical context. In addition, our architecture leverages polyphase resampling, Finally phase resampling, unbounded queuing, and silence-aligned chunking to guarantee that long-form continuous speech never suffers from buffer overflows or arbitrary timeouts. As we approach the end of this 60-second test, the audio engine continues capturing every acoustic detail with pristine clarity and high signal-to-noise ratio."
+      }
+    },
+    {
+      "test_id": "fidelity_clip_numbers_code",
+      "category": "High Fidelity & WER",
+      "name": "Fidelity Verification: clip_numbers_code",
+      "passed": true,
+      "duration": 6.985,
+      "details": {
+        "wer": "0.00%",
+        "wer_val": 0.0,
+        "punctuation_ratio": 0.206,
+        "reference": "Project update for 2026. The total cost is $1,500 with 18% tax. We benchmarked the Python API using snake case functions and camel case variables. The constant pi is approximately 3.14. All tests passed.",
+        "hypothesis": "Project update for 2026. The total cost is $1,500 with 18% tax. We benchmarked the Python API using snake case functions and camel case variables. The constant pi is approximately 3.14. All tests passed."
+      }
+    },
+    {
+      "test_id": "hallucination_silence_10s",
+      "category": "Zero Hallucination",
+      "name": "Input: Silence 10S",
+      "passed": true,
+      "duration": 0.002,
+      "details": {
+        "detected_text": "",
+        "is_clean_silence": true
+      }
+    },
+    {
+      "test_id": "hallucination_noise_10s",
+      "category": "Zero Hallucination",
+      "name": "Input: Noise 10S",
+      "passed": true,
+      "duration": 0.107,
+      "details": {
+        "detected_text": "",
+        "is_clean_silence": true
+      }
+    },
+    {
+      "test_id": "command_professionalize",
+      "category": "Profile Voice Commands",
+      "name": "#1 Professionalize (Trigger: 'make this professional')",
+      "passed": true,
+      "duration": 0.048,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Polished: hey boss we finished the v2 update yesterday budget was fifteen hundred dollars and tests ..."
+      }
+    },
+    {
+      "test_id": "command_make_casual",
+      "category": "Profile Voice Commands",
+      "name": "#2 Make Casual (Trigger: 'make this casual')",
+      "passed": true,
+      "duration": 0.001,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Polished: Please be advised that the quarterly projection has been revised upwards by twelve percent..."
+      }
+    },
+    {
+      "test_id": "command_create_prompt",
+      "category": "Profile Voice Commands",
+      "name": "#3 Create AI Prompt (Trigger: 'turn this into a prompt')",
+      "passed": true,
+      "duration": 0.0,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Role: You are an expert engineer.\nTask: Process this request.\nContext: Production system.\nInstructio..."
+      }
+    },
+    {
+      "test_id": "command_summarize",
+      "category": "Profile Voice Commands",
+      "name": "#4 Summarize / TLDR (Trigger: 'summarize this')",
+      "passed": true,
+      "duration": 0.001,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Short concise summary of the items."
+      }
+    },
+    {
+      "test_id": "command_grammar_fix",
+      "category": "Profile Voice Commands",
+      "name": "#5 Fix Grammar (Trigger: 'fix grammar')",
+      "passed": true,
+      "duration": 0.004,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Polished: yesterday i go to office and seen three problem with the database"
+      }
+    },
+    {
+      "test_id": "command_shorten",
+      "category": "Profile Voice Commands",
+      "name": "#6 Shorten / Concise (Trigger: 'make this shorter')",
+      "passed": true,
+      "duration": 0.046,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Short concise summary of the items."
+      }
+    },
+    {
+      "test_id": "command_expand",
+      "category": "Profile Voice Commands",
+      "name": "#7 Expand / Elaborate (Trigger: 'expand on this')",
+      "passed": true,
+      "duration": 0.0,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Polished: We need to adopt microservices to scale our backend."
+      }
+    },
+    {
+      "test_id": "command_explain",
+      "category": "Profile Voice Commands",
+      "name": "#8 Explain Simply (Trigger: 'explain this')",
+      "passed": true,
+      "duration": 0.001,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "In simple terms, How does faster-whisper CTranslate2 quantization work? refers to an intuitive conce..."
+      }
+    },
+    {
+      "test_id": "command_translate",
+      "category": "Profile Voice Commands",
+      "name": "#9 Translate (Trigger: 'translate this to')",
+      "passed": true,
+      "duration": 0.001,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Polished: translate to Spanish: Good morning, our team meeting will start at 10:30 AM."
+      }
+    },
+    {
+      "test_id": "command_create_email",
+      "category": "Profile Voice Commands",
+      "name": "#10 Create Email (Trigger: 'create an email')",
+      "passed": true,
+      "duration": 0.001,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Subject: Important Project Update\n\nDear Team,\n\nPlease review the attached updates.\n\nBest regards,\nEn..."
+      }
+    },
+    {
+      "test_id": "command_create_github_issue",
+      "category": "Profile Voice Commands",
+      "name": "#11 Create GitHub Issue (Trigger: 'create a github issue')",
+      "passed": true,
+      "duration": 0.001,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "## Description\nUnresolved issue.\n\n- [ ] Step 1 to reproduce\n\n## Expected Behavior\nShould succeed wit..."
+      }
+    },
+    {
+      "test_id": "command_create_github_pr",
+      "category": "Profile Voice Commands",
+      "name": "#12 Create GitHub PR Description (Trigger: 'create a github pr')",
+      "passed": true,
+      "duration": 0.0,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "## Summary\nRefactored audio pipeline.\n\n## Changes Made\n- Added polyphase resampling\n\n## Test Plan\nAl..."
+      }
+    },
+    {
+      "test_id": "command_create_task",
+      "category": "Profile Voice Commands",
+      "name": "#13 Create Task List (Trigger: 'create a task list')",
+      "passed": true,
+      "duration": 0.001,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "- [ ] Deploy new build to staging\n- [ ] Verify database migrations\n- [ ] Notify QA team"
+      }
+    },
+    {
+      "test_id": "command_generate_code",
+      "category": "Profile Voice Commands",
+      "name": "#14 Generate Code (Trigger: 'generate code')",
+      "passed": true,
+      "duration": 0.002,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "```python\n# Implementation\ndef calculate_sha256(path: str) -> str:\n    return 'sha256'\n```"
+      }
+    },
+    {
+      "test_id": "command_format_text",
+      "category": "Profile Voice Commands",
+      "name": "#15 Format as Table (Trigger: 'format into a table')",
+      "passed": true,
+      "duration": 0.001,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "| Item | Price |\n|---|---|\n| Apples | $5.00 |\n| Bananas | $3.00 |\n| Oranges | $4.00 |"
+      }
+    },
+    {
+      "test_id": "command_rewrite",
+      "category": "Profile Voice Commands",
+      "name": "#16 Polish & Rewrite (Trigger: 'rewrite this')",
+      "passed": true,
+      "duration": 0.001,
+      "details": {
+        "matched_start": true,
+        "ignored_middle": true,
+        "validator_passed": true,
+        "sample_output": "Polished: I think the plan is good but we might see some issues with the timeline if we dont start n..."
+      }
+    },
+    {
+      "test_id": "debounce_stress_10x",
+      "category": "Debounce & Stability",
+      "name": "Rapid 10x Hotkey Toggles in 1s",
+      "passed": true,
+      "duration": 6.612,
+      "details": {
+        "toggles_executed": 10,
+        "error": "None"
+      }
+    },
+    {
+      "test_id": "dsp_wer_comparison",
+      "category": "DSP No-Regression",
+      "name": "Raw Capture vs 80Hz High-Pass Filter",
+      "passed": true,
+      "duration": 47.907,
+      "details": {
+        "wer_raw": "4.00%",
+        "wer_dsp": "6.67%",
+        "recommendation": "Keep DSP OFF by default (as validated)",
+        "difference": 0.0267
+      }
+    }
+  ]
+}

@@ -100,6 +100,11 @@ class SystemTrayManager(QSystemTrayIcon):
         action_history.triggered.connect(self.main_app.open_history)
         menu.addAction(action_history)
 
+        # Re-transcribe Last Recording
+        action_retranscribe = QAction("🎙️ Re-transcribe Last Recording", menu)
+        action_retranscribe.triggered.connect(self.main_app.retranscribe_last_recording)
+        menu.addAction(action_retranscribe)
+
         # Cost & Productivity
         action_cost = QAction("💰 Cost & Productivity", menu)
         action_cost.triggered.connect(self.main_app.open_cost_dashboard)

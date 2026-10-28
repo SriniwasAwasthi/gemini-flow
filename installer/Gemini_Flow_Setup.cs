@@ -33,6 +33,7 @@ namespace GeminiFlowSetup
         private Button btnInstall;
         private CheckBox chkDesktop;
         private CheckBox chkStartMenu;
+        private CheckBox chkStartup;
         private CheckBox chkLaunchNow;
         private Panel pnlHeader;
 
@@ -41,7 +42,7 @@ namespace GeminiFlowSetup
         public InstallerForm()
         {
             this.Text = "Gemini Flow — Setup Wizard";
-            this.Size = new Size(580, 440);
+            this.Size = new Size(580, 490);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = true;
@@ -80,7 +81,7 @@ namespace GeminiFlowSetup
             lblTitle.AutoSize = true;
 
             lblSubtitle = new Label();
-            lblSubtitle.Text = "Next-Gen AI Voice Dictation & Real-Time Assistant (Sub-Second Latency)";
+            lblSubtitle.Text = "Next-Gen AI Voice Dictation & Real-Time Assistant (Zero-Truncation Clean PC Ready)";
             lblSubtitle.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
             lblSubtitle.ForeColor = Color.FromArgb(148, 163, 184); // #94A3B8
             lblSubtitle.Location = new Point(26, 48);
@@ -135,7 +136,7 @@ namespace GeminiFlowSetup
             chkDesktop = new CheckBox();
             chkDesktop.Text = "Create a Desktop shortcut";
             chkDesktop.Checked = true;
-            chkDesktop.Location = new Point(28, 175);
+            chkDesktop.Location = new Point(28, 170);
             chkDesktop.AutoSize = true;
             chkDesktop.Font = new Font("Segoe UI", 9.5f);
             this.Controls.Add(chkDesktop);
@@ -143,15 +144,23 @@ namespace GeminiFlowSetup
             chkStartMenu = new CheckBox();
             chkStartMenu.Text = "Create a Start Menu shortcut";
             chkStartMenu.Checked = true;
-            chkStartMenu.Location = new Point(28, 205);
+            chkStartMenu.Location = new Point(28, 198);
             chkStartMenu.AutoSize = true;
             chkStartMenu.Font = new Font("Segoe UI", 9.5f);
             this.Controls.Add(chkStartMenu);
 
+            chkStartup = new CheckBox();
+            chkStartup.Text = "Start Gemini Flow automatically when Windows starts";
+            chkStartup.Checked = false;
+            chkStartup.Location = new Point(28, 226);
+            chkStartup.AutoSize = true;
+            chkStartup.Font = new Font("Segoe UI", 9.5f);
+            this.Controls.Add(chkStartup);
+
             chkLaunchNow = new CheckBox();
             chkLaunchNow.Text = "Launch Gemini Flow automatically when setup finishes";
             chkLaunchNow.Checked = true;
-            chkLaunchNow.Location = new Point(28, 235);
+            chkLaunchNow.Location = new Point(28, 254);
             chkLaunchNow.AutoSize = true;
             chkLaunchNow.Font = new Font("Segoe UI", 9.5f);
             this.Controls.Add(chkLaunchNow);
@@ -161,13 +170,13 @@ namespace GeminiFlowSetup
             lblStatus.Text = "Ready to install. Click 'Install' to begin.";
             lblStatus.Font = new Font("Segoe UI", 9f, FontStyle.Italic);
             lblStatus.ForeColor = Color.FromArgb(148, 163, 184);
-            lblStatus.Location = new Point(26, 275);
+            lblStatus.Location = new Point(26, 290);
             lblStatus.Size = new Size(520, 20);
             this.Controls.Add(lblStatus);
 
             // Progress Bar
             progressBar = new ProgressBar();
-            progressBar.Location = new Point(26, 300);
+            progressBar.Location = new Point(26, 315);
             progressBar.Size = new Size(518, 22);
             progressBar.Style = ProgressBarStyle.Continuous;
             this.Controls.Add(progressBar);
@@ -175,7 +184,7 @@ namespace GeminiFlowSetup
             // Install Button
             btnInstall = new Button();
             btnInstall.Text = "Install";
-            btnInstall.Location = new Point(414, 345);
+            btnInstall.Location = new Point(414, 390);
             btnInstall.Size = new Size(130, 36);
             btnInstall.FlatStyle = FlatStyle.Flat;
             btnInstall.BackColor = Color.FromArgb(99, 102, 241); // #6366F1 Indigo Accent
@@ -192,6 +201,7 @@ namespace GeminiFlowSetup
             txtPath.Enabled = false;
             chkDesktop.Enabled = false;
             chkStartMenu.Enabled = false;
+            chkStartup.Enabled = false;
             chkLaunchNow.Enabled = false;
 
             string targetDir = txtPath.Text.Trim();
@@ -209,40 +219,60 @@ namespace GeminiFlowSetup
                     string sourceDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
 
                     UpdateStatus("Copying core application files...", 25);
-                    CopyDirectory(Path.Combine(sourceDir, "app"), Path.Combine(targetDir, "app"));
+                    string srcApp = Path.Combine(sourceDir, "app");
+                    if (!Directory.Exists(srcApp) && Directory.Exists(Path.Combine(sourceDir, "..", "app")))
+                    {
+                        srcApp = Path.Combine(sourceDir, "..", "app");
+                    }
+                    CopyDirectory(srcApp, Path.Combine(targetDir, "app"));
 
-                    UpdateStatus("Copying pre-bundled offline models...", 50);
+                    UpdateStatus("Copying pre-bundled offline models...", 45);
                     string srcModels = Path.Combine(sourceDir, "models");
+                    if (!Directory.Exists(srcModels) && Directory.Exists(Path.Combine(sourceDir, "..", "models")))
+                    {
+                        srcModels = Path.Combine(sourceDir, "..", "models");
+                    }
                     if (Directory.Exists(srcModels))
                     {
                         CopyDirectory(srcModels, Path.Combine(targetDir, "models"));
                     }
 
-                    UpdateStatus("Configuring application executables and icons...", 70);
+                    UpdateStatus("Installing isolated Python runtime...", 70);
+                    string srcRuntime = Path.Combine(sourceDir, "runtime");
+                    if (!Directory.Exists(srcRuntime) && Directory.Exists(Path.Combine(sourceDir, "..", "runtime")))
+                    {
+                        srcRuntime = Path.Combine(sourceDir, "..", "runtime");
+                    }
+                    if (Directory.Exists(srcRuntime))
+                    {
+                        CopyDirectory(srcRuntime, Path.Combine(targetDir, "runtime"));
+                    }
+
+                    UpdateStatus("Configuring application executables and icons...", 85);
                     string[] rootFiles = new string[] {
-                        "Gemini Flow.exe", "Launcher.cs", "main.py", "main_standalone.py",
+                        "Gemini Flow.exe", "Gemini_Flow.exe", "Launcher.cs", "main.py", "main_standalone.py",
                         "app_icon.ico", "app_icon.png", "requirements.txt", "run.bat"
                     };
 
                     foreach (var rf in rootFiles)
                     {
                         string s = Path.Combine(sourceDir, rf);
+                        if (!File.Exists(s) && File.Exists(Path.Combine(sourceDir, "..", rf)))
+                        {
+                            s = Path.Combine(sourceDir, "..", rf);
+                        }
                         if (File.Exists(s))
                         {
                             File.Copy(s, Path.Combine(targetDir, rf), true);
                         }
                     }
 
-                    // Copy runtime if present
-                    string srcRuntime = Path.Combine(sourceDir, "runtime");
-                    if (Directory.Exists(srcRuntime))
-                    {
-                        UpdateStatus("Installing embedded Python runtime...", 85);
-                        CopyDirectory(srcRuntime, Path.Combine(targetDir, "runtime"));
-                    }
-
-                    UpdateStatus("Creating Windows shortcuts and registry entries...", 92);
+                    UpdateStatus("Creating Windows shortcuts, startup config, and uninstaller...", 92);
                     string targetExe = Path.Combine(targetDir, "Gemini Flow.exe");
+                    if (!File.Exists(targetExe) && File.Exists(Path.Combine(targetDir, "Gemini_Flow.exe")))
+                    {
+                        targetExe = Path.Combine(targetDir, "Gemini_Flow.exe");
+                    }
                     string iconPath = Path.Combine(targetDir, "app_icon.ico");
 
                     if (chkDesktop.Checked)
@@ -263,7 +293,22 @@ namespace GeminiFlowSetup
                         );
                     }
 
-                    RegisterUninstall(targetDir);
+                    if (chkStartup.Checked)
+                    {
+                        try
+                        {
+                            using (RegistryKey runKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
+                            {
+                                if (runKey != null)
+                                {
+                                    runKey.SetValue("GeminiFlow", "\"" + targetExe + "\" --startup");
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    RegisterUninstall(targetDir, targetExe);
 
                     UpdateStatus("Installation complete! Enjoy Gemini Flow.", 100);
 
@@ -353,19 +398,44 @@ namespace GeminiFlowSetup
             catch { }
         }
 
-        private void RegisterUninstall(string installDir)
+        private void RegisterUninstall(string installDir, string targetExe)
         {
             try
             {
+                // Create robust uninstall batch script
+                string uninstScript = Path.Combine(installDir, "uninstall.cmd");
+                string scriptContent = "@echo off\r\n" +
+                    "echo ====================================================\r\n" +
+                    "echo            Gemini Flow - Uninstaller\r\n" +
+                    "echo ====================================================\r\n" +
+                    "echo Closing active Gemini Flow processes...\r\n" +
+                    "taskkill /F /IM \"Gemini Flow.exe\" >nul 2>&1\r\n" +
+                    "taskkill /F /IM \"Gemini_Flow.exe\" >nul 2>&1\r\n" +
+                    "echo Removing Desktop and Start Menu shortcuts...\r\n" +
+                    "del /Q \"%USERPROFILE%\\Desktop\\Gemini Flow.lnk\" >nul 2>&1\r\n" +
+                    "rmdir /S /Q \"%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Gemini Flow\" >nul 2>&1\r\n" +
+                    "echo Cleaning Windows registry configuration...\r\n" +
+                    "reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\GeminiFlow\" /f >nul 2>&1\r\n" +
+                    "reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v \"GeminiFlow\" /f >nul 2>&1\r\n" +
+                    "echo Removing Gemini Flow application files...\r\n" +
+                    "cd \"%USERPROFILE%\"\r\n" +
+                    "rmdir /S /Q \"" + installDir + "\" >nul 2>&1\r\n" +
+                    "echo.\r\n" +
+                    "echo Gemini Flow was successfully uninstalled from your PC.\r\n" +
+                    "if not \"%1\"==\"/quiet\" pause\r\n";
+                File.WriteAllText(uninstScript, scriptContent);
+
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\GeminiFlow"))
                 {
                     if (key != null)
                     {
-                        key.SetValue("DisplayName", "Gemini Flow (AI Voice Assistant)");
+                        key.SetValue("DisplayName", "Gemini Flow (Zero-Truncation AI Voice Assistant)");
                         key.SetValue("DisplayVersion", "2.0.0");
                         key.SetValue("Publisher", "Sriniwas Awasthi");
                         key.SetValue("InstallLocation", installDir);
                         key.SetValue("DisplayIcon", Path.Combine(installDir, "app_icon.ico"));
+                        key.SetValue("UninstallString", "\"" + uninstScript + "\"");
+                        key.SetValue("QuietUninstallString", "\"" + uninstScript + "\" /quiet");
                         key.SetValue("NoModify", 1);
                         key.SetValue("NoRepair", 1);
                     }

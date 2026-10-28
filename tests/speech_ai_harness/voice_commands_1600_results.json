@@ -1,0 +1,387 @@
+{
+  "timestamp": 1793190220.522476,
+  "total_runs": 1600,
+  "total_passed": 1590,
+  "overall_pass_rate": 99.4,
+  "categories": {
+    "PROFESSIONALIZE": {
+      "category": "PROFESSIONALIZE",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 4.54,
+      "elapsed_seconds": 152.1,
+      "failures": [],
+      "sample_outputs": [
+        "I am Trina Savastrian. I was recently visiting the market attending to some miscellaneous ...",
+        "Hello team, we must delay the launch until Friday because the database test failed. Additi...",
+        "During my visit to the market, I purchased the following items:  \u2022 Two apples \u2022 One mango ..."
+      ]
+    },
+    "MAKE_CASUAL": {
+      "category": "MAKE_CASUAL",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 4.94,
+      "elapsed_seconds": 167.1,
+      "failures": [],
+      "sample_outputs": [
+        "Hey everyone, just a heads-up that we\u2019re pushing the release to next Tuesday. The Redis ca...",
+        "Hey team, quick heads-up - we're pushing the launch to Friday due to a database test issue...",
+        "Hey! Just wanted to let you know I\u2019m back home now\u2014I stopped by the market and picked up t..."
+      ]
+    },
+    "CREATE_PROMPT": {
+      "category": "CREATE_PROMPT",
+      "total_runs": 100,
+      "passed_runs": 99,
+      "pass_rate_pct": 99.0,
+      "avg_latency_sec": 15.02,
+      "elapsed_seconds": 755.0,
+      "failures": [
+        {
+          "id": 243,
+          "category": "CREATE_PROMPT",
+          "mode": "spoken_at_start",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 21.66,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'OAuth2' not preserved in output"
+          ],
+          "output_preview": "## AI Prompt: Market Trip & Home Return  **Role & Objective:** Generate a detailed narrati...",
+          "full_output": "## AI Prompt: Market Trip & Home Return\n\n**Role & Objective:** Generate a detailed narrative describing a market trip and the subsequent journey home.\n\n**Context & Background:** The user is a person who recently visited a market. They purchased various items, including apples, a mango, bananas, and "
+        }
+      ],
+      "sample_outputs": [
+        "# Role & Objective You are an elite, world-class Technical Project Coordinator and AI Assi...",
+        "# Role & Objective You are an elite, world-class AI Project Coordinator and Communications...",
+        "# ROLE & OBJECTIVE You are an elite, world-class AI Data Extraction and Text Enhancement S..."
+      ]
+    },
+    "SUMMARIZE": {
+      "category": "SUMMARIZE",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 5.33,
+      "elapsed_seconds": 177.9,
+      "failures": [],
+      "sample_outputs": [
+        "\u2022 **Decision:** Release pushed to next Tuesday due to a Redis cache synchronization test f...",
+        "\u2022 **Decision:** Launch delayed to Friday due to database test failure. \u2022 **Action Item:** ...",
+        "\u2022 Purchased market items: two apples, one mango, three bananas, and bread. \u2022 Completed ret..."
+      ]
+    },
+    "GRAMMAR_FIX": {
+      "category": "GRAMMAR_FIX",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 4.6,
+      "elapsed_seconds": 164.9,
+      "failures": [],
+      "sample_outputs": [
+        "We gotta push the release to next Tuesday because the Redis cache synchronization test fai...",
+        "Hey team we gotta delay the launch to friday cause database test failed also Srinivas will...",
+        "I was visiting the market and I buy: \u2022 Two \u2022 Apples \u2022 One \u2022 Mango \u2022 Three \u2022 Bananas \u2022 Brea..."
+      ]
+    },
+    "SHORTEN": {
+      "category": "SHORTEN",
+      "total_runs": 100,
+      "passed_runs": 96,
+      "pass_rate_pct": 96.0,
+      "avg_latency_sec": 2.55,
+      "elapsed_seconds": 128.9,
+      "failures": [
+        {
+          "id": 540,
+          "category": "SHORTEN",
+          "mode": "spoken_at_start",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 2.76,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'ten thousand dollars' not preserved in output"
+          ],
+          "output_preview": "Sarah Chen to coordinate weekly sync and Jira ticket updates by end of business today. $10...",
+          "full_output": "Sarah Chen to coordinate weekly sync and Jira ticket updates by end of business today. $10,000 funding."
+        },
+        {
+          "id": 552,
+          "category": "SHORTEN",
+          "mode": "spoken_at_start",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 2.74,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'ten thousand dollars' not preserved in output"
+          ],
+          "output_preview": "Marcus Vance passed technical coding interview, demonstrating strong distributed systems s...",
+          "full_output": "Marcus Vance passed technical coding interview, demonstrating strong distributed systems skills. $10,000 funding leads this effort."
+        },
+        {
+          "id": 564,
+          "category": "SHORTEN",
+          "mode": "spoken_at_start",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 2.74,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'ten thousand dollars' not preserved in output"
+          ],
+          "output_preview": "Patient reports severe headaches and dizziness after 20mg lisinopril. $10,000 funding effo...",
+          "full_output": "Patient reports severe headaches and dizziness after 20mg lisinopril. $10,000 funding effort."
+        },
+        {
+          "id": 600,
+          "category": "SHORTEN",
+          "mode": "highlighted_plus_hotkey",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 2.82,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'ten thousand dollars' not preserved in output"
+          ],
+          "output_preview": "Sarah Chen to coordinate weekly sync and Jira ticket updates by end of business today. $10...",
+          "full_output": "Sarah Chen to coordinate weekly sync and Jira ticket updates by end of business today. $10,000 funding."
+        }
+      ],
+      "sample_outputs": [
+        "Release delayed to next Tuesday: Redis cache synchronization test failed under load. Srini...",
+        "Launch delayed to Friday: database test failed. Srinivas: prepare slides. Budget: under $5...",
+        "Bought 2 apples, 1 mango, 3 bananas, and bread at the market...."
+      ]
+    },
+    "EXPAND": {
+      "category": "EXPAND",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 6.2,
+      "elapsed_seconds": 310.2,
+      "failures": [],
+      "sample_outputs": [
+        "Due to a Redis cache synchronization test failure under load, we're adjusting the release ...",
+        "Subject: Project [Project Name] Launch Update  Team,  Due to a recent database test failur...",
+        "During a trip to the local market, I made a selection of fresh produce. I purchased two ap..."
+      ]
+    },
+    "EXPLAIN": {
+      "category": "EXPLAIN",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 4.52,
+      "elapsed_seconds": 226.1,
+      "failures": [],
+      "sample_outputs": [
+        "## Release Update:  **New Release Date:** Tuesday, [Date]  **Reason for Delay:** Redis cac...",
+        "**Updated Launch Date:** Friday  **Reason for Delay:** Database test failed.  **Action Ite...",
+        "Market visit: 2 apples, 1 mango, 3 bananas, bread.  Return home...."
+      ]
+    },
+    "TRANSLATE": {
+      "category": "TRANSLATE",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 2.96,
+      "elapsed_seconds": 148.6,
+      "failures": [],
+      "sample_outputs": [
+        "Nous devons reporter la sortie \u00e0 mardi prochain car le test de synchronisation de la m\u00e9moi...",
+        "\"\" Hola equipo, tenemos que posponer el lanzamiento hasta el viernes debido a que las prue...",
+        "Ich war im Markt und ich habe zwei \u00c4pfel, einen Mango und drei Bananen und Brot gekauft, d..."
+      ]
+    },
+    "CREATE_EMAIL": {
+      "category": "CREATE_EMAIL",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 4.48,
+      "elapsed_seconds": 224.3,
+      "failures": [],
+      "sample_outputs": [
+        "Subject: Release Schedule Update - Redis Cache Synchronization  Hi team,  Quick update on ...",
+        "Subject: Project Update: Launch Delay to Friday  Hi Team,  Quick update on the launch sche...",
+        "Subject: Market Haul  Dear [Recipient Name],  I recently visited the market and picked up ..."
+      ]
+    },
+    "CREATE_GITHUB_ISSUE": {
+      "category": "CREATE_GITHUB_ISSUE",
+      "total_runs": 100,
+      "passed_runs": 99,
+      "pass_rate_pct": 99.0,
+      "avg_latency_sec": 12.61,
+      "elapsed_seconds": 634.4,
+      "failures": [
+        {
+          "id": 1019,
+          "category": "CREATE_GITHUB_ISSUE",
+          "mode": "spoken_at_start",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 19.91,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'v1.4.0' not preserved in output"
+          ],
+          "output_preview": "## Issue: Cross-Site Scripting Vulnerability in User Profile Bio Input Field  **Summary:**...",
+          "full_output": "## Issue: Cross-Site Scripting Vulnerability in User Profile Bio Input Field\n\n**Summary:**  Penetration test identified a cross-site scripting (XSS) vulnerability in the user profile bio input field. This vulnerability allows attackers to inject malicious scripts into user profiles, potentially lead"
+        }
+      ],
+      "sample_outputs": [
+        "##  Release Schedule Adjustment - Redis Cache Synchronization Test Failure  **Title:** Rel...",
+        "##  GitHub Issue  **Title:** Launch Delay - Database Test Failure  **Summary:**  Database ...",
+        "## Issue: Shopping Trip  **Summary:**  Completed a shopping trip to the market.  **Steps o..."
+      ]
+    },
+    "CREATE_GITHUB_PR": {
+      "category": "CREATE_GITHUB_PR",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 1.47,
+      "elapsed_seconds": 398.1,
+      "failures": [],
+      "sample_outputs": [
+        "## Summary of Changes * Delayed the release to next Tuesday due to a Redis cache synchroni...",
+        "## Summary of Changes * Delayed the project launch to Friday due to database test failures...",
+        "## Summary of Changes - Integrated market visit module to procure inventory items: 2 apple..."
+      ]
+    },
+    "CREATE_TASK": {
+      "category": "CREATE_TASK",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 1.45,
+      "elapsed_seconds": 396.2,
+      "failures": [],
+      "sample_outputs": [
+        "[ ] **Fix Redis cache synchronization test failure under load** *(Priority: High)*  - **Ow...",
+        "[ ] **High Priority** | Fix database test failures and confirm system stability for launch...",
+        "[ ] **Eat/Store Market Purchases**  - **Owner:** Unassigned  - **Deliverable:** Two apples..."
+      ]
+    },
+    "GENERATE_CODE": {
+      "category": "GENERATE_CODE",
+      "total_runs": 100,
+      "passed_runs": 100,
+      "pass_rate_pct": 100.0,
+      "avg_latency_sec": 4.85,
+      "elapsed_seconds": 6630.4,
+      "failures": [],
+      "sample_outputs": [
+        "\"\"\" We gotta push the release to next Tuesday because the Redis cache synchronization test...",
+        "\"\"\" Hey team, we're delaying the launch to Friday due to a failed database test.  Srinivas...",
+        "// I was visiting the market and I buy two apples, one mango, three bananas, and bread the..."
+      ]
+    },
+    "FORMAT_TEXT": {
+      "category": "FORMAT_TEXT",
+      "total_runs": 100,
+      "passed_runs": 98,
+      "pass_rate_pct": 98.0,
+      "avg_latency_sec": 3.97,
+      "elapsed_seconds": 717.8,
+      "failures": [
+        {
+          "id": 1443,
+          "category": "FORMAT_TEXT",
+          "mode": "spoken_at_start",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 13.5,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'Name, Role, Location, Salary' not preserved in output"
+          ],
+          "output_preview": "| Item | Quantity | Apples | 2 | Mango | 1 | Bananas | 3 | Bread | 1 | Location | Market |...",
+          "full_output": "| Item | Quantity | Apples | 2 | Mango | 1 | Bananas | 3 | Bread | 1 | Location | Market |"
+        },
+        {
+          "id": 1452,
+          "category": "FORMAT_TEXT",
+          "mode": "spoken_at_start",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 3.0,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'Name, Role, Location, Salary' not preserved in output"
+          ],
+          "output_preview": "| Candidate | Technical Skills | Effort | Marcus Vance | Distributed Systems | Leading thi...",
+          "full_output": "| Candidate | Technical Skills | Effort | Marcus Vance | Distributed Systems | Leading this effort |"
+        }
+      ],
+      "sample_outputs": [
+        "| Topic | Details | Release Schedule | Push to next Tuesday due to Redis cache synchroniza...",
+        "| Field | Value | Launch Delay | Friday | Reason | Database test failed | Budget | Under f...",
+        "| Item | Quantity | Apples | 2 | Mango | 1 | Bananas | 3 | Bread | 1 |..."
+      ]
+    },
+    "REWRITE": {
+      "category": "REWRITE",
+      "total_runs": 100,
+      "passed_runs": 98,
+      "pass_rate_pct": 98.0,
+      "avg_latency_sec": 3.54,
+      "elapsed_seconds": 675.0,
+      "failures": [
+        {
+          "id": 1504,
+          "category": "REWRITE",
+          "mode": "spoken_at_start",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 2.88,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'customer engagement' not preserved in output"
+          ],
+          "output_preview": "A patient reported experiencing severe headaches and mild dizziness since last Thursday fo...",
+          "full_output": "A patient reported experiencing severe headaches and mild dizziness since last Thursday following the ingestion of 20 milligrams of lisinopril."
+        },
+        {
+          "id": 1564,
+          "category": "REWRITE",
+          "mode": "spoken_at_start",
+          "is_regression": false,
+          "passed": false,
+          "latency_sec": 3.05,
+          "intent_matched": true,
+          "trigger_stripped": true,
+          "fail_reasons": [
+            "Spoken entity/name 'customer engagement' not preserved in output"
+          ],
+          "output_preview": "A patient reported experiencing severe headaches and mild dizziness since last Thursday fo...",
+          "full_output": "A patient reported experiencing severe headaches and mild dizziness since last Thursday following the ingestion of 20 milligrams of lisinopril."
+        }
+      ],
+      "sample_outputs": [
+        "The Redis cache synchronization test failed under load, necessitating a release postponeme...",
+        "Team, due to a failed database test, we're adjusting the launch date to Friday. Srinivas w...",
+        "While at the market, I purchased two apples, one mango, three bananas, and some bread befo..."
+      ]
+    }
+  }
+}

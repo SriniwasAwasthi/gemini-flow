@@ -96,45 +96,55 @@ class AIPolishBrain:
     def format_list_items(cls, text: str) -> str:
         """
         Detects spoken comma-separated or 'and'-separated item lists (groceries, deliverables, tasks)
-        and converts them into structured bullet points if 3 or more items are dictated.
+        and converts them into structured bullet points if 2 or more items are dictated.
+        Never splits on raw whitespace.
         """
-        if not text or "•" in text or "\n" in text:
+        if not text or "\u2022" in text or "\n" in text:
             return text
-        
-        m = re.match(r'^(.*?\b(?:buy|pack|need|bring|agenda|items|deliverables|priorities|bugs|steps|include|includes|following)(?:\s+to\s+buy|\s+for\s+the\s+[^:]+)?[:\s]+)(.+)$', text, re.IGNORECASE)
-        if m:
+
+        prefix = ""
+        rest = ""
+        if ":" in text:
+            prefix, rest = text.split(":", 1)
+            prefix = prefix.strip() + ":"
+            rest = rest.strip()
+        else:
+            m = re.match(
+                r'^(.*?\b(?:buy|pack|need|bring|agenda|items|deliverables|priorities|bugs|steps|include|includes|following|purchased|bought)(?:\s+to\s+buy|\s+for\s+the\s+[^:]+|\s+the\s+following\s+items)?[:\s]+)(.+)$',
+                text, re.IGNORECASE
+            )
+            if not m:
+                return text
             prefix = m.group(1).strip()
             rest = m.group(2).strip()
-            trail_m = re.search(r'\s+(at\s+\d+.*|from\s+.*|for\s+.*|on\s+.*|tomorrow.*|yesterday.*|today.*)[.\s]*$', rest, re.IGNORECASE)
-            trail = ''
-            if trail_m:
-                trail = ' ' + trail_m.group(1).strip()
-                rest = rest[:trail_m.start()].strip()
 
-            parts = [p.strip() for p in re.split(r',\s*|\s+and\s+', rest) if p.strip()]
-            if len(parts) < 3:
-                space_parts = [p.strip() for p in re.split(r'\s+and\s+|\s+', rest) if p.strip()]
-                if len(space_parts) >= 3 and not any(p.lower() in ('the', 'a', 'an', 'to', 'for', 'with', 'in', 'on') for p in space_parts):
-                    parts = space_parts
+        trail_m = re.search(
+            r'(?:[.;]\s+|\s+)(?:Afterwards|After that|Then|Later|Finally|I come back|I came back|I returned|I go back|I went back|at\s+\d+|from\s+\w+|for\s+\w+|on\s+\w+|tomorrow|yesterday|today)\b.*$',
+            rest, re.IGNORECASE
+        )
+        trailing_sentence = ""
+        if trail_m:
+            trailing_sentence = rest[trail_m.start():].strip()
+            trailing_sentence = re.sub(r'^[.;,\s]+', '', trailing_sentence)
+            rest = rest[:trail_m.start()].strip()
 
-            if len(parts) >= 3:
-                bullets = "\n".join([f"• {p[0].upper() + p[1:] if p else p}" for p in parts])
-                head = prefix + trail
-                colon_prefix = head if head.endswith(':') else head + ':'
-                return f"{colon_prefix}\n{bullets}"
-        return text
-        
-        # Detect patterns like: "we need to buy milk bread butter and eggs"
-        m = re.match(r'^(.*?\b(?:buy|pack|need|bring|agenda|items|deliverables|priorities|bugs|steps)(?:\s+to\s+buy|\s+for\s+the\s+[^:]+)?[:\s]+)(.+)$', text, re.IGNORECASE)
-        if m:
-            prefix = m.group(1).strip()
-            rest = m.group(2).strip()
-            # Split items on commas or 'and'
-            parts = [p.strip() for p in re.split(r',\s*|\s+and\s+', rest) if p.strip()]
-            if len(parts) >= 3:
-                bullets = "\n".join([f"• {p[0].upper() + p[1:] if p else p}" for p in parts])
-                colon_prefix = prefix if prefix.endswith(":") else prefix + ":"
-                return f"{colon_prefix}\n{bullets}"
+        norm_rest = re.sub(
+            r'(?<=[a-zA-Z])\s+(?=(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+)',
+            ', ',
+            rest,
+            flags=re.IGNORECASE
+        )
+        parts = [p.strip().rstrip('.,;') for p in re.split(r'[,;]|\s+and\s+|\.\s+', norm_rest) if p.strip()]
+        if len(parts) >= 2:
+            bullets = "\n".join([f"\u2022 {p[0].upper() + p[1:] if p else p}" for p in parts])
+            colon_prefix = prefix if prefix.endswith(":") else prefix + ":"
+            result = f"{colon_prefix}\n{bullets}"
+            if trailing_sentence:
+                ts = trailing_sentence[0].upper() + trailing_sentence[1:] if trailing_sentence else ""
+                if ts and not ts.endswith('.'):
+                    ts += '.'
+                result += f"\n{ts}"
+            return result
         return text
 
     @classmethod
@@ -620,6 +630,15 @@ class AIPolishBrain:
 
         t = re.sub(r'\b(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(apple|egg|banana|orange|server|ticket|minute|dollar|item|problem)\b',
                    lambda m: f"{m.group(1)} {m.group(2)}s", t, flags=re.IGNORECASE)
+
+        # 1d. Spoken tense and adverb agreement enhancements
+        t = re.sub(r'\b(would|could|should|must)\s+have\s+did\b', r'\1 have done', t, flags=re.IGNORECASE)
+        t = re.sub(r'\bwas\s+took\b', 'was taken', t, flags=re.IGNORECASE)
+        t = re.sub(r'\breach\s+home\s+safe\b', 'reach home safely', t, flags=re.IGNORECASE)
+        t = re.sub(r'\bwhy\s+you\s+are\s+not\b', "why you aren't", t, flags=re.IGNORECASE)
+        t = re.sub(r'\b(yesterday|last\s+\w+)\s+([iI]|we|they)\s+go\b', lambda m: f"{m.group(1)} {m.group(2)} went", t, flags=re.IGNORECASE)
+        t = re.sub(r'(?<=\band\s)seen\s+(him|her|them|it|that)\b', r'saw \1', t, flags=re.IGNORECASE)
+        t = re.sub(r'(?<=,\s)seen\s+(him|her|them|it|that)\b', r'saw \1', t, flags=re.IGNORECASE)
 
         # 2. Double negative resolution
         t = re.sub(r'\b(don\'?t|doesn\'?t|didn\'?t|won\'?t|can\'?t|couldn\'?t|hasn\'?t|haven\'?t)\s+know\s+nothing\b', r'\1 know anything', t, flags=re.IGNORECASE)

@@ -257,20 +257,14 @@ class OfflineSpeechEngine:
         if model is None:
             return False, "Whisper model unavailable"
 
-        vocab_bias = "Vocabulary: Sriniwas Awasthi, Gemini Flow, Antigravity, Wispr, API key."
+        prompt = initial_prompt or ""
         try:
             from app.vocabulary.vocab_engine import VocabEngine
-            vocab_bias = VocabEngine.get_instance().get_whisper_prompt()
+            vocab_prompt = VocabEngine.get_instance().get_whisper_prompt()
+            if vocab_prompt and not prompt:
+                prompt = vocab_prompt
         except Exception:
             pass
-
-        if not initial_prompt or initial_prompt.strip() in ("", "Clean verbatim speech dictation, accurate grammar, proper punctuation.", "Clean speech dictation, accurate grammar, proper punctuation."):
-            prompt = vocab_bias
-        else:
-            if vocab_bias and "Sriniwas Awasthi" not in initial_prompt:
-                prompt = f"{initial_prompt} {vocab_bias}"
-            else:
-                prompt = initial_prompt
 
         is_multilingual = getattr(getattr(model, "model", None), "is_multilingual", False)
         kwargs: dict = {

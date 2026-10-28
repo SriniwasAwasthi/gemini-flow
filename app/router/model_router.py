@@ -1,7 +1,7 @@
 """
 Intelligent Model Router for Gemini Flow.
 Curated to the fastest, production-verified models:
-1. gemini-3.5-transcribe (Dedicated Speech Model - Ultra-Fast < 1.5s)
+1. gemini-2.5-flash (Dedicated Multimodal Speech & Text — Ultra-Fast < 1.5s)
 2. gemini-3.5-flash-lite (Lowest Latency < 1.0s)
 3. offline-whisper (Offline Whisper AI - 100% Local On-Device)
 4. ollama-gemma2 (Ollama Gemma 2B - 100% Local GPU Offline Brain)
@@ -28,9 +28,9 @@ class ModelMetadata:
 
 
 MODEL_REGISTRY: Dict[str, ModelMetadata] = {
-    "gemini-3.5-transcribe": ModelMetadata(
-        model_name="gemini-3.5-transcribe",
-        display_name="Gemini 3.5 Transcribe (Dedicated Speech Model: < 1.5s)",
+    "gemini-2.5-flash": ModelMetadata(
+        model_name="gemini-2.5-flash",
+        display_name="Gemini 2.5 Flash (Flagship Speech & Multimodal — Ultra Fast — Recommended)",
         speed_rating=5,
         typical_latency="< 1.5s",
         punctuation_style="Dedicated audio transcription, verbatim accuracy, rich formatting",
@@ -40,7 +40,7 @@ MODEL_REGISTRY: Dict[str, ModelMetadata] = {
     ),
     "gemini-3.5-flash-lite": ModelMetadata(
         model_name="gemini-3.5-flash-lite",
-        display_name="Gemini 3.5 Flash Lite (Lowest Latency: < 1.0s)",
+        display_name="Gemini 3.5 Flash-Lite (Lowest Latency < 1.0s)",
         speed_rating=5,
         typical_latency="< 1.0s",
         punctuation_style="Rapid streaming transcription, clean formatting",
@@ -50,7 +50,7 @@ MODEL_REGISTRY: Dict[str, ModelMetadata] = {
     ),
     "offline-whisper": ModelMetadata(
         model_name="offline-whisper",
-        display_name="Offline Whisper AI (100% On-Device / No Internet)",
+        display_name="Offline Whisper AI (100% On-Device / Faster-Whisper)",
         speed_rating=5,
         typical_latency="~0.3s – 1.4s",
         punctuation_style="Direct local speech transcription + on-device AI Polish Brain, 100% offline privacy",
@@ -81,15 +81,15 @@ class RoutingResult:
 
 
 class ModelRouter:
-    """Centralized routing layer tuned to Gemini 3.5 Transcribe and Flash Lite for ultra-low latency and zero-drop dictation."""
-    def __init__(self, default_model: str = "gemini-3.5-transcribe"):
+    """Centralized routing layer tuned to Gemini 3.5 Flash and Flash-Lite for ultra-low latency and zero-drop dictation."""
+    def __init__(self, default_model: str = "gemini-2.5-flash"):
         self.default_model = default_model
         self.model_registry = MODEL_REGISTRY
 
     def get_metadata(self, model_name: str) -> ModelMetadata:
         return self.model_registry.get(
             model_name,
-            self.model_registry.get("gemini-3.5-transcribe", list(self.model_registry.values())[0])
+            self.model_registry.get("gemini-3.5-flash", list(self.model_registry.values())[0])
         )
 
     @classmethod
@@ -129,10 +129,10 @@ class ModelRouter:
         auto_cost_mode: bool = False
     ) -> RoutingResult:
         """
-        Determines the most appropriate Gemini model.
-        Binds execution context to gemini-3.5-transcribe for audio and gemini-3.5-flash-lite for text.
+        Determines the most appropriate AI model.
+        Binds execution context to gemini-2.5-flash for audio and gemini-3.5-flash-lite for text.
         """
-        speech_meta = self.model_registry.get("gemini-3.5-transcribe", list(self.model_registry.values())[0])
+        speech_meta = self.model_registry.get("gemini-2.5-flash", list(self.model_registry.values())[0])
         text_meta = self.model_registry.get("gemini-3.5-flash-lite", speech_meta)
 
         # 1. Check explicit manual override if not 'auto'
@@ -146,12 +146,12 @@ class ModelRouter:
 
         task = (task_type or "dictate").upper()
 
-        # 2. Voice Audio Dictation Routing (Dedicated ultra-low latency transcription model)
+        # 2. Voice Audio Dictation Routing
         if task in ("DICTATE", "VOICE", "TRANSCRIPTION", "SPEECH", "AUDIO"):
             return RoutingResult(
-                model_name="gemini-3.5-transcribe",
+                model_name="gemini-2.5-flash",
                 metadata=speech_meta,
-                reason="Dedicated ultra-fast audio transcription model (< 1.5s turnaround)",
+                reason="High-accuracy Gemini 3.5 Flash (< 1.5s turnaround, multimodal speech)",
                 is_auto=True
             )
 
@@ -159,7 +159,7 @@ class ModelRouter:
         return RoutingResult(
             model_name="gemini-3.5-flash-lite",
             metadata=text_meta,
-            reason="Ultra-low latency Gemini 3.5 Flash Lite (< 1.0s turnaround)",
+            reason="Ultra-low latency Gemini 3.5 Flash-Lite (< 1.0s turnaround)",
             is_auto=True
         )
 

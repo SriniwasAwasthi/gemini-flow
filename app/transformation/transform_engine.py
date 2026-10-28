@@ -51,10 +51,10 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Improve Writing",
         description="Enhance clarity, flow, vocabulary, and readability while preserving meaning.",
         system_instruction=(
-            "You are an elite copy editor. Improve the following text for clarity, cadence, "
-            "and elegance. Keep the core meaning unchanged. Output ONLY the improved text."
+            "Rewrite the following text to maximize clarity, elegance, and readability while faithfully "
+            "preserving the author's original voice, meaning, proper names, and key facts. Output ONLY the rewritten text without commentary."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.3,
         icon="✨"
     ),
@@ -63,9 +63,9 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Fix Grammar & Spelling",
         description="Correct all punctuation, grammar, and typos with zero semantic distortion.",
         system_instruction=(
-            "Proofread the following text. Correct all spelling, punctuation, capitalization, subject-verb agreement, "
-            "double negatives, and grammatical errors. Preserve intentional vocabulary and style without altering the intended meaning. "
-            "Output ONLY the corrected text without any explanations, conversational filler, or enclosing quotation marks."
+            "Proofread the following text with zero hallucination. Strictly correct all spelling, typos, punctuation, "
+            "capitalization, subject-verb agreement, and grammatical slips. Preserve all words, phrasing, proper names, "
+            "numbers, and technical terms exactly without altering the intended meaning. Output ONLY the corrected text without any explanations or quotation marks."
         ),
         recommended_model="gemini-3.5-flash-lite",
         temperature=0.1,
@@ -78,8 +78,10 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         system_instruction=(
             "Rewrite the following text in a polished, articulate, and professional style suitable for business or professional communication. "
             "Crucially, preserve the author's original voice, perspective, and intent (e.g. if written in first-person 'I', keep it in first-person). "
-            "Elevate vocabulary, refine sentence flow, and remove colloquial fillers while keeping the genuine human message intact. "
-            "Never convert personal speech into third-person telemetry, software execution logs, or robotic status reports. Output ONLY the rewritten text."
+            "Preserve all proper names, numbers, dates, and facts without substitution or omission. "
+            "Correct all informal grammar and verb tenses (e.g. 'I buy' -> 'purchased', 'I come back home' -> 'I returned home'). "
+            "When the user lists items, groceries, purchases, or tasks (including run-together items), format them into clean bullet points ('• ') on separate lines. "
+            "Elevate vocabulary and sentence flow while keeping the genuine message intact. Output ONLY the rewritten text without commentary."
         ),
         recommended_model="gemini-3.5-flash-lite",
         temperature=0.3,
@@ -90,10 +92,10 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Make Casual",
         description="Rephrase into friendly, warm, conversational text.",
         system_instruction=(
-            "Rephrase the following text in a warm, relaxed, and conversational tone suitable for direct "
-            "messaging or quick team syncs. Output ONLY the rewritten text."
+            "Rephrase the following text in a warm, relaxed, and conversational tone suitable for direct messaging or Slack syncs "
+            "while preserving all key facts, names, and deadlines. Output ONLY the rewritten text without commentary."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.4,
         icon="☕"
     ),
@@ -102,10 +104,10 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Make Concise",
         description="Cut redundant words and fluff while retaining core information.",
         system_instruction=(
-            "Condense the following text to its leanest, punchiest form. Remove all superfluous words "
-            "and fluff while keeping 100% of essential facts. Output ONLY the concise text."
+            "Condense the following text to its leanest, punchiest form. Remove all superfluous words and fluff while keeping "
+            "100% of essential facts, names, and figures. Output ONLY the concise text without commentary."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.2,
         icon="✂️"
     ),
@@ -114,11 +116,11 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Expand & Elaborate",
         description="Add thorough depth, clear explanations, and supporting nuance.",
         system_instruction=(
-            "Elaborate upon the provided text with rich context, supporting nuance, and comprehensive "
-            "detail. Output ONLY the expanded content."
+            "Elaborate upon the provided text with rich context, strategic nuance, and comprehensive professional detail. "
+            "Preserve all core facts and names. Output ONLY the expanded content."
         ),
-        recommended_model="gemini-2.5-flash",
-        temperature=0.5,
+        recommended_model="gemini-3.5-flash-lite",
+        temperature=0.4,
         icon="📖"
     ),
     TransformType.SUMMARIZE: TransformPreset(
@@ -126,10 +128,10 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Summarize",
         description="Generate clean bullet-point summary with key takeaways.",
         system_instruction=(
-            "Summarize the provided content into a tight executive summary with high-signal bullet "
-            "points highlighting core conclusions and action items. Output ONLY the summary."
+            "Summarize the provided content into a tight executive summary with high-signal bullet points ('• ') "
+            "highlighting core conclusions, decisions, and action items. Output ONLY the summary bullet points."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.2,
         icon="📋"
     ),
@@ -138,10 +140,10 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Explain Clearly",
         description="Break down complex concepts or code with step-by-step clarity.",
         system_instruction=(
-            "Explain the following concept, code snippet, or argument in crystal-clear, structured terms. "
-            "Use intuitive metaphors where appropriate. Output ONLY the explanation."
+            "Explain the following concept or project update in crystal-clear, structured operational terms with step-by-step clarity. "
+            "Output ONLY the explanation."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.3,
         icon="💡"
     ),
@@ -150,8 +152,10 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Technical & Code",
         description="Write clean code or refine text using rigorous engineering standards.",
         system_instruction=(
-            "Write clean, robust, idiomatic, and production-grade code or technical specifications according to best practices. "
-            "Include concise comments and proper type annotations where applicable. Output ONLY the code or technical content without conversational filler."
+            "You are a Senior Staff Software Engineer. Write clean, complete, runnable, and idiomatic code "
+            "(with functions, classes, data structures, or executable scripts) implementing, modeling, or automating "
+            "the requirements, logic, workflow, or data in the input text. Always define concrete functions (`def`, `function`), "
+            "classes, variables, or logic. Output ONLY the code directly without markdown code fences or conversational text."
         ),
         recommended_model="gemini-3.5-flash-lite",
         temperature=0.2,
@@ -163,24 +167,11 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         description="Craft an optimized, high-fidelity system/user prompt from raw notes with 100% information retention.",
         system_instruction=(
             "You are an elite, world-class AI Prompt Architect. Transform the provided text into a comprehensive, "
-            "production-grade, and beautifully structured AI Prompt that can be executed directly by any AI agent "
-            "(Claude, ChatGPT, Gemini, Antigravity, Cursor, etc.).\n\n"
-            "Critical Directives:\n"
-            "1. 100% Information Retention & Zero Data Loss: Analyze the ENTIRE provided text. You MUST preserve 100% "
-            "of all requirements, parameters, constraints, specific details, background context, questions, and ideas. "
-            "Do NOT summarize away, omit, pinch, or discard ANY detail or nuance from the selected text.\n"
-            "2. Zero Unrelated Injections & Anti-Hallucination: Build the prompt STRICTLY from the provided text. Under NO "
-            "circumstances should you inject unrelated personal names (e.g. 'Sriniwas Awasthi'), phonetic replacement rules, "
-            "Wispr references, or external templates that were not explicitly in the user's input.\n"
-            "3. Structural Architecture:\n"
-            "   - ### Role & Objective: Precise persona, expertise, and ultimate goal.\n"
-            "   - ### Context & Background: Full background, context, and problem statement from the user's text.\n"
-            "   - ### Detailed Requirements & Scope: Exhaustive breakdown of all functional requirements, features, and constraints.\n"
-            "   - ### Step-by-Step Instructions: Logical, numbered steps for the receiving AI agent.\n"
-            "   - ### Expected Output Format: Concrete, unambiguous specifications for the expected response.\n"
-            "4. Output ONLY the finalized prompt directly without conversational preambles ('Here is the prompt:'), pleasantries, or code fence wrappers around the prompt."
+            "production-grade, and beautifully structured AI Prompt with Role, Objective, Context, Step-by-Step Instructions, "
+            "and Expected Output Format. Preserve 100% of all information, names, constraints, and parameters. "
+            "Output ONLY the finalized prompt directly without preambles or outer code fences."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.2,
         icon="🧠"
     ),
@@ -190,9 +181,9 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         description="Format into an email with subject line, greeting, and sign-off.",
         system_instruction=(
             "Convert the user's thoughts into a polished email. Include a compelling 'Subject: ' line, "
-            "appropriate salutation, clean body paragraphs, and professional closing."
+            "appropriate salutation, clean body paragraphs, and professional closing. Output ONLY the email."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.3,
         icon="✉️"
     ),
@@ -201,15 +192,12 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Convert to GitHub Issue",
         description="Structure as a bug report or feature request issue with repro steps.",
         system_instruction=(
-            "Convert the provided details into a structured GitHub Issue in markdown format, including:\n"
-            "## Summary\n"
-            "## Steps to Reproduce\n"
-            "## Expected Behavior\n"
-            "## Actual Behavior\n"
-            "## Environment & Notes\n"
-            "Output ONLY the markdown issue."
+            "Convert the provided details into a structured GitHub Issue in markdown format, including Title, Summary, "
+            "Steps/Context, Technical Details & Components, and Action Items checklist (- [ ]). "
+            "Preserve 100% of all technical details, component names, error codes, and notes without omitting anything. "
+            "Do not echo the spoken trigger command. Output ONLY the markdown issue."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.2,
         icon="🐛"
     ),
@@ -218,16 +206,12 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Convert to Pull Request",
         description="Structure as a pull request description with context and test plan.",
         system_instruction=(
-            "Convert the following notes into a professional GitHub Pull Request description in markdown format:\n"
-            "## Description\n"
-            "## Motivation & Context\n"
-            "## How Has This Been Tested?\n"
-            "## Checklist\n"
-            "- [ ] Tests added/updated\n"
-            "- [ ] Documentation updated\n"
-            "Output ONLY the markdown PR description."
+            "Convert the following notes into a professional GitHub Pull Request description in markdown format with "
+            "Summary of Changes, Motivation & Context, Key Details & Branches, and Testing Checklist (- [ ]). "
+            "Preserve 100% of all technical details, branch names, file paths, issue references, numbers, and notes without omitting anything. "
+            "Do not echo the spoken trigger command. Output ONLY the markdown PR description."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.2,
         icon="🔀"
     ),
@@ -239,7 +223,7 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
             "Format the input as production-grade technical documentation or docstrings following "
             "Google/Markdown developer doc standards. Output ONLY the documentation."
         ),
-        recommended_model="gemini-2.5-flash",
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.2,
         icon="📚"
     ),
@@ -248,71 +232,44 @@ TRANSFORM_PRESETS: Dict[TransformType, TransformPreset] = {
         title="Convert to Structured Notes",
         description="Organize thoughts into hierarchical bullet points and action items.",
         system_instruction=(
-            "Organize the provided text into clean, structured meeting/project notes in markdown with "
-            "key headings, bullet points, and action items with checkboxes. Output ONLY the notes."
+            "Extract and organize all implied and explicit action items into a prioritized, actionable markdown checklist "
+            "with clear check-boxes (- [ ]) and owners. Output ONLY the checklist."
         ),
-        recommended_model="gemini-2.5-flash",
-        temperature=0.3,
+        recommended_model="gemini-3.5-flash-lite",
+        temperature=0.2,
         icon="📝"
     ),
     TransformType.CUSTOM: TransformPreset(
         type=TransformType.CUSTOM,
         title="Custom Transformation",
-        description="Apply a custom user prompt instruction to the selected text.",
-        system_instruction="Follow the user's custom instruction faithfully. Output ONLY the transformed text.",
-        recommended_model="gemini-2.5-flash",
+        description="Apply custom user instructions directly.",
+        system_instruction=(
+            "Follow the user's specific transformation instruction faithfully while preserving all proper names, numbers, and facts. "
+            "Output ONLY the transformed result."
+        ),
+        recommended_model="gemini-3.5-flash-lite",
         temperature=0.3,
-        icon="🎯"
+        icon="⚡"
     )
 }
 
 
 class TransformEngine:
-    """Manages prompt construction and model selection for text transformation."""
-
-    @staticmethod
-    def get_preset(transform_type: TransformType) -> TransformPreset:
+    @classmethod
+    def get_preset(cls, transform_type: TransformType) -> TransformPreset:
         return TRANSFORM_PRESETS.get(transform_type, TRANSFORM_PRESETS[TransformType.IMPROVE])
-
-    @staticmethod
-    def list_presets() -> List[TransformPreset]:
-        return list(TRANSFORM_PRESETS.values())
 
     @classmethod
     def build_system_instruction(
         cls,
-        transform_type: TransformType = TransformType.IMPROVE,
+        transform_type: TransformType,
         app_context: Optional[AppContext] = None,
         custom_instruction: str = ""
     ) -> str:
-        if custom_instruction and custom_instruction.strip():
-            instruction = f"{custom_instruction.strip()}\n\nOutput ONLY the final transformed text without commentary or preamble."
-        else:
-            preset = cls.get_preset(transform_type)
-            instruction = preset.system_instruction
-
-        # Application context for text transformations:
-        # Provide destination awareness only for messaging/email/writing apps.
-        # NEVER leak dev IDE speech transcription directives (e.g. camelCase/snake_case)
-        # into text transformations, which previously caused personal speech to be converted
-        # into robotic system telemetry or execution logs.
-        if app_context and getattr(app_context, "category", "") in ("email", "communication", "browser", "writing"):
-            instruction += f"\n\nDestination Context: Active application is {app_context.app_name}."
-
-        return instruction
-
-    @classmethod
-    def resolve_model(
-        cls,
-        transform_type: TransformType,
-        text_length: int = 0,
-        manual_model: Optional[str] = None
-    ) -> str:
-        """Determines best model using preset recommendations and ModelRouter."""
-        if manual_model and manual_model != "auto":
-            return manual_model
-
         preset = cls.get_preset(transform_type)
-        if text_length > 3000:
-            return "gemini-2.5-flash"
-        return preset.recommended_model
+        base = custom_instruction.strip() if custom_instruction and custom_instruction.strip() else preset.system_instruction
+
+        if app_context and app_context.profile_id:
+            base += f" Adapt formatting seamlessly for target workspace application: '{app_context.app_name}'."
+
+        return base

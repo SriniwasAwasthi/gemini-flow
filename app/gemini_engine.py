@@ -28,13 +28,9 @@ from app.offline.offline_engine import OfflineSpeechEngine
 logger = logging.getLogger("GeminiFlow.GeminiEngine")
 
 FALLBACK_MODELS = [
+    "gemini-2.5-flash",
     "gemini-3.5-flash-lite",
-    "gemini-flash-lite-latest",
-    "gemini-3.1-flash-lite",
-    "gemini-3.5-transcribe",
-    "gemini-3.6-flash",
-    "gemini-flash-latest",
-    "gemini-2.5-flash"
+    "gemini-3.5-flash"
 ]
 
 
@@ -104,8 +100,8 @@ class GeminiEngine:
 
         # Step 1: Query the Google Generative Language models endpoint to strictly verify the API Key
         try:
-            url_models = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
-            resp_models = self.session.get(url_models, timeout=(5.0, 5.0))
+            url_models = "https://generativelanguage.googleapis.com/v1beta/models"
+            resp_models = self.session.get(url_models, headers={"x-goog-api-key": key}, timeout=(5.0, 5.0))
             if resp_models.status_code in (400, 401, 403):
                 try:
                     err_msg = resp_models.json().get("error", {}).get("message", resp_models.text)
@@ -119,9 +115,9 @@ class GeminiEngine:
 
         # Step 2: Prioritize active production models for sub-second generation & transcription
         models_to_try = [
-            "gemini-3.5-transcribe",
+            "gemini-2.5-flash",
             "gemini-3.5-flash-lite",
-            "gemini-2.5-flash"
+            "gemini-3.5-flash"
         ]
         if self.model_name and self.model_name not in models_to_try and self.model_name != "auto":
             models_to_try.insert(0, self.model_name)
@@ -131,7 +127,7 @@ class GeminiEngine:
 
         for model in models_to_try:
             try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
                 payload = {
                     "contents": [
                         {
@@ -219,23 +215,23 @@ class GeminiEngine:
                 self.last_latency = time.time() - t_off_start
                 if offline_ok:
                     if offline_text:
-                        if is_ollama:
-                            try:
-                                from app.intelligence.ollama_engine import OllamaEngine
-                                OllamaEngine.ensure_daemon_running(timeout=1.5)
-                                if OllamaEngine.is_available(timeout=0.3):
-                                    ok_ol, txt_ol = OllamaEngine.polish_text(offline_text, timeout=12.0)
-                                    if ok_ol and txt_ol:
-                                        offline_text = txt_ol
-                            except Exception as ol_err:
-                                logger.debug(f"Ollama execution note: {ol_err}")
-
-                        # Apply AIPolishBrain to format bullet points, strip ordinals, and fix grammar
+                        # Apply AIPolishBrain first to resolve self-corrections, format bullet points, and clean speech
                         try:
                             from app.intelligence.ai_polish_brain import AIPolishBrain
                             offline_text = AIPolishBrain.polish_speech(offline_text)
                         except Exception as apb_err:
                             logger.debug(f"AIPolishBrain offline note: {apb_err}")
+
+                        if is_ollama:
+                            try:
+                                from app.intelligence.ollama_engine import OllamaEngine
+                                OllamaEngine.ensure_daemon_running(timeout=5.0)
+                                if OllamaEngine.is_available(timeout=0.5):
+                                    ok_ol, txt_ol = OllamaEngine.polish_text(offline_text, timeout=15.0)
+                                    if ok_ol and txt_ol:
+                                        offline_text = txt_ol
+                            except Exception as ol_err:
+                                logger.debug(f"Ollama execution note: {ol_err}")
 
                         try:
                             from app.vocabulary.vocab_engine import VocabEngine
@@ -248,7 +244,7 @@ class GeminiEngine:
 
         # 1. Resolve Primary Model via ModelRouter (Dynamic Application Context & Profile Routing)
         duration_approx = len(wav_bytes) / 32000.0  # Approx seconds for 16kHz 16-bit mono
-        app_name = app_context.app_name if app_context else "General"
+        app_name = getattr(app_context, "app_name", str(app_context) if isinstance(app_context, str) else "General") if app_context else "General"
         app_cat = getattr(app_context, "category", "general") if app_context else "general"
         routing = ModelRouter.route_model(
             task_type="dictate",
@@ -288,6 +284,11 @@ class GeminiEngine:
                 offline_ok, offline_text = OfflineSpeechEngine.transcribe_wav(wav_bytes, initial_prompt=prompt_ctx, language=offline_language)
                 if offline_ok:
                     if offline_text:
+                        try:
+                            from app.intelligence.ai_polish_brain import AIPolishBrain
+                            offline_text = AIPolishBrain.polish_speech(offline_text)
+                        except Exception as apb_err:
+                            logger.debug(f"AIPolishBrain offline note: {apb_err}")
                         try:
                             offline_text = VocabEngine.normalize_text(offline_text)
                         except Exception:
@@ -494,7 +495,7 @@ class GeminiEngine:
         if len(chunks) == 1:
             chunk_bytes = chunks[0]
             audio_b64 = base64.b64encode(chunk_bytes).decode("utf-8")
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
             gen_config: Dict[str, Any] = {
                 "temperature": 0.0,
@@ -545,7 +546,7 @@ class GeminiEngine:
                 start_t = time.time()
                 approx_sec = len(chunk_bytes) / 32000.0
                 # Production fast-response timeout: 1.8s connect, 3.5s-8.0s read for sub-2s SLA
-                req_timeout = (3.0, max(5.0, min(18.0, float(approx_sec * 0.5) + 4.0)))
+                req_timeout = (4.0, max(12.0, min(35.0, float(approx_sec * 0.8) + 8.0)))
                 response = self.session.post(url, headers=headers, json=payload, timeout=req_timeout)
 
                 elapsed = time.time() - start_t
@@ -598,10 +599,9 @@ class GeminiEngine:
         # Resilient chunk models
         chunk_model_candidates = [
             "gemini-3.5-flash-lite",
-            "gemini-flash-lite-latest",
-            "gemini-3.1-flash-lite",
-            "gemini-3.5-transcribe",
-            "gemini-2.5-flash"
+            "gemini-3.5-flash",
+            "gemini-2.5-flash",
+            "gemini-3.5-transcribe"
         ]
 
         def _transcribe_chunk_worker(c_idx: int, c_bytes: bytes):
@@ -610,7 +610,7 @@ class GeminiEngine:
             c_timeout = (3.0, max(6.0, min(25.0, float(c_sec * 0.5) + 4.0)))
 
             for try_model in chunk_model_candidates:
-                c_url = f"https://generativelanguage.googleapis.com/v1beta/models/{try_model}:generateContent?key={self.api_key}"
+                c_url = f"https://generativelanguage.googleapis.com/v1beta/models/{try_model}:generateContent"
                 c_gen_config: Dict[str, Any] = {
                     "temperature": 0.0,
                     "topP": 0.95,
@@ -755,7 +755,19 @@ class GeminiEngine:
                 # Transcribe models only take audio input
                 return False, "Transcribe model only accepts audio."
 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+            if any(k in model.lower() for k in ("ollama", "gemma")):
+                try:
+                    from app.intelligence.ollama_engine import OllamaEngine
+                    prompt = f"{instruction}\n\nCONTENT TO TRANSFORM:\n\"\"\"\n{raw_text}\n\"\"\"\n\nOUTPUT ONLY THE TRANSFORMED TEXT:"
+                    ok_ol, txt_ol = OllamaEngine.polish_text(raw_text=raw_text, prompt_override=prompt, timeout=25.0)
+                    if ok_ol and txt_ol and len(txt_ol.strip()) > 5:
+                        cleaned = self._clean_output(txt_ol, is_code=is_code)
+                        return True, cleaned
+                except Exception as ex_ol:
+                    logger.debug(f"Ollama call_model exception: {ex_ol}")
+                return False, "Ollama local inference failed."
+
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
             gen_config: Dict[str, Any] = {
                 "temperature": TransformEngine.get_preset(transform_type).temperature,
                 "maxOutputTokens": 4096
@@ -812,19 +824,33 @@ class GeminiEngine:
             is_audio=False
         )
 
-        # 5. Local Intelligence Fallback on total online transformation failure
+        # 5. Local Intelligence Fallback on total online transformation failure (Guaranteed Zero-Failure)
         if not exec_res.success:
             try:
-                from app.intelligence.ai_polish_brain import AIPolishBrain
-                cleaned = AIPolishBrain.polish_speech(raw_text)
-                cleaned = self._clean_output(cleaned)
-                if cleaned:
-                    exec_res.success = True
-                    exec_res.text = cleaned
-                    exec_res.model_used = "Local Intelligence Polish (Offline Fallback)"
-                    exec_res.fallback_occurred = True
-            except Exception as loc_err:
-                logger.debug(f"Local intelligence transform fallback note: {loc_err}")
+                from app.intelligence.ollama_engine import OllamaEngine
+                if OllamaEngine.is_available(timeout=0.4):
+                    prompt = f"{instruction}\n\nCONTENT TO TRANSFORM:\n\"\"\"\n{raw_text}\n\"\"\"\n\nOUTPUT ONLY THE TRANSFORMED TEXT:"
+                    ok_ol, txt_ol = OllamaEngine.polish_text(raw_text=raw_text, prompt_override=prompt, timeout=12.0)
+                    if ok_ol and txt_ol and len(txt_ol.strip()) > 5:
+                        exec_res.success = True
+                        exec_res.text = self._clean_output(txt_ol, is_code=is_code)
+                        exec_res.model_used = "Ollama Gemma 2B (Local Offline Fallback)"
+                        exec_res.fallback_occurred = True
+            except Exception as ol_err:
+                logger.debug(f"Ollama transform fallback note: {ol_err}")
+
+            if not exec_res.success:
+                try:
+                    from app.intelligence.ai_polish_brain import AIPolishBrain
+                    cleaned = AIPolishBrain.polish_speech(raw_text)
+                    cleaned = self._clean_output(cleaned)
+                    if cleaned:
+                        exec_res.success = True
+                        exec_res.text = cleaned
+                        exec_res.model_used = "Local Intelligence Polish (Offline Fallback)"
+                        exec_res.fallback_occurred = True
+                except Exception as loc_err:
+                    logger.debug(f"Local intelligence transform fallback note: {loc_err}")
 
         # 5b. Vocabulary Normalization & Metrics
         if exec_res.success and exec_res.text:
@@ -1028,7 +1054,7 @@ class GeminiEngine:
                     "- If the speaker dictated continuous narrative prose, explanations, questions, or paragraphs, DO NOT use bullet points; format as natural, fluent paragraphs in the original language and authentic script. Preserve 100% of all spoken concepts.\n"
                     "- Output ONLY the finalized text directly without conversational commentary."
                 )
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={self.api_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
                 payload = {
                     "contents": [{"parts": [{"text": f"{struct_prompt}\n\nSpoken Text:\n{text}"}]}],
                     "generationConfig": {

@@ -9,6 +9,7 @@ import logging
 import threading
 import winsound
 from pathlib import Path
+from typing import Tuple, Optional, Dict, Any, List, Callable
 
 from PyQt6.QtCore import Qt, QObject, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QMessageBox
@@ -311,6 +312,8 @@ from .intent.intent_system import IntentClassifier, IntentCategory, INTENT_TO_TR
 from .transformation.transform_engine import TransformType, TransformEngine
 from .profiles.profile_manager import ProfileManager
 from .reliability.fallback_handler import FallbackHandler
+from .transcription.engine import UnifiedTranscriptionEngine
+from .commands import match_spoken_command, COMMAND_MAP
 
 # Configure logging with bulletproof fallback
 import logging.handlers
@@ -389,6 +392,10 @@ class GeminiFlowApp:
             api_key=self.config.get_api_key(),
             model_name=active_model
         )
+        self.transcription_engine = UnifiedTranscriptionEngine(
+            api_key=self.config.get_api_key(),
+            config_manager=self.config
+        )
         self.text_injector = TextInjector()
         self.signals = WorkerSignals()
         self.signals.finished.connect(self._on_transcription_finished)
@@ -441,6 +448,7 @@ class GeminiFlowApp:
 
         self.is_busy_processing = False
         self._busy_start_time = 0.0
+        self._last_saved_audio_path: str = ""
         self._is_cancelled = False
         self._rolling_chunks = []
         self._rolling_lock = threading.Lock()
@@ -504,8 +512,15 @@ class GeminiFlowApp:
         self._rolling_active = True
         self.hotkey_mgr.set_recording_state(True)
 
-        # 1. Capture active foreground window
+        # 1. Capture active foreground window and any highlighted text for command triggers
         self.text_injector.capture_active_window()
+        self._pre_recorded_selected_text = ""
+        try:
+            sel = self.text_injector.get_selected_text(require_selection=True)
+            if sel and len(sel.strip()) >= 2:
+                self._pre_recorded_selected_text = sel.strip()
+        except Exception:
+            pass
 
         # 2. Audio feedback (subtle high beep)
         if self.config.get("play_sounds", True):
@@ -606,8 +621,9 @@ class GeminiFlowApp:
         self._rolling_active = False
         self.hotkey_mgr.set_recording_state(False)
 
-        # 1. Stop audio capture
-        wav_bytes, duration = self.recorder.stop_recording()
+        # 1. Stop audio capture & save complete playable recording to disk
+        wav_path, wav_bytes, duration, sample_count, rms = self.recorder.stop_recording()
+        self._last_saved_audio_path = wav_path or ConfigManager.save_recorded_audio(wav_bytes)
 
         if self._is_cancelled:
             logger.info("Speech was cancelled, discarding audio.")
@@ -638,7 +654,7 @@ class GeminiFlowApp:
         # 4. Dispatch background AI worker thread
         threading.Thread(
             target=self._process_speech_worker,
-            args=(wav_bytes, duration),
+            args=(self._last_saved_audio_path, wav_bytes, duration),
             daemon=True
         ).start()
 
@@ -806,300 +822,232 @@ class GeminiFlowApp:
             self.hud.show_state(FloatingHUD.STATE_ERROR, text_or_error[:35] if text_or_error else "Transform Failed")
             self.tray.update_status("⚠️ Transform Failed", state="ready")
 
-    def _process_speech_worker(self, wav_bytes: bytes, duration: float):
-        """Runs in background thread with Application Context, Profile routing, Intent classification, and resilient Gemini execution."""
+    def _process_speech_worker(self, wav_target: any, wav_bytes: bytes, duration: float):
+        """
+        Unified Speech Processing Worker for Gemini Flow.
+        Guarantees:
+        - G1: Zero truncation for any speech duration.
+        - G2: High-fidelity transcription with grammar and punctuation.
+        - G3: Zero hallucination, dictation is data never instructions.
+        - G4: Strict first-words-only matching for all 16 command categories.
+        """
         try:
             if self._is_cancelled:
                 return
 
-            api_key = self.config.get_api_key()
-            offline_fallback_on = self.config.get_offline_fallback_enabled() if hasattr(self.config, "get_offline_fallback_enabled") else self.config.get("offline_fallback_enabled", True)
-
-            if not api_key and not offline_fallback_on:
-                self.signals.finished.emit(False, "Missing Gemini API Key. Open Settings.", duration, "clean_dictation", "General", "", "")
-                return
-
-            self.gemini.set_api_key(api_key)
-            active_model = self.config.get("model_name") or self.config.get("model_mode", "auto")
-            self.gemini.set_model(active_model)
-
-            # Fast-path acoustic silence check: if audio is pure room noise/silence, exit in <5ms with zero hallucinations
-            if not AudioRecorder.contains_speech(wav_bytes):
-                logger.info(f"Acoustic check: Audio contains zero speech energy ({duration:.2f}s). Skipping AI call.")
-                self.signals.finished.emit(True, "", duration, self.config.get("mode_preset", "clean_dictation"), "General", "SilenceDetector", "")
-                return
-
-            # 1. Resolve Application Context & Dynamic Profile
+            # 1. Resolve Application Context
             target_hwnd = getattr(self.text_injector, "last_target_hwnd", None)
             app_context = AppIntelligenceManager.get_active_app_context(target_hwnd)
             app_name = app_context.app_name if app_context else self.text_injector.get_target_app_name()
-            category = getattr(app_context, "category", "general") if app_context else "general"
 
-            # 2. Voice Dictation Mode: Strictly adhere to user's configured mode_preset (default: clean_dictation)
-            # Never force-override voice dictation to prompt_enhancer or code_assistant based on foreground apps.
-            user_profile = self.config.get("active_profile")
-            active_profile = user_profile if user_profile else (app_context.profile_id if (app_context and app_context.profile_id) else "coding")
+            active_profile = self.config.get("active_profile", "coding")
             active_mode = self.config.get("mode_preset", "clean_dictation")
-            if active_mode == "prompt_enhancer":
-                logger.info("Voice dictation requested but mode_preset was prompt_enhancer. Resetting to clean_dictation.")
-                active_mode = "clean_dictation"
-                self.config.set("mode_preset", "clean_dictation")
+            active_model = self.config.get("model_name") or self.config.get("model_mode", "gemini-2.5-flash")
+            primary_lang = self.config.get_primary_language_code() if hasattr(self.config, 'get_primary_language_code') else "en"
 
-            auto_cost_mode = self.config.get("auto_cost_mode", True)
-            logger.info(f"Dynamic Context: App='{app_name}', Category='{category}', Profile='{active_profile}', Mode='{active_mode}'")
+            # 2. Fast Acoustic Silence Check
+            if duration <= 0.1 or not AudioRecorder.contains_speech(wav_bytes):
+                logger.info(f"Acoustic check: Audio contains zero speech energy ({duration:.2f}s). Skipping AI call.")
+                self.signals.finished.emit(True, "", duration, active_mode, app_name, active_model, "")
+                return
 
-            # 3. Construct Active Speech Transcription System Prompt
-            prompt = self.config.get_system_prompt(preset_override=active_mode, app_context=app_context, profile_id_override=active_profile)
+            # 3. Transcribe via Unified Transcription Engine
+            api_key = self.config.get_api_key()
+            self.transcription_engine.set_api_key(api_key)
 
-            # 4. Transcribe with Gemini / Whisper
-            # If rolling background streaming emitted slices, assemble in real-time for < 2.0s stop-to-text turnaround.
-            # Otherwise for short recordings (< 22s), transcribe complete audio directly in a single pass (< 1.2s).
-            primary_lang = self.config.get_primary_language_code() if hasattr(self.config, 'get_primary_language_code') else None
-            has_rolling = self.recorder.rolling_chunks_were_emitted()
-            if not has_rolling:
-                success, raw_result = self.gemini.transcribe_audio(
-                    wav_bytes=wav_bytes,
-                    system_instruction=prompt,
-                    app_context=app_context,
-                    profile_id=active_profile,
-                    auto_cost_mode=auto_cost_mode,
-                    offline_fallback_enabled=offline_fallback_on,
-                    offline_language=primary_lang
+            logger.info(f"Initiating Unified Transcription for {duration:.2f}s audio with model '{active_model}' (Lang: '{primary_lang}')...")
+            transcript = self.transcription_engine.transcribe(
+                wav_path_or_bytes=wav_target if (isinstance(wav_target, str) and os.path.exists(wav_target)) else wav_bytes,
+                model_name=active_model,
+                language=primary_lang
+            )
+
+            # Resilient offline fallback if online model failed
+            offline_fallback_on = self.config.get_offline_fallback_enabled() if hasattr(self.config, "get_offline_fallback_enabled") else self.config.get("offline_fallback_enabled", True)
+            if not transcript.success and offline_fallback_on and "offline" not in active_model.lower():
+                logger.warning(f"Online model '{active_model}' failed ({transcript.error_message}). Rescuing with offline Whisper...")
+                self.hud.show_state(FloatingHUD.STATE_PROCESSING, "Offline Rescue...")
+                transcript = self.transcription_engine.transcribe(
+                    wav_path_or_bytes=wav_target if (isinstance(wav_target, str) and os.path.exists(wav_target)) else wav_bytes,
+                    model_name="offline-whisper",
+                    language=primary_lang
                 )
-            else:
-                logger.info(f"Processing rolling streaming dictation ({len(self._rolling_chunks)} chunks accumulated during speech)...")
-                tail_wav = self.recorder.get_tail_chunk()
-                if tail_wav and len(tail_wav) > 1000:
-                    with self._rolling_lock:
-                        tail_idx = len(self._rolling_chunks)
-                        self._rolling_chunks.append({"id": tail_idx, "done": False, "text": "", "wav": tail_wav})
 
-                    def _transcribe_tail():
-                        ok_tail = False
-                        txt_tail = ""
-                        try:
-                            ok_tail, txt_tail = self.gemini.transcribe_audio(
-                                wav_bytes=tail_wav,
-                                system_instruction=prompt,
-                                app_context=app_context,
-                                profile_id=active_profile,
-                                auto_cost_mode=auto_cost_mode,
-                                offline_fallback_enabled=offline_fallback_on,
-                                offline_language=primary_lang
-                            )
-                        except Exception as tail_ex:
-                            logger.debug(f"Tail chunk online note: {tail_ex}")
-                            ok_tail = False
+            if not transcript.success:
+                logger.error(f"Transcription failed: {transcript.error_message}")
+                self.signals.finished.emit(False, transcript.error_message or "Transcription failed.", duration, active_mode, app_name, active_model, "")
+                return
 
-                        if (not ok_tail or not txt_tail or not txt_tail.strip()) and offline_fallback_on:
-                            try:
-                                from app.offline.offline_engine import OfflineSpeechEngine
-                                ok_off, txt_off = OfflineSpeechEngine.transcribe_wav(tail_wav, language=primary_lang)
-                                if ok_off and txt_off and txt_off.strip():
-                                    ok_tail, txt_tail = True, txt_off
-                            except Exception as off_ex:
-                                logger.debug(f"Tail chunk offline fallback error: {off_ex}")
+            raw_result = transcript.text.strip()
+            if not raw_result:
+                logger.info("Speech transcription returned empty text.")
+                self.signals.finished.emit(True, "", duration, active_mode, app_name, transcript.model, "")
+                return
 
-                        with self._rolling_lock:
-                            if tail_idx < len(self._rolling_chunks):
-                                self._rolling_chunks[tail_idx]["text"] = txt_tail.strip() if (ok_tail and txt_tail) else ""
-                                self._rolling_chunks[tail_idx]["done"] = True
+            # 4. Voice Intent & Command Routing (All 16 Profile Categories)
+            clipboard_text = getattr(self, "_pre_recorded_selected_text", "") or ""
+            if not clipboard_text:
+                try:
+                    clipboard_text = self.text_injector.get_selected_text() or pyperclip.paste() or ""
+                except Exception:
+                    pass
 
-                    # Run tail chunk concurrently with any remaining in-flight background chunks
-                    threading.Thread(target=_transcribe_tail, daemon=True, name="TailChunkWorker").start()
+            matched_cmd_info = match_spoken_command(raw_result, selected_text=clipboard_text)
+            if matched_cmd_info is not None:
+                matched_cmd, cmd_payload = matched_cmd_info
+                logger.info(f"Voice Command Triggered: {matched_cmd.name} (Trigger: first words matched, Payload: '{cmd_payload[:60]}...')")
+                self.hud.show_state(FloatingHUD.STATE_PROCESSING, f"⚡ Command: {matched_cmd.name}...")
 
-                # Wait for in-flight rolling chunks and tail chunk with sub-second turnaround
-                t_wait_start = time.time()
-                speculative_whisper_started = False
-                while time.time() - t_wait_start < 3.2:
-                    with self._rolling_lock:
-                        all_done = all(c.get("done", False) if isinstance(c, dict) else bool(c) for c in self._rolling_chunks)
-                    if all_done:
-                        break
-
-                    # Parallel Speculative Rescue: If any chunk is taking > 1.4s, launch offline Whisper concurrently
-                    if time.time() - t_wait_start > 1.4 and not speculative_whisper_started and offline_fallback_on:
-                        speculative_whisper_started = True
-                        with self._rolling_lock:
-                            pending = [c for c in self._rolling_chunks if isinstance(c, dict) and not c.get("done", False) and c.get("wav")]
-                        for p_chunk in pending:
-                            def _rescue_chunk(chunk_ref):
-                                try:
-                                    from app.offline.offline_engine import OfflineSpeechEngine
-                                    ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(chunk_ref["wav"], language=primary_lang)
-                                    if ok_r and txt_r and txt_r.strip():
-                                        with self._rolling_lock:
-                                            if not chunk_ref.get("text"):
-                                                chunk_ref["text"] = txt_r.strip()
-                                                chunk_ref["done"] = True
-                                                chunk_ref["wav"] = None
-                                except Exception:
-                                    pass
-                            threading.Thread(target=_rescue_chunk, args=(p_chunk,), daemon=True).start()
-
-                    time.sleep(0.015)
-
-                # Zero-Loss Guarantee: Immediate local Whisper rescue for any unresolved slice
-                with self._rolling_lock:
-                    for c in self._rolling_chunks:
-                        if isinstance(c, dict) and not c.get("text") and c.get("wav") and len(c.get("wav")) > 1000:
-                            try:
-                                from app.offline.offline_engine import OfflineSpeechEngine
-                                ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(c["wav"], language=primary_lang)
-                                if ok_r and txt_r and txt_r.strip():
-                                    c["text"] = txt_r.strip()
-                                    c["done"] = True
-                                    c["wav"] = None
-                            except Exception:
-                                pass
-
-                with self._rolling_lock:
-                    total_chunks = len(self._rolling_chunks)
-                    valid_chunks = [
-                        (c["text"].strip() if isinstance(c, dict) else str(c).strip())
-                        for c in self._rolling_chunks
-                        if (isinstance(c, dict) and c.get("text") and c["text"].strip()) or (isinstance(c, str) and c.strip())
-                    ]
-
-                # 100% Completeness Guarantee:
-                # Ensure EVERY single chunk is resolved before stitching.
-                # If any chunk is still missing, immediately rescue via local Whisper AI.
-                with self._rolling_lock:
-                    for c in self._rolling_chunks:
-                        if isinstance(c, dict) and not c.get("text"):
-                            w_bytes = c.get("wav")
-                            if w_bytes and len(w_bytes) > 800:
-                                try:
-                                    from app.offline.offline_engine import OfflineSpeechEngine
-                                    ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(w_bytes, language=primary_lang)
-                                    if ok_r and txt_r and txt_r.strip():
-                                        c["text"] = txt_r.strip()
-                                        c["done"] = True
-                                        c["wav"] = None
-                                except Exception:
-                                    pass
-
-                    valid_chunks = [
-                        (c["text"].strip() if isinstance(c, dict) else str(c).strip())
-                        for c in self._rolling_chunks
-                        if (isinstance(c, dict) and c.get("text") and c["text"].strip()) or (isinstance(c, str) and c.strip())
-                    ]
-                    total_chunks = len(self._rolling_chunks)
-
-                # 100% Completeness Guarantee:
-                # If any chunk is missing, rescue it with local Whisper AI
-                missing_chunks = [c for c in self._rolling_chunks if isinstance(c, dict) and not c.get("text")]
-                if missing_chunks:
-                    logger.warning(f"Detected {len(missing_chunks)} unresolved rolling chunk(s). Rescuing with local Whisper...")
-                    for mc in missing_chunks:
-                        if mc.get("wav"):
-                            try:
-                                from app.offline.offline_engine import OfflineSpeechEngine
-                                ok_r, txt_r = OfflineSpeechEngine.transcribe_wav(mc["wav"], language=primary_lang)
-                                if ok_r and txt_r.strip():
-                                    mc["text"] = txt_r.strip()
-                                    mc["done"] = True
-                            except Exception:
-                                pass
-
-                valid_chunks = [
-                    (c["text"].strip() if isinstance(c, dict) else str(c).strip())
-                    for c in self._rolling_chunks
-                    if (isinstance(c, dict) and c.get("text") and c["text"].strip()) or (isinstance(c, str) and c.strip())
-                ]
-
-                # If still missing chunks or incomplete, run full-session audio recovery so ZERO speech is ever lost
-                if len(valid_chunks) < len(self._rolling_chunks) or not valid_chunks:
-                    logger.warning(f"Rolling assembly incomplete ({len(valid_chunks)}/{len(self._rolling_chunks)}). Running full-session recovery...")
-                    success, raw_result = self.gemini.transcribe_audio(
-                        wav_bytes=wav_bytes,
-                        system_instruction=prompt,
-                        app_context=app_context,
-                        profile_id=active_profile,
-                        auto_cost_mode=auto_cost_mode,
-                        offline_fallback_enabled=True,
-                        offline_language=primary_lang
-                    )
+                cmd_success, cmd_output = self._execute_voice_command(matched_cmd, cmd_payload, app_context)
+                if cmd_success and cmd_output:
+                    cmd_output = GeminiEngine.apply_dictionary(cmd_output, self.config.get_dictionary())
+                    self.signals.finished.emit(True, cmd_output, duration, f"Command: {matched_cmd.name}", app_name, transcript.model, raw_result)
+                    return
                 else:
-                    raw_result = GeminiEngine._stitch_chunk_transcripts(valid_chunks)
-                    raw_result = self.gemini._clean_output(raw_result)
-                    success = True
+                    logger.warning(f"Voice command execution failed ({cmd_output}). Continuing with clean dictation.")
 
-            if self._is_cancelled:
-                return
+            # 5. Post-Processing Pipeline & Hard Fidelity Gate (Phase 3)
+            from app.intelligence.post_processing import post_process_transcript
+            polish_enabled = self.config.get("grammar_polish", True)
+            voice_punct = self.config.get("voice_punctuation", True)
+            remove_fillers = self.config.get("remove_fillers", False)
 
-            if not success:
-                self.signals.finished.emit(False, raw_result or "Transcription failed.", duration, active_mode, app_name, self.gemini.last_model_used, "")
-                return
+            polish_fn = self._get_llm_polish_fn(active_model)
+            final_text = post_process_transcript(
+                raw_text=raw_result,
+                grammar_polish_enabled=polish_enabled,
+                polish_fn=polish_fn,
+                voice_punctuation=voice_punct,
+                remove_fillers=remove_fillers
+            )
 
-            # Clean silence detection (no words spoken)
-            if not raw_result or not raw_result.strip():
-                self.signals.finished.emit(True, "", duration, active_mode, app_name, self.gemini.last_model_used, "")
-                return
-
-            # 5. Voice Intent & Spoken Command Routing (All 16 Built-in Voice Command Modes)
-            clipboard_text = ""
-            try:
-                clipboard_text = self.text_injector.get_selected_text() or pyperclip.paste() or ""
-            except Exception:
-                pass
-
-            intent_res = IntentClassifier.classify(raw_result, clipboard_fallback=clipboard_text)
-            if intent_res.intent != IntentCategory.DICTATE:
-                logger.info(f"Voice Command Triggered: {intent_res.intent.value} (Trigger: '{intent_res.command_trigger}', Payload: '{intent_res.payload[:60]}...')")
-                payload = intent_res.payload.strip() if intent_res.payload else ""
-                if not payload and clipboard_text and clipboard_text.strip():
-                    payload = clipboard_text.strip()
-                payload = payload.strip().strip('"\'“”«»').strip()
-
-                if payload:
-                    trans_type = INTENT_TO_TRANSFORM_MAP.get(intent_res.intent, TransformType.IMPROVE)
-                    custom_inst = intent_res.system_instruction if (intent_res.intent in (IntentCategory.TRANSLATE, IntentCategory.FORMAT_TEXT, IntentCategory.GENERATE_CODE, IntentCategory.CREATE_PROMPT, IntentCategory.CREATE_TASK)) else ""
-                    
-                    cmd_label = intent_res.intent.value.replace("_", " ").title()
-                    exec_res = self.gemini.transform_text(
-                        raw_text=payload,
-                        transform_type=trans_type,
-                        app_context=app_context,
-                        custom_instruction=custom_inst,
-                        profile_id=active_profile
-                    )
-                    if exec_res.success and exec_res.text:
-                        final_transformed = exec_res.text
-                        if trans_type != TransformType.TECHNICAL and intent_res.intent != IntentCategory.GENERATE_CODE:
-                            final_transformed = GeminiEngine.apply_dictionary(final_transformed, self.config.get_dictionary())
-                            final_transformed = GeminiEngine.apply_snippets(final_transformed, self.config.get_snippets())
-                        
-                        model_used = exec_res.model_used or self.gemini.last_model_used or "gemini-3.5-flash-lite"
-                        self.signals.finished.emit(True, final_transformed, duration, f"Command: {cmd_label}", app_name, model_used, raw_result)
-                        return
-                    else:
-                        logger.warning(f"Voice command transformation failed ({exec_res.error_message}). Continuing with normalized dictation.")
-
-            # 6. Apply AI Polish Brain (Deduplication, Self-Corrections, 12 Tenses Grammar, Adaptive Bullets)
-            try:
-                from app.intelligence.ai_polish_brain import AIPolishBrain
-                normalized_text = AIPolishBrain.polish_speech(raw_result)
-            except Exception as pe:
-                logger.debug(f"AIPolishBrain polish exception: {pe}")
-                normalized_text = VocabEngine.normalize_text(raw_result)
-            final_text = GeminiEngine.apply_dictionary(normalized_text, self.config.get_dictionary())
+            final_text = GeminiEngine.apply_dictionary(final_text, self.config.get_dictionary())
             final_text = GeminiEngine.apply_snippets(final_text, self.config.get_snippets())
-            raw_spoken_text = final_text
 
-            model_used = self.gemini.last_model_used or "gemini-2.5-flash"
-
-            # Diagnostic Stage Instrumentation (Part 3)
-            logger.info(f"[DIAGNOSTIC] Stage 1 (Audio Capture): duration={duration:.2f}s, bytes={len(wav_bytes)}, format=16kHz mono PCM")
-            logger.info(f"[DIAGNOSTIC] Stage 2 (Raw Recognizer Output): '{raw_result}' (Model: {model_used})")
-            logger.info(f"[DIAGNOSTIC] Stage 3 (Normalized / Polished): '{normalized_text}'")
-            logger.info(f"[DIAGNOSTIC] Stage 4 (Final UI Insertion Text): '{final_text}'")
-
-            self.signals.finished.emit(True, final_text, duration, active_mode, app_name, model_used, raw_spoken_text)
+            logger.info(f"[DIAGNOSTIC] Capture={duration:.2f}s, Raw='{raw_result}', Final='{final_text}' (Model={transcript.model})")
+            self.signals.finished.emit(True, final_text, duration, active_mode, app_name, transcript.model, raw_result)
 
         except Exception as e:
             logger.error(f"Error in speech processing worker: {e}", exc_info=True)
             self.signals.finished.emit(False, f"Error: {str(e)}", duration, "clean_dictation", "General", "gemini-2.5-flash", "")
+
+    def _execute_voice_command(self, cmd, payload: str, app_context=None) -> Tuple[bool, str]:
+        """Executes a validated command via the centralized command executor."""
+        from app.commands import execute_command
+        active_model = self.config.get("model_name") or "gemini-2.5-flash"
+
+        def _llm_fn(sys_prompt: str, user_content: str, temp: float, max_tok: int) -> str:
+            if "ollama" in active_model.lower() or "gemma" in active_model.lower():
+                from app.intelligence.ollama_engine import OllamaEngine
+                full_prompt = f"{sys_prompt}\n\nUSER INPUT:\n{user_content}"
+                ok, txt = OllamaEngine.polish_text(raw_text=user_content, prompt_override=full_prompt)
+                if ok and txt:
+                    return txt
+                raise RuntimeError("Ollama local command execution failed.")
+            elif "offline" in active_model.lower() or "whisper" in active_model.lower():
+                from app.intelligence.ollama_engine import OllamaEngine
+                if OllamaEngine.is_available():
+                    full_prompt = f"{sys_prompt}\n\nUSER INPUT:\n{user_content}"
+                    ok, txt = OllamaEngine.polish_text(raw_text=user_content, prompt_override=full_prompt)
+                    if ok and txt:
+                        return txt
+                return user_content
+            else:
+                api_key = self.config.get_api_key()
+                if not api_key:
+                    raise RuntimeError("Gemini API key missing.")
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent"
+                payload_data = {
+                    "contents": [{"parts": [{"text": f"{sys_prompt}\n\nUSER INPUT:\n{user_content}"}]}],
+                    "generationConfig": {"temperature": temp, "maxOutputTokens": max_tok}
+                }
+                res = self.gemini.session.post(
+                    url,
+                    headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+                    json=payload_data,
+                    timeout=(4.0, 20.0)
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                    txt = "".join([p.get("text", "") for p in parts])
+                    return txt.strip()
+                raise RuntimeError(f"Gemini API returned status {res.status_code}")
+
+        return execute_command(cmd, payload, _llm_fn)
+
+    def _get_llm_polish_fn(self, active_model: str):
+        """Returns the LLM copy-editor function for the active model."""
+        if "offline" in active_model.lower() or "whisper" in active_model.lower():
+            from app.intelligence.ollama_engine import OllamaEngine
+            if OllamaEngine.is_available():
+                return lambda raw_chunk, prompt: OllamaEngine.polish_text(raw_text=raw_chunk, prompt_override=prompt)
+            return None
+        elif "ollama" in active_model.lower() or "gemma" in active_model.lower():
+            from app.intelligence.ollama_engine import OllamaEngine
+            return lambda raw_chunk, prompt: OllamaEngine.polish_text(raw_text=raw_chunk, prompt_override=prompt)
+        else:
+            api_key = self.config.get_api_key()
+            if not api_key:
+                return None
+            def _gemini_polish(raw_chunk: str, prompt: str) -> Tuple[bool, str]:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent"
+                payload_data = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.0, "maxOutputTokens": 2048}
+                }
+                try:
+                    res = self.gemini.session.post(
+                        url,
+                        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+                        json=payload_data,
+                        timeout=(4.0, 10.0)
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                        return True, "".join([p.get("text", "") for p in parts]).strip()
+                except Exception as e:
+                    logger.debug(f"Gemini polish request note: {e}")
+                return False, ""
+            return _gemini_polish
+
+    def retranscribe_last_recording(self):
+        """Re-transcribes the most recent audio recording on demand."""
+        target_path = getattr(self, "_last_saved_audio_path", "")
+        if not target_path or not os.path.exists(target_path):
+            orphaned = AudioRecorder.get_orphaned_recordings()
+            if orphaned:
+                target_path = str(orphaned[0])
+                self._last_saved_audio_path = target_path
+
+        if not target_path or not os.path.exists(target_path):
+            if hasattr(self, "hud") and self.hud:
+                self.hud.show_state(FloatingHUD.STATE_ERROR, "No Recording Found")
+            return
+
+        try:
+            with open(target_path, "rb") as f:
+                wav_bytes = f.read()
+            from app.transcription.chunker import get_audio_info
+            duration, _, _, _ = get_audio_info(wav_bytes)
+
+            self.is_busy_processing = True
+            self._busy_start_time = time.time()
+            if hasattr(self, "hud") and self.hud:
+                self.hud.show_state(FloatingHUD.STATE_PROCESSING, "Re-transcribing last audio...")
+            if hasattr(self, "tray") and self.tray:
+                self.tray.update_status("⚡ Re-transcribing...", state="processing")
+
+            threading.Thread(
+                target=self._process_speech_worker,
+                args=(target_path, wav_bytes, duration),
+                daemon=True
+            ).start()
+        except Exception as ex:
+            logger.error(f"Failed to re-transcribe last recording: {ex}")
+            if hasattr(self, "hud") and self.hud:
+                self.hud.show_state(FloatingHUD.STATE_ERROR, "Re-transcribe Failed")
 
     def _on_transcription_finished(
         self,
@@ -1152,7 +1100,8 @@ class GeminiFlowApp:
                 app_name=app_name,
                 model=model_used,
                 raw_text=raw_spoken_text or text_or_error,
-                prompt=text_or_error if mode == "prompt_generation" else ""
+                prompt=text_or_error if mode == "prompt_generation" else "",
+                audio_path=getattr(self, "_last_saved_audio_path", "")
             )
             if self.settings_dialog and self.settings_dialog.isVisible():
                 self.settings_dialog.notify_history_changed()

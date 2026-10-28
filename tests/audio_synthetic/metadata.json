@@ -1,0 +1,37 @@
+{
+  "clip_5s": {
+    "path": "E:\\W c One Drive\\Wisper\\tests\\audio_synthetic\\clip_5s.wav",
+    "text": "Welcome to Gemini Flow. Fast, accurate speech dictation for Windows.",
+    "duration": 6.213650793650793
+  },
+  "clip_30s": {
+    "path": "E:\\W c One Drive\\Wisper\\tests\\audio_synthetic\\clip_30s.wav",
+    "text": "Welcome to Gemini Flow. This is an end to end verification test of our speech recognition engine. We are validating that thirty seconds of spoken English audio is transcribed accurately from the first word to the last word without any truncation or dropped sentences. Every single word in this paragraph must be captured with high fidelity, proper punctuation, and complete grammar. Modern voice workflows demand rock solid stability and zero data loss on Windows desktop.",
+    "duration": 30.313786848072564
+  },
+  "clip_60s": {
+    "path": "E:\\W c One Drive\\Wisper\\tests\\audio_synthetic\\clip_60s.wav",
+    "text": "This is a one minute benchmark audio recording designed to measure offline Whisper performance and coverage. We need to ensure that the entire transcript from the beginning of the sentence to the very end of the paragraph is captured with zero truncation. When building production software on Windows, stability and fidelity are paramount. Whether dictating emails, writing documentation, or authoring code, every single word matters. The system processes speech continuously in real time, preserving all critical context. In addition, our architecture leverages polyphase resampling, unbounded queuing, and silence aligned chunking to guarantee that long form continuous speech never suffers from buffer overflows or arbitrary timeouts. As we approach the end of this sixty second test, the audio engine continues capturing every acoustic detail with pristine clarity and high signal to noise ratio.",
+    "duration": 57.94299319727891
+  },
+  "clip_120s": {
+    "path": "E:\\W c One Drive\\Wisper\\tests\\audio_synthetic\\clip_120s.wav",
+    "text": "This is an extended two minute stress test for the Gemini Flow dictation architecture. In modern knowledge work, professionals frequently dictate long form memos, technical architecture reviews, and comprehensive meeting summaries without pause. A common flaw in legacy speech applications is buffer overrun or premature timeout truncation, where only the first thirteen seconds of a thirty second speech are captured. Gemini Flow completely eliminates this failure mode through unbounded streaming queues, high fidelity polyphase resampling, and silence aligned audio chunking with longest common substring deduplication. Furthermore, all dictation text is treated strictly as data rather than instructions. This guarantees that speaking prompts or commands never causes unexpected actions or hallucinations. Whether running offline on CPU with INT8 quantization or online via the Gemini API, the final output retains complete fidelity from the very first word to the very last word. In the second minute of continuous dictation, we observe how memory usage remains constant and how CPU utilization remains predictable across multiple threads. The underlying ctranslate2 engine handles acoustic feature extraction and beam search decoding with optimal numerical stability. Punctuation marks, capitalization, and numbers are correctly restored. No audio frames are dropped, no tail segments are abandoned, and the final transcript matches the spoken audio. As this comprehensive two minute benchmark concludes, all background worker threads terminate cleanly and deliver the verified transcript to the user interface.",
+    "duration": 105.09455782312925
+  },
+  "clip_numbers_code": {
+    "path": "E:\\W c One Drive\\Wisper\\tests\\audio_synthetic\\clip_numbers_code.wav",
+    "text": "Project update for 2026. The total cost is $1,500 with 18% tax. We benchmarked the Python API using snake case functions and camel case variables. The constant pi is approximately 3.14. All tests passed.",
+    "duration": 20.420952380952382
+  },
+  "silence_10s": {
+    "path": "E:\\W c One Drive\\Wisper\\tests\\audio_synthetic\\silence_10s.wav",
+    "text": "",
+    "duration": 10.0
+  },
+  "noise_10s": {
+    "path": "E:\\W c One Drive\\Wisper\\tests\\audio_synthetic\\noise_10s.wav",
+    "text": "",
+    "duration": 10.0
+  }
+}

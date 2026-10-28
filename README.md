@@ -258,6 +258,20 @@ Gemini Flow's modular architecture operates across four synchronized execution t
 
 ## 🚀 Step-by-Step Implementation & Setup Guide
 
+### 📦 Clean PC Release Package (Zero Python, Zero Requirements)
+If you want to run Gemini Flow on **any clean Windows 10/11 laptop or PC without installing Python, Git, or anything else**:
+
+1. Download **`Gemini_Flow_Setup_Full.zip`** from `dist/` (or your release bundle).
+2. Extract the ZIP archive to your desired location.
+3. Run either:
+   * **`Gemini_Flow_Setup_Full.exe`** — The full setup wizard that installs Gemini Flow to `%LOCALAPPDATA%\Programs\GeminiFlow`, creates Desktop & Start Menu shortcuts, and configures an uninstaller in Windows Settings.
+   * **`Gemini_Flow.exe`** — Portable standalone mode. Double-click and start dictating immediately with zero installation!
+4. Press **`Ctrl + Space`** anywhere in Windows to start/stop dictating!
+
+---
+
+### 💻 Developer Setup (Running from Source)
+
 Anyone in the world can clone or download Gemini Flow and get the exact same premium experience in minutes. Follow this setup guide:
 
 ### Step 1: Prerequisites

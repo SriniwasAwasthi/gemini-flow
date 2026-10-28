@@ -7,7 +7,7 @@ import time
 import logging
 from enum import Enum
 from dataclasses import dataclass
-from typing import Optional, List, Callable, Tuple, Any
+from typing import Optional, List, Callable, Tuple, Any, Dict
 
 import pyperclip
 
@@ -45,17 +45,19 @@ class ExecutionResult:
 
 
 AUDIO_FALLBACK_CHAINS = {
-    "gemini-3.5-transcribe": ["gemini-3.5-transcribe", "gemini-3.5-flash-lite"],
-    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-3.5-transcribe"],
-    "auto": ["gemini-3.5-transcribe", "gemini-3.5-flash-lite"],
+    "gemini-2.5-flash": ["gemini-2.5-flash", "gemini-3.5-flash-lite", "offline-whisper"],
+    "gemini-3.5-flash": ["gemini-2.5-flash", "gemini-3.5-flash-lite", "offline-whisper"],
+    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "offline-whisper"],
+    "auto": ["gemini-2.5-flash", "gemini-3.5-flash-lite", "offline-whisper"],
     "offline-whisper": ["offline-whisper"],
     "ollama-gemma2": ["ollama-gemma2", "offline-whisper"]
 }
 
 TEXT_FALLBACK_CHAINS = {
-    "gemini-3.5-transcribe": ["gemini-3.5-transcribe", "gemini-3.5-flash-lite"],
-    "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-3.5-transcribe"],
-    "auto": ["gemini-3.5-transcribe", "gemini-3.5-flash-lite"],
+    "gemini-2.5-flash": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-gemma2"],
+    "gemini-3.5-flash": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-gemma2"],
+    "gemini-3.5-flash-lite": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-gemma2"],
+    "auto": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-gemma2"],
     "offline-whisper": ["offline-whisper"],
     "ollama-gemma2": ["ollama-gemma2"]
 }
@@ -65,13 +67,14 @@ MODEL_FALLBACK_CHAINS = AUDIO_FALLBACK_CHAINS
 
 class FallbackHandler:
     """Manages resilient execution of Gemini API requests with automatic model fallback."""
+    _rate_limited_models: Dict[str, float] = {}
 
     @staticmethod
     def get_fallback_chain(primary_model: str, is_audio: bool = True) -> List[str]:
         if is_audio:
-            return AUDIO_FALLBACK_CHAINS.get(primary_model, [primary_model, "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"])
+            return AUDIO_FALLBACK_CHAINS.get(primary_model, [primary_model, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"])
         else:
-            return TEXT_FALLBACK_CHAINS.get(primary_model, [primary_model, "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-2.5-flash"])
+            return TEXT_FALLBACK_CHAINS.get(primary_model, [primary_model, "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.5-flash"])
 
     @staticmethod
     def classify_error(status_code: int, error_text: str) -> Tuple[APIErrorType, str]:
@@ -133,11 +136,22 @@ class FallbackHandler:
         fallback_occurred = False
         fallback_reason = None
 
-        cutoff_sec = 2.0 if is_audio else 10.0
+        cutoff_sec = 35.0 if is_audio else 18.0
+        now = time.time()
+
         for idx, model in enumerate(models_to_try):
-            # Short-circuit if overall elapsed time exceeds cutoff so offline Whisper engine takes over if cloud is unresponsive
+            # Check rate limit cooldown: if model was rate-limited in last 10 minutes and alternatives exist, skip it
+            if model in cls._rate_limited_models:
+                cooldown_left = 300.0 - (now - cls._rate_limited_models[model])
+                if cooldown_left > 0 and idx + 1 < len(models_to_try):
+                    logger.info(f"Model {model} is on rate-limit cooldown ({cooldown_left:.0f}s left). Skipping to next model: {models_to_try[idx+1]}")
+                    fallback_occurred = True
+                    continue
+                elif cooldown_left <= 0:
+                    del cls._rate_limited_models[model]
+
             if time.time() - start_overall > cutoff_sec:
-                logger.warning(f"Fallback search reached {time.time() - start_overall:.2f}s (>{cutoff_sec}s cutoff). Short-circuiting to trigger fast offline fallback.")
+                logger.warning(f"Fallback search reached {time.time() - start_overall:.2f}s (>{cutoff_sec}s cutoff). Terminating cloud attempts.")
                 break
 
             if idx > 0 and not fallback_occurred:
@@ -159,7 +173,6 @@ class FallbackHandler:
                         )
                     else:
                         last_error_msg = text_or_err
-                        # Parse status code if in format "Gemini API Error (XYZ): ..."
                         status_code = 0
                         import re
                         m = re.search(r'\((\d{3})\)', text_or_err)
@@ -168,37 +181,38 @@ class FallbackHandler:
 
                         err_type, friendly_msg = cls.classify_error(status_code, text_or_err)
 
-                        # For audio dictation, if ANY cloud failure occurs (429, 503, 500, Timeout), abort cloud retries immediately (< 50ms)
-                        # so pre-warmed local Whisper AI takes over instantly, maintaining the < 2s user latency SLA
-                        if is_audio and (err_type in (APIErrorType.RATE_LIMIT_429, APIErrorType.TIMEOUT, APIErrorType.SERVER_UNAVAILABLE_503, APIErrorType.INTERNAL_SERVER_ERROR_500) or status_code in (429, 503, 500)):
-                            logger.warning(f"Audio cloud error {status_code or err_type.value} on {model}. Aborting cloud retries for immediate local Whisper failover.")
-                            fallback_reason = FallbackReason(
-                                original_model=primary_model,
-                                fallback_model="Offline Local Speech (Whisper AI)",
-                                error_type=err_type,
-                                user_message=friendly_msg
-                            )
-                            return ExecutionResult(
-                                success=False,
-                                text="",
-                                model_used=model,
-                                fallback_occurred=True,
-                                fallback_reason=fallback_reason,
-                                latency_seconds=time.time() - start_overall,
-                                retries_attempted=retries_count,
-                                error_message=friendly_msg
-                            )
+                        # If rate-limited (429) or quota exceeded, check if daily quota exhausted
+                        is_daily_quota = any(q in text_or_err.lower() for q in ("per day", "free_tier", "daily", "free tier"))
+                        if is_daily_quota:
+                            cls._rate_limited_models[model] = time.time()
+                            logger.info(f"Daily quota reached on {model}. Fast failover immediately to next model.")
+                            if idx + 1 < len(models_to_try):
+                                fallback_reason = FallbackReason(
+                                    original_model=primary_model,
+                                    fallback_model=models_to_try[idx + 1],
+                                    error_type=err_type,
+                                    user_message=friendly_msg
+                                )
+                            break
 
-                        # Instant failover to next model on 429, 503, 500, Timeout, 404, empty transcript, or unsupported model
-                        if err_type != APIErrorType.INVALID_KEY and (err_type in (APIErrorType.RATE_LIMIT_429, APIErrorType.SERVER_UNAVAILABLE_503, APIErrorType.TIMEOUT, APIErrorType.INTERNAL_SERVER_ERROR_500) or status_code in (404, 400, 500, 503, 429) or "not found" in text_or_err.lower() or "timeout" in text_or_err.lower() or "empty" in text_or_err.lower()) and idx + 1 < len(models_to_try):
-                            logger.warning(f"Model {model} returned {status_code or err_type.value}. Instant fast failover to {models_to_try[idx + 1]}.")
-                            fallback_reason = FallbackReason(
-                                original_model=primary_model,
-                                fallback_model=models_to_try[idx + 1],
-                                error_type=err_type,
-                                user_message=friendly_msg
-                            )
-                            break  # Move to next model immediately
+                        if err_type == APIErrorType.RATE_LIMIT_429 or status_code == 429:
+                            if attempt + 1 < max_retries_per_model:
+                                sleep_time = 1.0 * (attempt + 1)
+                                logger.info(f"Rate limit (429) on {model}. Backing off {sleep_time:.1f}s before retry...")
+                                time.sleep(sleep_time)
+                                retries_count += 1
+                                continue
+                            else:
+                                cls._rate_limited_models[model] = time.time()
+                                logger.warning(f"Model {model} exhausted rate-limit retries. Fast failover to next model.")
+                                if idx + 1 < len(models_to_try):
+                                    fallback_reason = FallbackReason(
+                                        original_model=primary_model,
+                                        fallback_model=models_to_try[idx + 1],
+                                        error_type=err_type,
+                                        user_message=friendly_msg
+                                    )
+                                break
 
                         # If invalid API key, fail out completely
                         if err_type == APIErrorType.INVALID_KEY:
@@ -211,28 +225,28 @@ class FallbackHandler:
                                 retries_attempted=retries_count
                             )
 
-                        # On 500/503/Timeout: retry with exponential backoff if time permits
+                        # Instant failover to next model on 503, 500, Timeout, 404, or empty transcript
+                        if idx + 1 < len(models_to_try):
+                            logger.warning(f"Model {model} returned {status_code or err_type.value}. Instant fast failover to {models_to_try[idx + 1]}.")
+                            fallback_reason = FallbackReason(
+                                original_model=primary_model,
+                                fallback_model=models_to_try[idx + 1],
+                                error_type=err_type,
+                                user_message=friendly_msg
+                            )
+                            break  # Proceed to next model immediately
+
+                        # If this is the last model and attempts remain, quick retry
                         if attempt < max_retries_per_model - 1:
                             if time.time() - start_overall >= cutoff_sec:
                                 break
                             retries_count += 1
-                            backoff = min(0.3 * (2 ** attempt), max(0.1, cutoff_sec - (time.time() - start_overall)))
-                            logger.info(f"Retrying {model} in {backoff:.2f}s due to: {friendly_msg}")
-                            time.sleep(backoff)
-                        else:
-                            fallback_reason = FallbackReason(
-                                original_model=primary_model,
-                                fallback_model=models_to_try[idx + 1] if idx + 1 < len(models_to_try) else "none",
-                                error_type=err_type,
-                                user_message=friendly_msg
-                            )
-
+                            time.sleep(0.2)
                 except Exception as ex:
                     last_error_msg = str(ex)
-                    retries_count += 1
-                    if time.time() - start_overall >= 12.0:
+                    logger.warning(f"Exception during {model} call: {ex}")
+                    if idx + 1 < len(models_to_try):
                         break
-                    time.sleep(0.2)
 
         elapsed = time.time() - start_overall
         _, friendly_final = cls.classify_error(0, last_error_msg)

@@ -51,72 +51,43 @@ class VocabularyEntry:
 
 DEFAULT_VOCABULARY = [
     {
-        "canonical_term": "Sriniwas Awasthi",
-        "aliases": [
-            "Srinivas Awasthi", "Sriniwas Awasti", "Srinivas Awasti", "Srinivas Avasthi",
-            "Sriniwas Avasthi", "Sri Srinivas Awasthi", "Sri Sriniwas Awasthi", "Sri Srinivas",
-            "seeing what's up, Steve", "seeing what's up Steve", "seeing whats up steve",
-            "see what's up steve", "seeing what's up, steve", "Srin was of us 3",
-            "Srin was of us three", "Shriniwas Awasthi", "Shreeniwas Awasthi",
-            "Shrinivas Awasthi", "Shreenivas Awasthi", "I am sitting", "I'm sitting", "sitting was", "sitting wash", "sitting with", "seeing was"
-        ],
-        "category": "Personal",
-        "enabled": True,
-        "notes": "Full user name"
-    },
-    {
-        "canonical_term": "Sriniwas",
-        "aliases": ["Srinivas", "Shrinivas", "Shriniwas", "Shreeniwas", "Shreenivas", "sitting was", "sitting wash", "sitting with", "seeing was"],
-        "category": "Personal",
-        "enabled": True,
-        "notes": "First name"
-    },
-    {
-        "canonical_term": "Awasthi",
-        "aliases": ["Avasthi", "Awasti", "Avasti"],
-        "category": "Personal",
-        "enabled": True,
-        "notes": "Last name"
-    },
-    {
         "canonical_term": "Antigravity",
-        "aliases": [
-            "anti gravity", "anti-gravity", "cluster advantage is integrated",
-            "advantage is integrated"
-        ],
+        "aliases": ["anti gravity", "anti-gravity"],
         "category": "Project",
         "enabled": True,
-        "notes": "Flagship Antigravity Agent & IDE Project"
+        "notes": "Flagship Antigravity Agent and IDE Project"
+    },
+    {
+        "canonical_term": "Faster-Whisper",
+        "aliases": ["fast whisper", "faster whisper"],
+        "category": "Project",
+        "enabled": True,
+        "notes": "On-device Whisper STT"
+    },
+    {
+        "canonical_term": "Ollama",
+        "aliases": ["olama"],
+        "category": "Project",
+        "enabled": True,
+        "notes": "Local LLM runtime"
     },
     {
         "canonical_term": "Wispr Flow",
-        "aliases": [
-            "Whisper flow", "Wisper flow", "whisper flow"
-        ],
+        "aliases": ["Wisper Flow", "whisper flow", "Wisper flow"],
         "category": "Project",
         "enabled": True,
-        "notes": "Wispr Flow Desktop Application"
-    },
-    {
-        "canonical_term": "Wispr",
-        "aliases": [
-            "Wisper",
-            "changes in the workflow", "changes in workflow"
-        ],
-        "category": "Project",
-        "enabled": True,
-        "notes": "Application inspiration brand"
+        "notes": "Voice AI Application"
     },
     {
         "canonical_term": "Gemini Flow",
-        "aliases": ["gemini flow", "GeminiFlow", "gemini-flow", "gemini flow app"],
+        "aliases": ["gemini flow", "GeminiFlow", "gemini-flow"],
         "category": "Project",
         "enabled": True,
-        "notes": "Gemini Flow Desktop Voice AI Application"
+        "notes": "Desktop Voice AI Application"
     },
     {
         "canonical_term": "API key",
-        "aliases": ["api key", "an api key", "API keys", "apiKey"],
+        "aliases": ["api key", "apiKey"],
         "category": "Technical",
         "enabled": True,
         "notes": "Application API key"
@@ -360,7 +331,10 @@ class VocabularyEngine:
         Constructs a concise acoustic priming prompt tuned for Whisper's decoder.
         Keeps prompt under 15 tokens to prevent decoder slowdown.
         """
-        return "Vocabulary: Sriniwas Awasthi, Sriniwas, Gemini Flow, Antigravity, Wispr, API key."
+        active = [e.canonical_term for e in self.entries if e.enabled and e.category != "Personal"]
+        if active:
+            return "Vocabulary: " + ", ".join(active[:4]) + "."
+        return "Clean speech dictation, proper grammar, accurate punctuation."
 
     format_prompt_injection = get_prompt_injection
     save = save_vocabulary
@@ -483,33 +457,8 @@ class VocabularyEngine:
         if not re.search(r'\b(?:my name is|call me|introduce myself)\b', result, re.IGNORECASE):
             result = re.sub(r'[\s,\.]+(?:I am|This is|My name is)\s+Sriniwas\s*(?:Awasthi)?[\.\?!]?\s*$', '.', result, flags=re.IGNORECASE)
 
-        # Pass 1: Common phonetic acoustic confusion corrections
-        result = re.sub(r'^\s*Oh,?\s+(?=hey|hello|hi)\b', '', result, flags=re.IGNORECASE)
-        result = re.sub(r'\bpass(?:ed)?\s+the\s+neutral\b', 'personal', result, flags=re.IGNORECASE)
-        result = re.sub(r'\bpast\s+neutral\b', 'personal', result, flags=re.IGNORECASE)
-        if re.search(r'\b(?:github|git|repo|repository|code|push|zip)\b', result, re.IGNORECASE):
-            result = re.sub(r'\bimportant\s+quotes\b', 'important codes', result, flags=re.IGNORECASE)
-
-        # Acoustic confusions for user name & product terms
-        result = re.sub(r'(\b(?:hey|hello|hi)[,.\s]+)(?:I\'?m|I\s+am)\s+sitting\b', r"\1I'm Sriniwas Awasthi", result, flags=re.IGNORECASE)
-        result = re.sub(r'\b(?:I\'?m\s+|I\s+am\s+)?sitting\s+was\b', "I'm Sriniwas", result, flags=re.IGNORECASE)
-        result = re.sub(r'\bsitting\s+was\b', "Sriniwas", result, flags=re.IGNORECASE)
-        result = re.sub(r'\bsitting\s+wash\b', "Sriniwas", result, flags=re.IGNORECASE)
-        result = re.sub(r'\bsitting\s+with\b', "Sriniwas", result, flags=re.IGNORECASE)
-        result = re.sub(r'\b(?:I\'?m|I\s+am)\s+sitting\s+(?=was|how|and|today|\.)', "I'm Sriniwas Awasthi ", result, flags=re.IGNORECASE)
-        result = re.sub(r'\b(?:I\'?m|I\s+am)\s+sitting\s*$', "I'm Sriniwas Awasthi", result, flags=re.IGNORECASE)
-        result = re.sub(r"\b(?:I'?m\s+|I\s+am\s+)?seeing\s+what'?s\s+up,?\s+steve\b", "I'm Sriniwas Awasthi", result, flags=re.IGNORECASE)
-        result = re.sub(r"\bsee\s+what'?s\s+up,?\s+steve\b", "Sriniwas Awasthi", result, flags=re.IGNORECASE)
-        result = re.sub(r"\bcluster\s+advantage\s+is\s+integrated\b", "Antigravity", result, flags=re.IGNORECASE)
-        result = re.sub(r"\badvantage\s+is\s+integrated\b", "Antigravity", result, flags=re.IGNORECASE)
-        result = re.sub(r"\bchanges\s+in\s+the\s+workflow\b", "changes in Wispr", result, flags=re.IGNORECASE)
-        result = re.sub(r"\bchanges\s+in\s+workflow\b", "changes in Wispr", result, flags=re.IGNORECASE)
-        result = re.sub(r"\bSrin\s+was\s+of\s+us\s+(?:3|three)\b", "Sriniwas Awasthi", result, flags=re.IGNORECASE)
-        result = re.sub(r'\bused one (?:new )?API key(?:\s*,?\s*I have just created one new(?:\s+API(?:\s+key)?)?)?\b', 'used one API key', result, flags=re.IGNORECASE)
-        result = re.sub(r'\bI have just created one new(?:\s+API(?:\s+key)?)?\b', '', result, flags=re.IGNORECASE)
-        result = re.sub(r'\bIt\'?s\s+10\.20(?!\d)\.?\s*Today\b', "It's 10:20 a.m., and today", result, flags=re.IGNORECASE)
-        result = re.sub(r'\bIt\'?s\s+10\.20(?!\d)\.?\b', "It's 10:20 a.m.", result, flags=re.IGNORECASE)
-
+        # Pass 1: Clean punctuation and whitespace corrections
+        result = re.sub(r'^\s*Oh,?\s+(?=hey|hello|hi)', '', result, flags=re.IGNORECASE)
         # Pass 2: Eliminate mid-sentence stray greetings / mic-checks (e.g. '. Hello. And also...')
         result = re.sub(r'(?<=[.!?])\s*(?:hello|hi|hey|testing|mic check)[.!?]?\s+(?=[A-Z])', ' ', result, flags=re.IGNORECASE)
 
