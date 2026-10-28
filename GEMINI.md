@@ -15,7 +15,7 @@ Whenever requested to create, script, or automate a walkthrough video or LinkedI
    - Never obscure more than 15-20% of the screen with overlay boxes.
 
 4. **Live Credential Typing Simulation**:
-   - First type mock invalid key in visible plain text (`AIzaSyD987_invalid_mock_key_demo_test_999`) -> click Test Save (red glow) -> red failure message.
+   - First type mock invalid key in visible plain text (`AIzaSy_MOCK_INVALID_KEY_DEMO_TEST_999`) -> click Test Save (red glow) -> red failure message.
    - Clear field -> type real key securely masked with bullet dots (`••••••••••••••••••••`) -> click Test Save (green glow) -> green verified active message.
    - Never expose real credentials in plain text.
 

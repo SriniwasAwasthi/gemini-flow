@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-28 20:59:36",
+  "timestamp": "2026-10-28 22:29:33",
   "total_tests": 27,
   "passed": 27,
   "failed": 0,
@@ -10,7 +10,7 @@
       "category": "Zero Truncation",
       "name": "Audio Duration: 6.2s | Model: offline-whisper",
       "passed": true,
-      "duration": 13.682,
+      "duration": 11.159,
       "details": {
         "audio_seconds": 6.21,
         "covered_seconds": 5.6,
@@ -24,7 +24,7 @@
       "category": "Zero Truncation",
       "name": "Audio Duration: 30.3s | Model: offline-whisper",
       "passed": true,
-      "duration": 28.507,
+      "duration": 21.84,
       "details": {
         "audio_seconds": 30.31,
         "covered_seconds": 29.46,
@@ -38,7 +38,7 @@
       "category": "Zero Truncation",
       "name": "Audio Duration: 57.9s | Model: offline-whisper",
       "passed": true,
-      "duration": 54.292,
+      "duration": 40.787,
       "details": {
         "audio_seconds": 57.94,
         "covered_seconds": 57.16,
@@ -52,7 +52,7 @@
       "category": "Zero Truncation",
       "name": "Audio Duration: 105.1s | Model: offline-whisper",
       "passed": true,
-      "duration": 81.838,
+      "duration": 70.723,
       "details": {
         "audio_seconds": 105.09,
         "covered_seconds": 104.38,
@@ -66,7 +66,7 @@
       "category": "High Fidelity & WER",
       "name": "Fidelity Verification: clip_30s",
       "passed": true,
-      "duration": 28.118,
+      "duration": 29.188,
       "details": {
         "wer": "4.00%",
         "wer_val": 0.04,
@@ -80,7 +80,7 @@
       "category": "High Fidelity & WER",
       "name": "Fidelity Verification: clip_60s",
       "passed": true,
-      "duration": 53.169,
+      "duration": 52.581,
       "details": {
         "wer": "4.55%",
         "wer_val": 0.0455,
@@ -94,7 +94,7 @@
       "category": "High Fidelity & WER",
       "name": "Fidelity Verification: clip_numbers_code",
       "passed": true,
-      "duration": 6.985,
+      "duration": 5.111,
       "details": {
         "wer": "0.00%",
         "wer_val": 0.0,
@@ -108,7 +108,7 @@
       "category": "Zero Hallucination",
       "name": "Input: Silence 10S",
       "passed": true,
-      "duration": 0.002,
+      "duration": 0.001,
       "details": {
         "detected_text": "",
         "is_clean_silence": true
@@ -119,7 +119,7 @@
       "category": "Zero Hallucination",
       "name": "Input: Noise 10S",
       "passed": true,
-      "duration": 0.107,
+      "duration": 0.073,
       "details": {
         "detected_text": "",
         "is_clean_silence": true
@@ -130,7 +130,7 @@
       "category": "Profile Voice Commands",
       "name": "#1 Professionalize (Trigger: 'make this professional')",
       "passed": true,
-      "duration": 0.048,
+      "duration": 0.036,
       "details": {
         "matched_start": true,
         "ignored_middle": true,
@@ -182,7 +182,7 @@
       "category": "Profile Voice Commands",
       "name": "#5 Fix Grammar (Trigger: 'fix grammar')",
       "passed": true,
-      "duration": 0.004,
+      "duration": 0.003,
       "details": {
         "matched_start": true,
         "ignored_middle": true,
@@ -195,7 +195,7 @@
       "category": "Profile Voice Commands",
       "name": "#6 Shorten / Concise (Trigger: 'make this shorter')",
       "passed": true,
-      "duration": 0.046,
+      "duration": 0.037,
       "details": {
         "matched_start": true,
         "ignored_middle": true,
@@ -234,7 +234,7 @@
       "category": "Profile Voice Commands",
       "name": "#9 Translate (Trigger: 'translate this to')",
       "passed": true,
-      "duration": 0.001,
+      "duration": 0.0,
       "details": {
         "matched_start": true,
         "ignored_middle": true,
@@ -338,7 +338,7 @@
       "category": "Debounce & Stability",
       "name": "Rapid 10x Hotkey Toggles in 1s",
       "passed": true,
-      "duration": 6.612,
+      "duration": 5.916,
       "details": {
         "toggles_executed": 10,
         "error": "None"
@@ -349,7 +349,7 @@
       "category": "DSP No-Regression",
       "name": "Raw Capture vs 80Hz High-Pass Filter",
       "passed": true,
-      "duration": 47.907,
+      "duration": 43.792,
       "details": {
         "wer_raw": "4.00%",
         "wer_dsp": "6.67%",
