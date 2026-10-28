@@ -4,6 +4,7 @@ Handles settings persistence, JSON storage, dictionary mappings, snippets, and h
 """
 import os
 import sys
+import time
 import json
 import logging
 from pathlib import Path
@@ -11,11 +12,39 @@ from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("GeminiFlow.Config")
 
-APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow"
-APP_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow"
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    APP_DIR = Path(__file__).parent.parent / "recordings"
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+
+RECORDINGS_DIR = APP_DIR / "recordings"
+try:
+    RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    RECORDINGS_DIR = Path(__file__).parent.parent / "recordings"
+    RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+
+WORKSPACE_RECORDINGS_DIR = Path(__file__).parent.parent / "recordings"
+try:
+    WORKSPACE_RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 CONFIG_FILE = APP_DIR / "config.json"
 HISTORY_FILE = APP_DIR / "history.json"
+
+# Load environment variables (.env) from project root if available
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).parent.parent / ".env"
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path, override=True)
+    else:
+        load_dotenv(override=True)
+except Exception:
+    pass
 
 
 def sanitize_api_key(raw_key: Any) -> str:
@@ -64,7 +93,7 @@ DEFAULT_PROMPTS = {
         "   - Continuous Narrative: When the speaker is conveying ordinary conversational sentences, explanations, or continuous narrative, format as clean, flowing paragraphs with natural double-newline paragraph breaks.\n"
         "   - Spoken Formatting Commands: If the speaker explicitly says formatting or punctuation commands ('bullet point', 'new line', 'next line', 'colon', 'semicolon', 'comma', 'period', 'question mark'), immediately apply that exact formatting and symbol.\n"
         "4. Strict Vocabulary & Verb Integrity (NEVER Substitute Words): You MUST transcribe the EXACT verbs, nouns, and terminology spoken by the user. NEVER substitute verbs with synonyms: when the user says 'analyze', you MUST transcribe 'analyze' (NEVER substitute with 'list' or 'enumerate'). When the user says 'localhost', transcribe 'localhost' (NEVER substitute with 'token' or 'server'). When the user says 'in my Chrome', transcribe 'in my Chrome' (NEVER rephrase into an action command like 'Opening Chrome' or split with an unintended period).\n"
-        "5. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY if explicitly spoken. Under NO circumstances should you inject, assume, or append personal names, greetings, or sign-offs (e.g. NEVER append 'I am Sriniwas Awasthi' or any personal signature) that were not uttered in this audio.\n"
+        "5. Proper Name Integrity & Zero Unsolicited Injection: Transcribe proper nouns and names accurately ONLY as explicitly spoken in the audio. Never substitute spoken names with other names. Under NO circumstances should you inject, assume, alter, or append personal names, greetings, or signatures that were not uttered in the audio.\n"
         "6. Universal Accent, Tense & Grammar Intelligence: The speaker or general public may speak with varied international accents, regional cadence, non-native phrasing, or mixed tenses (mixing past, present, and future). Decipher the intended meaning and seamlessly polish spoken grammar, irregular verb agreements, and tense consistency natively across past, present, and future tenses in the spoken language, while preserving 100% of the user's intended thoughts, vocabulary, verbs, numbers, specifics, and technical terms. Automatically insert proper commas (,), periods (.), question marks (?), exclamation marks (!), quotation marks (\"...\"), semicolons (;), colons (:), and capitalization naturally based on speech pauses and clause boundaries.\n"
         "7. No Code Fences or Code Formatting for Normal Speech: Do NOT wrap sentences in Markdown code blocks (```) or treat normal speech as code generation. Only format code if the speaker explicitly dictates programming syntax or commands 'code block'.\n"
         "8. 100% Transcription Completeness & Zero Omissions: You MUST transcribe 100% of all spoken concepts, syllabus items, textbook definitions, technical lists, and ideas from the audio. Never summarize, condense, truncate, or omit any spoken topic, no matter how long the speech is.\n"
@@ -198,35 +227,17 @@ GOLDEN_ANCHOR_EXAMPLES = """--- 22 FEW-SHOT GOLDEN ANCHOR DEMONSTRATIONS ---
 
 
 DEFAULT_DICTIONARY = [
-    {"spoken": "Srinivas Awasthi", "replacement": "Sriniwas Awasthi"},
-    {"spoken": "Srinivas Avasthi", "replacement": "Sriniwas Awasthi"},
-    {"spoken": "Sri Srinivas Awasthi", "replacement": "Sriniwas Awasthi"},
-    {"spoken": "Srinivas", "replacement": "Sriniwas"},
-    {"spoken": "Shrinivas", "replacement": "Sriniwas"},
-    {"spoken": "fast whisper", "replacement": "Faster-Whisper"},
-    {"spoken": "olama", "replacement": "Ollama"},
-    {"spoken": "Avasthi", "replacement": "Awasthi"},
-    {"spoken": "Shriniwas", "replacement": "Sriniwas"},
-    {"spoken": "Shreeniwas", "replacement": "Sriniwas"},
-    {"spoken": "Shreenivas", "replacement": "Sriniwas"},
-    {"spoken": "Wisper", "replacement": "Wispr"},
-    {"spoken": "the whisper", "replacement": "Wispr"},
-    {"spoken": "whisper", "replacement": "Wispr"},
-    {"spoken": "hold data under", "replacement": "whole data under"},
-    {"spoken": "hold data", "replacement": "whole data"},
     {"spoken": "Javascript", "replacement": "JavaScript"},
     {"spoken": "Typescript", "replacement": "TypeScript"},
     {"spoken": "Github", "replacement": "GitHub"},
     {"spoken": "local host", "replacement": "localhost"},
-    {"spoken": "list all the things", "replacement": "analyze all the things"},
-    {"spoken": "Opening Chrome", "replacement": "in my Chrome"},
-    {"spoken": "Pass the neutral details", "replacement": "personal details"},
-    {"spoken": "pass the neutral details", "replacement": "personal details"},
-    {"spoken": "past neutral details", "replacement": "personal details"},
-    {"spoken": "Pass the neutral", "replacement": "personal"},
-    {"spoken": "pass the neutral", "replacement": "personal"},
-    {"spoken": "past neutral", "replacement": "personal"},
-    {"spoken": "important quotes", "replacement": "important codes"}
+    {"spoken": "fast whisper", "replacement": "Faster-Whisper"},
+    {"spoken": "faster whisper", "replacement": "Faster-Whisper"},
+    {"spoken": "olama", "replacement": "Ollama"},
+    {"spoken": "gemini flow", "replacement": "Gemini Flow"},
+    {"spoken": "antigravity", "replacement": "Antigravity"},
+    {"spoken": "pytorch", "replacement": "PyTorch"},
+    {"spoken": "leetcode", "replacement": "LeetCode"},
 ]
 
 DEFAULT_SNIPPETS = [
@@ -274,8 +285,8 @@ DEFAULT_SAVED_PROMPTS = [
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "api_key": "",
-    "model_name": "gemini-3.5-transcribe",
-    "model_mode": "gemini-3.5-transcribe",
+    "model_name": "auto",
+    "model_mode": "auto",
     "active_profile": "casual",
     "hotkey": "<ctrl>+<space>",
     "hotkey_display": "Ctrl + Space",
@@ -303,7 +314,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "mode_preset": "clean_dictation",
     "custom_prompt": "",
     "saved_prompts": DEFAULT_SAVED_PROMPTS,
-    "custom_vocabulary": ["Sriniwas Awasthi", "Sriniwas", "Awasthi", "Gemini Flow", "Wispr", "localhost", "PyTorch", "LeetCode", "TypeScript"],
+    "custom_vocabulary": ["Gemini Flow", "Faster-Whisper", "Ollama", "Wispr Flow", "localhost", "PyTorch", "LeetCode", "TypeScript"],
     "dictionary": DEFAULT_DICTIONARY,
     "snippets": DEFAULT_SNIPPETS,
     "input_device_index": None,
@@ -327,8 +338,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     },
     "auto_cost_mode": True,
     "auto_prompt_conversion": False,  # If False, voice dictation outputs clean verbatim text everywhere
-    "dsp_fan_filter_enabled": True,  # 85 Hz Butterworth High-Pass Filter for AC & Ceiling Fan Hum
-    "dsp_noise_gate_enabled": False,  # Disabled by default so quiet speech is never muted (Gemini AI handles noise natively)
+    "dsp_fan_filter_enabled": False,  # 80 Hz Butterworth High-Pass Filter (OFF by default)
+    "dsp_noise_gate_enabled": False,  # Dynamic noise gate (OFF by default to avoid degrading Whisper WER)
     "dsp_noise_gate_threshold_db": -52.0,  # Noise gate cutoff threshold in dB
     "offline_fallback_enabled": True,  # Offline speech recognition fallback when network drops
     "selected_languages": ["English"],  # Selected spoken languages (defaults to English only, or custom subset of 200+)
@@ -563,7 +574,12 @@ class ConfigManager:
             return False
 
     def get_api_key(self) -> str:
-        """Retrieves active Gemini API key from environment, DPAPI encrypted storage, or config."""
+        """Retrieves active Gemini API key from environment (.env), DPAPI encrypted storage, or config."""
+        env_k = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if env_k:
+            cleaned_env = sanitize_api_key(env_k)
+            if cleaned_env:
+                return cleaned_env
         try:
             from app.security.security_manager import SecurityManager
             sec = SecurityManager(APP_DIR)
@@ -646,14 +662,14 @@ class ConfigManager:
         self.save_config()
 
     def get_dsp_fan_filter_enabled(self) -> bool:
-        return bool(self.config.get("dsp_fan_filter_enabled", True))
+        return bool(self.config.get("dsp_fan_filter_enabled", False))
 
     def set_dsp_fan_filter_enabled(self, enabled: bool) -> None:
         self.config["dsp_fan_filter_enabled"] = bool(enabled)
         self.save_config()
 
     def get_dsp_noise_gate_enabled(self) -> bool:
-        return bool(self.config.get("dsp_noise_gate_enabled", True))
+        return bool(self.config.get("dsp_noise_gate_enabled", False))
 
     def set_dsp_noise_gate_enabled(self, enabled: bool) -> None:
         self.config["dsp_noise_gate_enabled"] = bool(enabled)
@@ -930,10 +946,70 @@ class ConfigManager:
             logger.error(f"Failed to read history: {e}")
             return []
 
+    @staticmethod
+    def save_recorded_audio(wav_bytes: bytes, prefix: str = "rec") -> str:
+        """
+        Saves full, complete, playable 16-bit PCM WAV audio to disk.
+        Saves to workspace recordings directory and AppData recordings directory.
+        Guarantees that saved audio has a valid WAV RIFF header, is playable, and returns the absolute path.
+        """
+        if not wav_bytes or len(wav_bytes) < 44:
+            return ""
+
+        final_wav = wav_bytes
+        if not (wav_bytes.startswith(b"RIFF") and b"WAVE" in wav_bytes[:16]):
+            try:
+                import io
+                import wave
+                out_io = io.BytesIO()
+                with wave.open(out_io, "wb") as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(2)
+                    wf.setframerate(16000)
+                    wf.writeframes(wav_bytes)
+                final_wav = out_io.getvalue()
+            except Exception as whe:
+                logger.debug(f"WAV header fixup note: {whe}")
+
+        import datetime
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{prefix}_{ts}_{int(time.time() * 1000) % 10000:04d}.wav"
+        saved_path = ""
+
+        # 1. Prioritize Workspace recordings directory (always writable and accessible)
+        try:
+            WORKSPACE_RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+            ws_file = WORKSPACE_RECORDINGS_DIR / filename
+            with open(ws_file, "wb") as f_ws:
+                f_ws.write(final_wav)
+            ws_last = WORKSPACE_RECORDINGS_DIR / "last_recording.wav"
+            with open(ws_last, "wb") as f_wl:
+                f_wl.write(final_wav)
+            if ws_file.exists() and ws_file.stat().st_size > 0:
+                saved_path = str(ws_file.resolve())
+        except Exception as we:
+            logger.debug(f"Workspace recording save error: {we}")
+
+        # 2. Also save to AppData recordings directory if accessible
+        try:
+            RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+            file_path = RECORDINGS_DIR / filename
+            with open(file_path, "wb") as f:
+                f.write(final_wav)
+            last_path = RECORDINGS_DIR / "last_recording.wav"
+            with open(last_path, "wb") as f_last:
+                f_last.write(final_wav)
+            if not saved_path and file_path.exists() and file_path.stat().st_size > 0:
+                saved_path = str(file_path.resolve())
+        except Exception as ae:
+            logger.debug(f"AppData recording save error: {ae}")
+
+        return saved_path
+
     def add_history_entry(self, text: str, duration_sec: float, mode: str,
                           app_name: str = "General", model: str = "",
                           title: str = "", is_pinned: bool = False, is_favorite: bool = False,
-                          raw_text: str = "", prompt: str = "") -> str:
+                          raw_text: str = "", prompt: str = "", audio_path: str = "") -> str:
         if not text.strip():
             return ""
         import datetime
@@ -954,7 +1030,8 @@ class ConfigManager:
             "title": title or "",
             "api_key_tag": (self.get_api_key() or "")[-8:] if len(self.get_api_key() or "") >= 8 else "default",
             "is_pinned": bool(is_pinned),
-            "is_favorite": bool(is_favorite)
+            "is_favorite": bool(is_favorite),
+            "audio_path": str(audio_path or "")
         }
         history.insert(0, entry)
         limit = self.config.get("history_limit", 5000)

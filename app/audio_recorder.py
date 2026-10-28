@@ -1,13 +1,23 @@
 """
-Audio Recorder Module for Gemini Flow
-Captures microphone audio at 16kHz mono, provides live amplitude feedback, and outputs WAV bytes.
+Audio Recorder Module for Gemini Flow.
+Captures microphone audio at the hardware's native rate, resamples with high-fidelity
+polyphase filtering to 16 kHz mono float32, continuously streams PCM16 WAV directly
+to disk in a dedicated thread using an unbounded producer-consumer queue, enforces
+a 30-minute safety cap, and provides crash-recovery tracking.
 """
 import io
-import wave
+import math
+import os
+import queue
 import time
+import wave
 import logging
+import threading
+from pathlib import Path
+from typing import List, Dict, Any, Optional, Callable, Tuple
+
 import numpy as np
-from typing import List, Dict, Any, Optional, Callable
+from scipy import signal
 
 logger = logging.getLogger("GeminiFlow.AudioRecorder")
 
@@ -18,92 +28,136 @@ except ImportError:
     logger.warning("sounddevice is not installed or available.")
 
 
+def get_recordings_dir() -> Path:
+    """Returns the persistent recordings directory in %LOCALAPPDATA%/GeminiFlow/recordings with resilient fallback."""
+    candidates = []
+    if os.environ.get("LOCALAPPDATA"):
+        candidates.append(Path(os.environ["LOCALAPPDATA"]) / "GeminiFlow" / "recordings")
+    if os.environ.get("APPDATA"):
+        candidates.append(Path(os.environ["APPDATA"]) / "GeminiFlow" / "recordings")
+    # Project-local fallback for sandboxed, portable, or restricted permission environments
+    candidates.append(Path(__file__).resolve().parent.parent / "recordings")
+
+    for cand in candidates:
+        try:
+            cand.mkdir(parents=True, exist_ok=True)
+            test_file = cand / f".write_test_{int(time.time() * 1000) % 100000}"
+            test_file.write_text("ok", encoding="utf-8")
+            test_file.unlink()
+            return cand
+        except Exception:
+            continue
+
+    fallback = Path.cwd() / "recordings"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+
+def resample_to_16k_mono(audio_data: np.ndarray, orig_sr: int) -> np.ndarray:
+    """
+    High-fidelity polyphase down/up-sampling to 16,000 Hz mono float32.
+    Avoids linear interpolation spectral aliasing and preserves full phonetic bandwidth.
+    """
+    if audio_data is None or len(audio_data) == 0:
+        return np.zeros((0,), dtype=np.float32)
+
+    data = audio_data.astype(np.float32)
+    # Downmix multi-channel to mono
+    if data.ndim > 1:
+        data = np.mean(data, axis=1)
+
+    if orig_sr == 16000:
+        return data
+
+    gcd_val = math.gcd(16000, orig_sr)
+    up = 16000 // gcd_val
+    down = orig_sr // gcd_val
+    try:
+        resampled = signal.resample_poly(data, up, down).astype(np.float32)
+        return resampled
+    except Exception as ex:
+        logger.warning(f"resample_poly failed ({ex}), falling back to Fourier resample: {orig_sr} -> 16000")
+        target_len = int(round(len(data) * 16000.0 / orig_sr))
+        return signal.resample(data, target_len).astype(np.float32)
+
+
 def apply_dsp_filters(
     audio_data: np.ndarray,
     sample_rate: int = 16000,
-    high_pass_enabled: bool = True,
-    high_pass_hz: float = 85.0,
-    noise_gate_enabled: bool = True,
-    noise_gate_threshold_db: float = -52.0
+    high_pass_enabled: bool = False,
+    high_pass_hz: float = 80.0,
+    peak_norm_enabled: bool = False
 ) -> np.ndarray:
     """
-    Applies real-time Digital Signal Processing (DSP) audio enhancement:
-    1. 85 Hz 2nd-order Butterworth High-Pass Filter: Eliminates 50/60 Hz electrical hums and 20-75 Hz ceiling fan/AC motor rumble.
-    2. Dynamic RMS Noise Gate: Smoothly suppresses ambient room hiss, breathing, and background whispers during pauses in speech.
+    Applies gentle, optional DSP filters behind explicit settings (OFF by default):
+    1. Gentle 80 Hz 2nd-order Butterworth High-Pass Filter: strips AC rumble without affecting fundamental voice pitch.
+    2. Peak Normalization: scales peak speech amplitude to -0.5 dBFS (0.95) if enabled.
+    Note: Bandpass (300-3400 Hz) and dynamic noise gates are strictly prohibited to avoid degrading Whisper WER.
     """
     if audio_data is None or len(audio_data) == 0:
         return audio_data
 
     processed = audio_data.copy().astype(np.float32)
 
-    # 1. 85 Hz Butterworth High-Pass Filter
+    # 1. Gentle 80 Hz High-Pass Filter (OFF by default)
     if high_pass_enabled:
         try:
-            from scipy import signal
             sos = signal.butter(N=2, Wn=high_pass_hz, btype='highpass', fs=sample_rate, output='sos')
             processed = signal.sosfilt(sos, processed, axis=0)
         except Exception as hp_err:
             logger.debug(f"High-pass DSP filter note: {hp_err}")
 
-    # 2. Dynamic RMS Noise Gate
-    if noise_gate_enabled:
+    # 2. Peak Normalization (OFF by default)
+    if peak_norm_enabled:
         try:
-            # 20ms block frames (320 samples @ 16kHz)
-            frame_len = int(sample_rate * 0.02)
-            if frame_len > 0 and len(processed) >= frame_len:
-                num_frames = len(processed) // frame_len
-                shape_2d = processed.ndim > 1
-                reshaped = processed[:num_frames * frame_len].reshape(num_frames, frame_len, -1) if shape_2d else processed[:num_frames * frame_len].reshape(num_frames, frame_len)
-                rms = np.sqrt(np.mean(reshaped ** 2, axis=1, keepdims=True) + 1e-9)
-                rms_db = 20.0 * np.log10(rms + 1e-9)
-
-                # Soft-knee gain curve
-                knee_width = 6.0
-                diff = rms_db - noise_gate_threshold_db
-                gains = np.where(
-                    diff >= knee_width / 2.0, 1.0,
-                    np.where(diff <= -knee_width / 2.0, 0.45,
-                             0.45 + 0.55 * ((diff + knee_width / 2.0) / knee_width))
-                )
-
-                expanded_gains = np.repeat(gains, frame_len, axis=0)
-                if shape_2d:
-                    processed[:len(expanded_gains)] *= expanded_gains
-                else:
-                    processed[:len(expanded_gains)] *= expanded_gains.flatten()
-        except Exception as ng_err:
-            logger.debug(f"Noise gate DSP note: {ng_err}")
+            peak = float(np.max(np.abs(processed)))
+            if peak > 1e-5:
+                processed = (processed / peak) * 0.95
+        except Exception as norm_err:
+            logger.debug(f"Peak normalization note: {norm_err}")
 
     return processed
 
 
-import threading
-
-
 class AudioRecorder:
+    SAFETY_CAP_SECONDS = 1800.0  # 30 minutes hard safety cap
+
     def __init__(
         self,
         sample_rate: int = 16000,
         channels: int = 1,
         on_amplitude: Optional[Callable[[float], None]] = None,
+        on_safety_cap: Optional[Callable[[], None]] = None,
         config_manager: Optional[Any] = None
     ):
-        self.sample_rate = sample_rate
-        self.channels = channels
+        self.target_sample_rate = 16000
+        self.target_channels = 1
         self.on_amplitude = on_amplitude
+        self.on_safety_cap = on_safety_cap
         self.config = config_manager
-        self.dsp_fan_filter_enabled = True
-        self.dsp_noise_gate_enabled = True
-        self.dsp_noise_gate_threshold_db = -42.0
+
+        self.device_index: Optional[int] = None
+        self.device_sample_rate: int = 16000
+        self.device_channels: int = 1
+
         self.is_recording = False
         self.stream: Optional[Any] = None
-        self.audio_chunks: List[np.ndarray] = []
-        self._buffer_lock = threading.Lock()
         self.start_time = 0.0
-        self.device_index: Optional[int] = None
+
+        # Unbounded producer/consumer queue (zero drop under load)
+        self._raw_queue: queue.Queue = queue.Queue()
+        self._writer_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._buffer_lock = threading.Lock()
+
+        # Recording session metrics & storage
+        self._current_wav_path: Optional[Path] = None
+        self._accumulated_16k_samples: List[np.ndarray] = []
         self._current_amplitude: float = 0.0
-        self._rolling_sample_cursor: int = 0
-        self._tail_wav_bytes: Optional[bytes] = None
+        self._last_duration: float = 0.0
+        self._last_sample_count: int = 0
+        self._last_rms: float = 0.0
+        self._active_wav_file: Optional[wave.Wave_write] = None
 
     @staticmethod
     def get_input_devices() -> List[Dict[str, Any]]:
@@ -125,61 +179,55 @@ class AudioRecorder:
             logger.error(f"Error querying audio devices: {e}")
         return devices
 
-    @staticmethod
-    def _validate_device_index(dev_idx: Optional[int]) -> Optional[int]:
-        """Validates that device index exists, has input channels, and is not an output speaker."""
-        if dev_idx is None or sd is None:
-            return None
+    def _resolve_device_parameters(self, dev_idx: Optional[int]) -> Tuple[Optional[int], int, int]:
+        """Resolves device index, native sample rate, and channels."""
+        if sd is None:
+            return None, 16000, 1
         try:
-            dev_info = sd.query_devices(dev_idx)
-            if dev_info.get("max_input_channels", 0) <= 0:
-                logger.warning(f"Device index {dev_idx} ({dev_info.get('name')}) has 0 input channels. Using default mic.")
-                return None
-            name_lower = dev_info.get("name", "").lower()
-            if "speaker" in name_lower and "mic" not in name_lower and "input" not in name_lower:
-                logger.warning(f"Device index {dev_idx} appears to be a speaker ({dev_info.get('name')}). Using default mic.")
-                return None
-            return dev_idx
-        except Exception as e:
-            logger.warning(f"Device index {dev_idx} invalid ({e}). Falling back to default mic.")
-            return None
+            if dev_idx is not None:
+                info = sd.query_devices(dev_idx)
+            else:
+                info = sd.query_devices(kind="input")
+                dev_idx = info.get("index", None)
+            native_rate = int(info.get("default_samplerate", 16000))
+            max_ch = int(info.get("max_input_channels", 1))
+            channels = 1 if max_ch >= 1 else 1
+            return dev_idx, native_rate, channels
+        except Exception as ex:
+            logger.warning(f"Could not resolve device parameters for index {dev_idx}: {ex}")
+            return None, 16000, 1
 
     def set_device(self, device_index: Optional[int]):
-        self.device_index = self._validate_device_index(device_index)
+        self.device_index = device_index
 
     def warmup_audio(self):
-        """
-        Pre-warms the PortAudio driver and queries audio devices in the background
-        so that the very first user recording starts instantaneously with zero audio latency or clipping.
-        """
+        """Pre-warms PortAudio subsystem so first user recording starts instantaneously."""
         if sd is None:
             return
         try:
-            # 1. Query devices to initialize PortAudio driver subsystem
-            _ = sd.query_devices()
-            # 2. Briefly test opening an input stream for 50ms to prime OS audio buffer
-            target_device = self._validate_device_index(self.device_index)
-            try:
-                with sd.InputStream(samplerate=self.sample_rate, channels=self.channels, dtype="float32", device=target_device, blocksize=512):
-                    time.sleep(0.04)
-            except Exception:
-                with sd.InputStream(samplerate=self.sample_rate, channels=self.channels, dtype="float32", device=None, blocksize=512):
-                    time.sleep(0.04)
+            dev_idx, rate, ch = self._resolve_device_parameters(self.device_index)
+            with sd.InputStream(samplerate=rate, channels=ch, dtype="float32", device=dev_idx, blocksize=512):
+                time.sleep(0.04)
             logger.info("PortAudio microphone driver warmed up successfully.")
         except Exception as e:
             logger.debug(f"Audio driver warmup note: {e}")
 
     def _audio_callback(self, indata: np.ndarray, frames: int, time_info: Any, status: Any):
-        """Internal thread-safe callback for sounddevice InputStream."""
+        """
+        Lightweight sounddevice InputStream callback.
+        Enqueues raw audio without blocking; computes RMS for UI visualization.
+        """
         if status:
             logger.warning(f"Audio stream status: {status}")
-        with self._buffer_lock:
-            if self.is_recording:
-                # indata shape is (frames, channels)
-                self.audio_chunks.append(indata.copy())
 
-        # Calculate RMS amplitude for UI visualization (0.0 to 1.0)
-        rms = np.sqrt(np.mean(np.square(indata)))
+        if not self.is_recording:
+            return
+
+        # Zero blocking: enqueue raw frame copy
+        self._raw_queue.put(indata.copy())
+
+        # Amplitude calculation for UI
+        rms = float(np.sqrt(np.mean(np.square(indata)) + 1e-9))
         scaled = min(1.0, float(rms * 12.0))
         self._current_amplitude = scaled
         if self.on_amplitude:
@@ -188,12 +236,77 @@ class AudioRecorder:
             except Exception:
                 pass
 
-    @property
-    def current_amplitude(self) -> float:
-        return self._current_amplitude
+    def _writer_worker(self):
+        """
+        Dedicated background worker thread:
+        Pulls raw frames from queue, resamples once to 16 kHz mono float32,
+        converts to PCM16, and continuously writes frames to disk in real-time.
+        """
+        rec_dir = get_recordings_dir()
+        ts_str = time.strftime("%Y%m%d_%H%M%S")
+        self._current_wav_path = rec_dir / f"recording_{ts_str}_{int(time.time() * 1000) % 1000:03d}.wav"
+
+        try:
+            wf = wave.open(str(self._current_wav_path), "wb")
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(16000)
+            self._active_wav_file = wf
+        except Exception as ex:
+            logger.error(f"Failed to open WAV file for continuous writing: {ex}")
+            wf = None
+
+        total_16k_samples = 0
+
+        while not self._stop_event.is_set() or not self._raw_queue.empty():
+            try:
+                raw_chunk = self._raw_queue.get(timeout=0.08)
+            except queue.Empty:
+                continue
+
+            # Queue lag warning if queue depth grows significantly (>100 frames = ~2 seconds backlog)
+            qsize = self._raw_queue.qsize()
+            if qsize > 100:
+                logger.warning(f"Audio disk writer queue backlog: {qsize} frames pending.")
+
+            # Polyphase resampling to 16 kHz mono float32
+            chunk_16k = resample_to_16k_mono(raw_chunk, self.device_sample_rate)
+            if len(chunk_16k) == 0:
+                continue
+
+            with self._buffer_lock:
+                self._accumulated_16k_samples.append(chunk_16k)
+
+            total_16k_samples += len(chunk_16k)
+
+            # Continuous disk streaming as PCM16
+            if wf is not None:
+                pcm16 = (np.clip(chunk_16k, -1.0, 1.0) * 32767).astype(np.int16)
+                try:
+                    wf.writeframes(pcm16.tobytes())
+                except Exception as w_err:
+                    logger.error(f"Error writing continuous WAV frame to disk: {w_err}")
+
+            # Check 30-minute safety cap
+            curr_duration = total_16k_samples / 16000.0
+            if curr_duration >= self.SAFETY_CAP_SECONDS and self.is_recording:
+                logger.warning(f"Audio safety cap reached ({curr_duration:.1f}s >= {self.SAFETY_CAP_SECONDS}s). Triggering auto-stop.")
+                if self.on_safety_cap:
+                    try:
+                        self.on_safety_cap()
+                    except Exception as cap_err:
+                        logger.error(f"Error in on_safety_cap callback: {cap_err}")
+
+        # Finalize and close WAV file
+        if wf is not None:
+            try:
+                wf.close()
+            except Exception as close_err:
+                logger.error(f"Error closing WAV writer: {close_err}")
+            self._active_wav_file = None
 
     def start_recording(self) -> bool:
-        """Starts recording audio from the selected microphone with zero-drop buffer initialization."""
+        """Starts hardware capture at native rate and begins continuous disk writing."""
         with self._buffer_lock:
             if self.is_recording:
                 return False
@@ -201,207 +314,135 @@ class AudioRecorder:
                 logger.error("sounddevice is not available.")
                 return False
 
-            self.audio_chunks = []
             self.is_recording = True
             self.start_time = time.time()
             self._current_amplitude = 0.0
-            self._rolling_sample_cursor = 0
-            self._tail_wav_bytes = None
+            self._accumulated_16k_samples = []
+            self._raw_queue = queue.Queue()
+            self._stop_event.clear()
 
-        # Attempt with configured device index, or fallback to system default
-        target_device = self._validate_device_index(self.device_index)
+        dev_idx, native_rate, channels = self._resolve_device_parameters(self.device_index)
+        self.device_index = dev_idx
+        self.device_sample_rate = native_rate
+        self.device_channels = channels
+
+        # Start continuous disk writer thread
+        self._writer_thread = threading.Thread(target=self._writer_worker, daemon=True, name="AudioDiskWriter")
+        self._writer_thread.start()
+
         try:
             self.stream = sd.InputStream(
-                samplerate=self.sample_rate,
-                channels=self.channels,
+                samplerate=self.device_sample_rate,
+                channels=self.device_channels,
                 dtype="float32",
-                device=target_device,
+                device=self.device_index,
                 callback=self._audio_callback,
                 blocksize=1024
             )
             self.stream.start()
-            logger.info(f"Audio recording started on device: {target_device}")
+            logger.info(f"Continuous audio recording started: device={self.device_index}, native_sr={self.device_sample_rate}, ch={self.device_channels}")
             return True
         except Exception as e:
-            if target_device is not None:
-                logger.warning(f"Device {target_device} unavailable (likely reset/sleep). Falling back to Windows default mic: {e}")
-                try:
-                    self.stream = sd.InputStream(
-                        samplerate=self.sample_rate,
-                        channels=self.channels,
-                        dtype="float32",
-                        device=None,
-                        callback=self._audio_callback,
-                        blocksize=1024
-                    )
-                    self.stream.start()
-                    logger.info("Audio recording successfully started on fallback default microphone.")
-                    return True
-                except Exception as e2:
-                    logger.error(f"Fallback to default audio device also failed: {e2}")
-            else:
-                logger.error(f"Failed to start audio recording on default device: {e}")
+            logger.warning(f"Failed to start audio stream on device {self.device_index}: {e}. Retrying default mic...")
+            try:
+                self.stream = sd.InputStream(
+                    samplerate=self.device_sample_rate,
+                    channels=self.device_channels,
+                    dtype="float32",
+                    device=None,
+                    callback=self._audio_callback,
+                    blocksize=1024
+                )
+                self.stream.start()
+                logger.info("Recording started on fallback default microphone.")
+                return True
+            except Exception as e2:
+                logger.error(f"Fallback to default audio device failed: {e2}")
+                with self._buffer_lock:
+                    self.is_recording = False
+                    self._stop_event.set()
+                return False
 
-            with self._buffer_lock:
-                self.is_recording = False
-            return False
-
-    def _samples_to_wav(self, audio_data: np.ndarray, trim_silence: bool = False) -> bytes:
-        """Converts raw float32 audio samples to 16-bit PCM WAV bytes with DSP filtering applied."""
-        if audio_data is None or len(audio_data) == 0:
-            return b""
-
-        # Apply Real-Time DSP Filters (Ceiling Fan / AC High-Pass + Dynamic Noise Gate)
-        fan_filter_on = self.config.get_dsp_fan_filter_enabled() if hasattr(self.config, "get_dsp_fan_filter_enabled") else self.dsp_fan_filter_enabled
-        noise_gate_on = self.config.get_dsp_noise_gate_enabled() if hasattr(self.config, "get_dsp_noise_gate_enabled") else self.dsp_noise_gate_enabled
-        gate_thresh = self.config.get_dsp_noise_gate_threshold_db() if hasattr(self.config, "get_dsp_noise_gate_threshold_db") else self.dsp_noise_gate_threshold_db
-
-        if fan_filter_on or noise_gate_on:
-            audio_data = apply_dsp_filters(
-                audio_data=audio_data,
-                sample_rate=self.sample_rate,
-                high_pass_enabled=fan_filter_on,
-                high_pass_hz=85.0,
-                noise_gate_enabled=noise_gate_on,
-                noise_gate_threshold_db=gate_thresh
-            )
-
-        # Smart dead silence trimming only when explicitly requested (keeps 250ms generous safety padding)
-        if trim_silence and len(audio_data) > 6000:
-            abs_audio = np.abs(audio_data)
-            speech_indices = np.where(abs_audio > 0.002)[0]
-            if len(speech_indices) > 0:
-                pad = int(0.25 * self.sample_rate)
-                start_idx = max(0, speech_indices[0] - pad)
-                end_idx = min(len(audio_data), speech_indices[-1] + pad)
-                if end_idx - start_idx > 2000:
-                    audio_data = audio_data[start_idx:end_idx]
-
-        # Clip and convert float32 (-1.0 to 1.0) to int16 PCM
-        audio_data = np.clip(audio_data, -1.0, 1.0)
-        pcm16_data = (audio_data * 32767).astype(np.int16)
-
-        wav_io = io.BytesIO()
-        with wave.open(wav_io, "wb") as wf:
-            wf.setnchannels(self.channels)
-            wf.setsampwidth(2)
-            wf.setframerate(self.sample_rate)
-            wf.writeframes(pcm16_data.tobytes())
-
-        return wav_io.getvalue()
-
-    def get_rolling_chunk(self, min_sec: float = 30.0, max_sec: float = 45.0) -> Optional[bytes]:
+    def stop_recording(self) -> Tuple[str, bytes, float, int, float]:
         """
-        Extracts a silence-aligned audio slice if accumulated speech exceeds min_sec (18s+).
-        Enables real-time background transcription while recording long speech (1-120 minutes)
-        so that 95%+ of long speech is already transcribed when the user stops.
-        """
-        with self._buffer_lock:
-            if not self.is_recording or not self.audio_chunks:
-                return None
-
-            total_samples = sum(len(c) for c in self.audio_chunks)
-            cursor = self._rolling_sample_cursor
-            unemitted = total_samples - cursor
-            min_samples = int(min_sec * self.sample_rate)
-            max_samples = int(max_sec * self.sample_rate)
-
-            if unemitted < min_samples:
-                return None
-
-            # Concatenate chunks into continuous array
-            full_audio = np.concatenate(self.audio_chunks, axis=0)
-            search_region = full_audio[cursor : cursor + min(unemitted, max_samples)]
-
-            # Locate natural pause in speech (minimum RMS energy in 50ms windows)
-            block_size = int(0.05 * self.sample_rate)  # 50ms block
-            min_block_idx = int(min_sec * self.sample_rate) // block_size
-            total_blocks = len(search_region) // block_size
-
-            split_sample = len(search_region)
-            if total_blocks > min_block_idx + 1:
-                blocks = search_region[:total_blocks * block_size].reshape(total_blocks, block_size)
-                rms = np.sqrt(np.mean(blocks ** 2, axis=1) + 1e-9)
-                candidate_idx = min_block_idx + int(np.argmin(rms[min_block_idx:]))
-                split_sample = candidate_idx * block_size + block_size // 2
-
-            chunk_audio = full_audio[cursor : cursor + split_sample]
-            # Keep 0.20s acoustic overlap padding so words spoken across boundaries are never lost
-            overlap_samples = int(0.20 * self.sample_rate)
-            self._rolling_sample_cursor = max(cursor + overlap_samples, cursor + split_sample - overlap_samples)
-
-        return self._samples_to_wav(chunk_audio, trim_silence=False)
-
-    def get_tail_chunk(self) -> Optional[bytes]:
-        """Returns the final audio slice recorded after the last rolling chunk."""
-        return self._tail_wav_bytes
-
-    def rolling_chunks_were_emitted(self) -> bool:
-        """Returns True if rolling chunks were dispatched during this recording."""
-        return self._rolling_sample_cursor > 0
-
-    def stop_recording(self) -> tuple[bytes, float]:
-        """
-        Stops recording safely and returns (wav_bytes, duration_seconds).
-        If rolling transcription was active, also stores the remaining tail chunk.
+        Stops audio capture, waits for all pending frames to be written to disk,
+        and returns (wav_path, wav_bytes, duration_seconds, sample_count, rms).
         """
         with self._buffer_lock:
             if not self.is_recording:
-                return b"", 0.0
+                return "", b"", 0.0, 0, 0.0
             self.is_recording = False
 
-        duration = max(0.1, time.time() - self.start_time)
+        wall_duration = max(0.1, time.time() - self.start_time)
 
+        # Stop audio hardware stream
         try:
             if self.stream:
-                time.sleep(0.04)
                 self.stream.stop()
                 self.stream.close()
                 self.stream = None
         except Exception as e:
             logger.error(f"Error stopping audio stream: {e}")
 
+        # Signal writer thread to flush queue and finish file
+        self._stop_event.set()
+        if self._writer_thread and self._writer_thread.is_alive():
+            self._writer_thread.join(timeout=3.0)
+
         with self._buffer_lock:
-            if not self.audio_chunks:
-                logger.warning("No audio recorded.")
-                return b"", 0.0
-            raw_chunks = list(self.audio_chunks)
-            self.audio_chunks = []
-
-        try:
-            audio_data = np.concatenate(raw_chunks, axis=0)
-
-            # If rolling transcription was active, extract the tail chunk with zero clipping
-            if self._rolling_sample_cursor > 0 and self._rolling_sample_cursor < len(audio_data):
-                tail_audio = audio_data[self._rolling_sample_cursor:]
-                self._tail_wav_bytes = self._samples_to_wav(tail_audio, trim_silence=False)
+            if self._accumulated_16k_samples:
+                full_16k = np.concatenate(self._accumulated_16k_samples, axis=0)
             else:
-                self._tail_wav_bytes = None
+                full_16k = np.zeros((0,), dtype=np.float32)
 
-            # Always return full session audio to guarantee zero data loss and enable full-recording fallbacks
-            wav_bytes = self._samples_to_wav(audio_data, trim_silence=False)
-            logger.info(f"Recorded audio ({duration:.2f}s, {len(wav_bytes)} bytes). Rolling active: {self._rolling_sample_cursor > 0}, Tail bytes: {len(self._tail_wav_bytes) if self._tail_wav_bytes else 0}")
-            return wav_bytes, duration
-        except Exception as e:
-            logger.error(f"Error converting audio to WAV: {e}")
-            return b"", duration
+        sample_count = len(full_16k)
+        duration_sec = sample_count / 16000.0 if sample_count > 0 else wall_duration
+        rms = float(np.sqrt(np.mean(full_16k ** 2) + 1e-9)) if sample_count > 0 else 0.0
+
+        # Read the verified WAV bytes from disk
+        wav_path_str = str(self._current_wav_path) if self._current_wav_path and self._current_wav_path.exists() else ""
+        wav_bytes = b""
+        if wav_path_str and os.path.exists(wav_path_str):
+            try:
+                with open(wav_path_str, "rb") as rf:
+                    wav_bytes = rf.read()
+            except Exception as r_err:
+                logger.error(f"Failed to read WAV file from disk: {r_err}")
+
+        # If disk read failed, serialize in memory
+        if not wav_bytes and sample_count > 0:
+            bio = io.BytesIO()
+            with wave.open(bio, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(16000)
+                pcm16 = (np.clip(full_16k, -1.0, 1.0) * 32767).astype(np.int16)
+                wf.writeframes(pcm16.tobytes())
+            wav_bytes = bio.getvalue()
+
+        self._last_duration = duration_sec
+        self._last_sample_count = sample_count
+        self._last_rms = rms
+
+        logger.info(
+            f"[AUDIO CAPTURE METRICS] Path='{wav_path_str}', Duration={duration_sec:.2f}s, "
+            f"Samples={sample_count} (16kHz), RMS={rms:.5f}, Size={len(wav_bytes)} bytes"
+        )
+        return wav_path_str, wav_bytes, duration_sec, sample_count, rms
+
+    @property
+    def current_amplitude(self) -> float:
+        return self._current_amplitude
 
     @staticmethod
-    def contains_speech(wav_bytes: bytes, threshold_rms: float = 0.0005, threshold_peak: float = 0.003) -> bool:
-        """
-        Determines whether the recorded audio buffer contains acoustic human speech.
-        Uses conservative thresholds to protect quiet speech, whispers, and soft syllables,
-        while safely rejecting true flat digital silence.
-        """
+    def contains_speech(wav_bytes: bytes, threshold_rms: float = 0.0002, threshold_peak: float = 0.001) -> bool:
+        """Determines whether the audio buffer contains speech energy, rejecting true digital silence."""
         if not wav_bytes or len(wav_bytes) < 1000:
             return False
         try:
-            import wave
-            import io
-            import numpy as np
             with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
                 nframes = wf.getnframes()
-                if nframes < 1600:  # Less than 0.1s
+                if nframes < 800:
                     return False
                 pcm = wf.readframes(nframes)
             samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
@@ -411,3 +452,14 @@ class AudioRecorder:
         except Exception:
             return True
 
+    @staticmethod
+    def get_orphaned_recordings() -> List[Path]:
+        """Scans recordings directory for orphaned WAV files that have not been transcribed."""
+        rec_dir = get_recordings_dir()
+        if not rec_dir.exists():
+            return []
+        wav_files = sorted(rec_dir.glob("*.wav"), key=lambda p: p.stat().st_mtime, reverse=True)
+        # Keep recordings from the last 24 hours that are > 2000 bytes
+        cutoff = time.time() - 86400
+        orphaned = [f for f in wav_files if f.stat().st_mtime > cutoff and f.stat().st_size > 2000]
+        return orphaned
