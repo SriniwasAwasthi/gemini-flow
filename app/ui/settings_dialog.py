@@ -3,6 +3,8 @@ Settings & History Dialog for Gemini Flow (PyQt6)
 Features API configuration, interactive hotkey recorder, AI dictation presets, audio device selector,
 custom phonetic dictionary, voice snippets manager, direct history copy, and AI prompt transformer.
 """
+import os
+import sys
 import time
 import logging
 import threading
@@ -46,6 +48,32 @@ logger = logging.getLogger("GeminiFlow.SettingsDialog")
 _RESOURCES_DIR = Path(__file__).parent.parent / "resources"
 _CHECK_ICON = (_RESOURCES_DIR / "check.png").resolve().as_posix()
 _RADIO_ICON = (_RESOURCES_DIR / "radio.png").resolve().as_posix()
+_CHEVRON_DOWN = (_RESOURCES_DIR / "chevron-down.svg").resolve().as_posix()
+_CHEVRON_DOWN_HOVER = (_RESOURCES_DIR / "chevron-down-hover.svg").resolve().as_posix()
+_CHEVRON_DOWN_LIGHT = (_RESOURCES_DIR / "chevron-down-light.svg").resolve().as_posix()
+
+
+class SafeComboBox(QComboBox):
+    """
+    Rock-Solid QComboBox subclass for Windows.
+    Prevents popup dropdowns from instantly snapping shut on mouse-release.
+    Enforces a smooth 200ms debounce protection against premature dismissal.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._popup_open_time = 0.0
+
+    def showPopup(self):
+        import time
+        self._popup_open_time = time.time()
+        super().showPopup()
+
+    def hidePopup(self):
+        import time
+        # If user opened the popup within the last 220ms, ignore immediate closing from mouse release
+        if time.time() - self._popup_open_time < 0.22:
+            return
+        super().hidePopup()
 
 DARK_STYLE = """
 QDialog {
@@ -132,11 +160,12 @@ QComboBox::drop-down {
     border-bottom-right-radius: 8px;
 }
 QComboBox::down-arrow {
-    image: none;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid #94A3B8;
-    margin: 4px;
+    image: url({CHEVRON_DOWN});
+    width: 14px;
+    height: 14px;
+}
+QComboBox::down-arrow:hover {
+    image: url({CHEVRON_DOWN_HOVER});
 }
 QComboBox QAbstractItemView {
     background-color: #0B0F19;
@@ -842,7 +871,7 @@ QPushButton#langSuggestionBtn:hover {
     color: #FFFFFF;
 }
 """
-DARK_STYLE = DARK_STYLE.replace("{CHECK_ICON}", _CHECK_ICON).replace("{RADIO_ICON}", _RADIO_ICON)
+DARK_STYLE = DARK_STYLE.replace("{CHECK_ICON}", _CHECK_ICON).replace("{RADIO_ICON}", _RADIO_ICON).replace("{CHEVRON_DOWN}", _CHEVRON_DOWN).replace("{CHEVRON_DOWN_HOVER}", _CHEVRON_DOWN_HOVER)
 
 LIGHT_STYLE = """
 QDialog {
@@ -934,11 +963,12 @@ QComboBox::drop-down {
     border-bottom-right-radius: 8px;
 }
 QComboBox::down-arrow {
-    image: none;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid #475569;
-    margin: 4px;
+    image: url({CHEVRON_DOWN});
+    width: 14px;
+    height: 14px;
+}
+QComboBox::down-arrow:hover {
+    image: url({CHEVRON_DOWN_HOVER});
 }
 QComboBox QAbstractItemView {
     background-color: #FFFFFF;
@@ -1612,7 +1642,22 @@ QPushButton#langSuggestionBtn:hover {
     color: #0369A1;
 }
 """
-LIGHT_STYLE = LIGHT_STYLE.replace("{CHECK_ICON}", _CHECK_ICON).replace("{RADIO_ICON}", _RADIO_ICON)
+LIGHT_STYLE = LIGHT_STYLE.replace("{CHECK_ICON}", _CHECK_ICON).replace("{RADIO_ICON}", _RADIO_ICON).replace("{CHEVRON_DOWN}", _CHEVRON_DOWN_LIGHT).replace("{CHEVRON_DOWN_HOVER}", _CHEVRON_DOWN_HOVER)
+
+
+WINDOWS_RESERVED_COMBOS = {
+    "Win",
+    "Win + 1", "Win + 2", "Win + 3", "Win + 4", "Win + 5",
+    "Win + 6", "Win + 7", "Win + 8", "Win + 9", "Win + 0",
+    "Win + A", "Win + B", "Win + C", "Win + D", "Win + E", "Win + F",
+    "Win + G", "Win + H", "Win + I", "Win + J", "Win + K", "Win + L",
+    "Win + M", "Win + N", "Win + P", "Win + Q", "Win + R", "Win + S",
+    "Win + T", "Win + U", "Win + V", "Win + W", "Win + X", "Win + Y", "Win + Z",
+    "Win + Space", "Win + Tab", "Win + Enter", "Win + Esc", "Win + Pause",
+    "Win + Shift + S", "Win + Shift + M", "Win + Shift + Left", "Win + Shift + Right",
+    "Win + Ctrl + Shift + B", "Win + Ctrl + D", "Win + Ctrl + F4",
+    "Alt + F4", "Alt + Tab", "Ctrl + Alt + Del", "Ctrl + Shift + Esc", "Ctrl + Esc", "Alt + Esc"
+}
 
 
 class HotkeyCaptureSignals(QObject):
@@ -1630,6 +1675,7 @@ class HotkeyCaptureButton(QPushButton):
         self.internal_str = default_internal
         self.is_recording = False
         self.is_light = False
+        self._is_current_reserved = False
         self.signals = HotkeyCaptureSignals()
         self.signals.key_combo_updated.connect(self._on_combo_updated)
 
@@ -1656,7 +1702,7 @@ class HotkeyCaptureButton(QPushButton):
 
     def _update_button_text(self):
         if self.is_recording:
-            self.setText("🔴 Recording Shortcut... Press Keys on Keyboard (e.g. Shift, Ctrl, Win)")
+            self.setText("🔴 Recording Shortcut... Press Keys on Keyboard (e.g. Ctrl, Alt, Shift, Keys)")
             if self.is_light:
                 self.setStyleSheet("""
                     QPushButton {
@@ -1730,6 +1776,7 @@ class HotkeyCaptureButton(QPushButton):
 
     def start_recording(self):
         self.is_recording = True
+        self._is_current_reserved = False
         self._pressed_keys.clear()
         self._max_combo_disp = ""
         self._max_combo_inter = ""
@@ -1748,6 +1795,25 @@ class HotkeyCaptureButton(QPushButton):
         if self._listener:
             self._listener.stop()
             self._listener = None
+        if getattr(self, "_is_current_reserved", False):
+            # Reserved windows key detected: show warning and preserve previous valid key
+            self.setText(f"⚠️ default windows key — Kept ({self.display_str})")
+            self._is_current_reserved = False
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: #7F1D1D;
+                    color: #FCA5A5;
+                    border: 2px solid #EF4444;
+                    border-radius: 8px;
+                    padding: 8px 16px;
+                    font-size: 13px;
+                    font-weight: bold;
+                    text-align: center;
+                }
+            """)
+            QTimer.singleShot(2200, self._update_button_text)
+            return
+
         if getattr(self, "_max_combo_disp", "") and getattr(self, "_max_combo_inter", ""):
             self.display_str = self._max_combo_disp
             self.internal_str = self._max_combo_inter
@@ -1791,32 +1857,69 @@ class HotkeyCaptureButton(QPushButton):
             display_parts.append("Win")
             internal_parts.append("<cmd>")
 
-        # Check other keys (Space, F-keys, Alphanumerics)
+        # Check other keys (Space, Tab, F-keys, Alphanumerics)
         for k in self._pressed_keys:
             if k == keyboard.Key.space:
                 display_parts.append("Space")
                 internal_parts.append("<space>")
+            elif k == keyboard.Key.tab:
+                display_parts.append("Tab")
+                internal_parts.append("<tab>")
             elif hasattr(k, "name") and k.name and k.name.startswith("f") and k.name[1:].isdigit():
                 display_parts.append(k.name.upper())
                 internal_parts.append(k.name.lower())
-            elif isinstance(k, keyboard.KeyCode) and k.char:
-                char_str = k.char.upper()
-                if char_str not in display_parts:
+            elif isinstance(k, keyboard.KeyCode):
+                char_str = ""
+                if k.char:
+                    if ord(k.char) < 32:
+                        char_str = chr(ord(k.char) + 64).upper()
+                    else:
+                        char_str = k.char.upper()
+                elif hasattr(k, "vk") and k.vk:
+                    if 65 <= k.vk <= 90:
+                        char_str = chr(k.vk).upper()
+                    elif 48 <= k.vk <= 57:
+                        char_str = chr(k.vk)
+                    elif 96 <= k.vk <= 105:
+                        char_str = str(k.vk - 96)
+                if char_str and char_str not in display_parts:
                     display_parts.append(char_str)
                     internal_parts.append(char_str.lower())
 
         if display_parts:
             disp = " + ".join(display_parts)
             inter = "+".join(internal_parts)
-            if len(display_parts) >= len(getattr(self, "_max_combo_disp", "").split(" + ")):
-                self._max_combo_disp = disp
-                self._max_combo_inter = inter
-                self.signals.key_combo_updated.emit(disp, inter)
+
+            is_reserved = disp in WINDOWS_RESERVED_COMBOS or (len(display_parts) == 1 and display_parts[0] == "Win")
+            self._is_current_reserved = is_reserved
+
+            if is_reserved:
+                self.signals.key_combo_updated.emit(f"default windows key: {disp}", "")
+            else:
+                if len(display_parts) >= len(getattr(self, "_max_combo_disp", "").split(" + ")):
+                    self._max_combo_disp = disp
+                    self._max_combo_inter = inter
+                    self.signals.key_combo_updated.emit(disp, inter)
 
     def _on_combo_updated(self, disp: str, inter: str):
-        self.display_str = disp
-        self.internal_str = inter
-        self.setText(f"🔴 {disp} (Release keys to confirm)")
+        if not inter:  # Reserved warning
+            self.setText(f"⚠️ {disp} (Reserved Windows Key)")
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: #7F1D1D;
+                    color: #FCA5A5;
+                    border: 2px solid #EF4444;
+                    border-radius: 8px;
+                    padding: 8px 16px;
+                    font-size: 13px;
+                    font-weight: bold;
+                    text-align: center;
+                }
+            """)
+        else:
+            self.display_str = disp
+            self.internal_str = inter
+            self.setText(f"🔴 {disp} (Release keys to confirm)")
 
 
 class DictEditDialog(QDialog):
@@ -1961,8 +2064,8 @@ class VocabEditDialog(QDialog):
         layout.addWidget(self.aliases_input)
 
         layout.addWidget(QLabel("Category:"))
-        self.category_combo = QComboBox(self)
-        self.category_combo.setView(QListView())
+        self.category_combo = SafeComboBox(self)
+        # self.category_combo uses native view
         self.category_combo.addItems(["Technical", "Programming", "Personal", "Project", "Academic", "Business", "Custom"])
         idx = self.category_combo.findText(category)
         if idx >= 0:
@@ -2209,8 +2312,8 @@ COMBINATION_SHOWCASE_DATA = [
         "profile_name": "👔 Professional & Executive",
         "prompt_id": "smart_polish_custom",
         "prompt_name": "Smart Executive Polish",
-        "model_id": "auto",
-        "model_name": "auto (Intelligent AI Model Router)",
+        "model_id": "gemini-2.5-flash",
+        "model_name": "gemini-2.5-flash (Dedicated Speech & Multimodal — Ultra Fast — Recommended)",
         "purpose": "Best for executive memos, client updates, structured meeting minutes, and Slack/Teams updates where clear bullet points, bold category headers, and clean line-break spacing are required without conversational fluff.",
         "spoken_input": (
             "\"Uh hey basically we need to refactor the user authentication flow in our system means first we have to add JWT token verification with refresh token rotation semicolon second we need to implement Redis caching to check if the session is revoked semicolon third please update the database schema for user table and add two fields created_at and last_login and finally send an email notification to the security team on suspicious login attempts.\""
@@ -2489,6 +2592,7 @@ class SidebarNavButton(QPushButton):
 class SettingsDialog(QDialog):
     settings_applied = pyqtSignal()
     api_test_finished = pyqtSignal(bool, str, str)  # (ok, msg, key)
+    command_test_finished = pyqtSignal(bool, str, str, object)  # (ok, out_or_err, inp, cmd)
     benchmark_step = pyqtSignal(object, int)  # (result, step)
     benchmark_done = pyqtSignal(str)  # (model)
 
@@ -2503,6 +2607,7 @@ class SettingsDialog(QDialog):
 
         # Connect background worker signals
         self.api_test_finished.connect(self._on_api_test_result)
+        self.command_test_finished.connect(self._on_interactive_command_test_result)
         self.benchmark_step.connect(self._on_benchmark_step)
         self.benchmark_done.connect(self._on_benchmark_done)
 
@@ -2895,25 +3000,85 @@ class SettingsDialog(QDialog):
         self.api_status_label.setWordWrap(True)
         api_card_layout.addWidget(self.api_status_label)
 
+        # Groq LPU Whisper API Key Section
+        api_card_layout.addSpacing(6)
+        groq_header_layout = QHBoxLayout()
+        groq_label = QLabel("⚡ Groq API Key (for Groq Whisper Large V3 Turbo — Sub-250ms LPU):", api_card)
+        groq_label.setObjectName("blueSectionHeader")
+        groq_header_layout.addWidget(groq_label)
+        groq_header_layout.addStretch()
+
+        self.btn_get_groq_key = QPushButton("🔗 Get Free Groq Key (console.groq.com) ↗", api_card)
+        self.btn_get_groq_key.setObjectName("secondaryBtn")
+        self.btn_get_groq_key.setToolTip("Opens Groq Console (console.groq.com/keys) in browser to generate a free Groq API key")
+        self.btn_get_groq_key.clicked.connect(self._open_groq_console_link)
+        groq_header_layout.addWidget(self.btn_get_groq_key)
+        api_card_layout.addLayout(groq_header_layout)
+
+        groq_key_box = QHBoxLayout()
+        groq_key_box.setSpacing(8)
+        self.groq_key_input = QLineEdit(api_card)
+        self.groq_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.groq_key_input.setPlaceholderText("Paste your Groq API key here (starts with gsk_...)")
+        groq_key_box.addWidget(self.groq_key_input, stretch=4)
+
+        self.btn_toggle_groq_key = QPushButton("👁️ Show", api_card)
+        self.btn_toggle_groq_key.setObjectName("secondaryBtn")
+        self.btn_toggle_groq_key.clicked.connect(self._toggle_groq_key_echo)
+        groq_key_box.addWidget(self.btn_toggle_groq_key)
+
+        self.btn_paste_groq_key = QPushButton("📋 Paste", api_card)
+        self.btn_paste_groq_key.setObjectName("secondaryBtn")
+        self.btn_paste_groq_key.clicked.connect(self._paste_groq_key)
+        groq_key_box.addWidget(self.btn_paste_groq_key)
+
+        self.btn_clear_groq_key = QPushButton("✖ Clear", api_card)
+        self.btn_clear_groq_key.setObjectName("secondaryBtn")
+        self.btn_clear_groq_key.clicked.connect(self._clear_groq_key)
+        groq_key_box.addWidget(self.btn_clear_groq_key)
+        api_card_layout.addLayout(groq_key_box)
+
+        self.groq_status_label = QLabel("", api_card)
+        self.groq_status_label.setStyleSheet("border: none; font-size: 12px;")
+        self.groq_status_label.setWordWrap(True)
+        api_card_layout.addWidget(self.groq_status_label)
+
         layout.addWidget(api_card)
 
         # Model Selection (Intelligent Router + Models)
         model_label = QLabel("Gemini AI Model / Routing Mode:")
         layout.addWidget(model_label)
-        self.model_combo = QComboBox(self)
-        mv = QListView(self.model_combo)
+        self.model_combo = SafeComboBox(self)
+        mv = self.model_combo.view()
         mv.setTextElideMode(Qt.TextElideMode.ElideRight)
         mv.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         mv.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.model_combo.setView(mv)
+        # configured native view
         self.model_combo.setMaxVisibleItems(10)
-        self.model_combo.addItems([
-            "auto (Intelligent AI Model Router — Dynamic Per-Task Selection)",
-            "gemini-2.5-flash (Dedicated Speech & Multimodal — Ultra Fast < 1.5s — Recommended)",
-            "gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
-            "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)",
-            "ollama-gemma2 (Ollama Gemma 2B — 100% Local GPU Offline Brain)"
-        ])
+        for text, data in [
+            ("Offline Whisper AI (Faster-Whisper int8 — Sub-300ms — Default Recommended)", "offline-whisper"),
+            ("Groq Whisper Large V3 Turbo (Ultra-Low Latency < 0.25s — Groq LPU)", "groq-whisper-turbo"),
+            ("Moonshine ONNX (Sub-100ms Edge Dictation — Low Compute)", "moonshine-onnx"),
+            ("Sherpa-ONNX (Universal Offline Streaming Zipformer)", "sherpa-onnx"),
+            ("gemini-2.5-flash (Dedicated Speech & Multimodal — Ultra Fast < 1.5s)", "gemini-2.5-flash"),
+            ("gemini-3.5-flash-lite (Lowest Latency < 1.0s)", "gemini-3.5-flash-lite"),
+            ("ollama-qwen2.5 (Ollama Qwen 2.5 3B — 100% Local GPU Offline Brain)", "ollama-qwen2.5")
+        ]:
+            self.model_combo.addItem(text, data)
+        _diag_tips = {
+            "offline-whisper": "Offline Whisper AI (Faster-Whisper INT8 CPU).\n- Status: Built-in local offline engine with small.en/base.en/tiny.en weights.\n- Recommendation: Reliable offline dictation without internet.",
+            "groq-whisper-turbo": "Groq Whisper Large V3 Turbo (Ultra-Low Latency < 0.25s).\n- Status: Cloud LPU inference via Groq API (whisper-large-v3-turbo).\n- Setup: Requires GROQ_API_KEY in environment or Settings.",
+            "moonshine-onnx": "Moonshine ONNX (Sub-100ms Edge Dictation).\n- Status: Ultra-lightweight ONNX runtime.\n- Setup: If missing, install via 'pip install moonshine-voice'.",
+            "sherpa-onnx": "Sherpa-ONNX (Universal Streaming Zipformer).\n- Status: Next-gen streaming offline transducer.\n- Setup: Model weights stored in models/sherpa-onnx.",
+            "gemini-2.5-flash": "Gemini 2.5 Flash (Multimodal Cloud Speech).\n- Status: High accuracy and natural formatting (< 1.5s).\n- Setup: Requires Google Gemini API key.",
+            "gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite (Lowest Latency Cloud Speech).\n- Status: Fast sub-second transcription (< 1.0s).\n- Setup: Requires Google Gemini API key.",
+            "ollama-qwen2.5": "Ollama Qwen 2.5 3B (100% Local GPU Offline Brain).\n- Status: Local LLM text correction via Ollama.\n- Setup: Requires Ollama server running on http://localhost:11434."
+        }
+        for _i in range(self.model_combo.count()):
+            _d = self.model_combo.itemData(_i)
+            if _d in _diag_tips:
+                self.model_combo.setItemData(_i, _diag_tips[_d], Qt.ItemDataRole.ToolTipRole)
+
         self.model_combo.currentIndexChanged.connect(self._on_general_model_combo_changed)
         layout.addWidget(self.model_combo)
 
@@ -2922,8 +3087,8 @@ class SettingsDialog(QDialog):
         whisper_lbl = QLabel("Offline Whisper Engine Model:")
         whisper_lbl.setStyleSheet("font-size: 13px; font-weight: 600;")
         whisper_box.addWidget(whisper_lbl)
-        self.whisper_model_combo = QComboBox(self)
-        self.whisper_model_combo.setView(QListView())
+        self.whisper_model_combo = SafeComboBox(self)
+        # self.whisper_model_combo uses native view
         self.whisper_model_combo.addItems([
             "small.en (Recommended — 2.8x Real-Time, Highest Accuracy)",
             "base.en (Fast — Standard Accuracy)",
@@ -2960,8 +3125,8 @@ class SettingsDialog(QDialog):
         ret_lbl = QLabel("History Auto-Retention:", sec_card)
         ret_lbl.setStyleSheet("font-size: 13px; border: none; font-weight: 600;")
         ret_box.addWidget(ret_lbl)
-        self.retention_combo = QComboBox(sec_card)
-        self.retention_combo.setView(QListView())
+        self.retention_combo = SafeComboBox(sec_card)
+        # self.retention_combo uses native view
         self.retention_combo.addItem("7 Days", 7)
         self.retention_combo.addItem("14 Days", 14)
         self.retention_combo.addItem("30 Days (Recommended)", 30)
@@ -3152,6 +3317,41 @@ class SettingsDialog(QDialog):
         self.api_status_label.setStyleSheet("color: #94A3B8; border: none;")
         self.api_key_input.setFocus()
 
+    def _open_groq_console_link(self):
+        import webbrowser
+        webbrowser.open("https://console.groq.com/keys")
+
+    def _toggle_groq_key_echo(self):
+        if self.groq_key_input.echoMode() == QLineEdit.EchoMode.Password:
+            self.groq_key_input.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.btn_toggle_groq_key.setText("🔒 Hide")
+        else:
+            self.groq_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+            self.btn_toggle_groq_key.setText("👁️ Show")
+
+    def _paste_groq_key(self):
+        from ..config import sanitize_api_key
+        text = QApplication.clipboard().text().strip()
+        cleaned = sanitize_api_key(text)
+        if not cleaned:
+            self.groq_status_label.setText("⚠️ Clipboard is empty or contains invalid text.")
+            self.groq_status_label.setStyleSheet("color: #F59E0B; border: none;")
+            return
+        self.groq_key_input.setText(cleaned)
+        self.config.set("groq_api_key", cleaned)
+        os.environ["GROQ_API_KEY"] = cleaned
+        self.groq_status_label.setText("⚡ Groq API key loaded. Ultra-low latency LPU ready.")
+        self.groq_status_label.setStyleSheet("color: #10B981; border: none;")
+
+    def _clear_groq_key(self):
+        self.groq_key_input.clear()
+        self.config.set("groq_api_key", "")
+        if "GROQ_API_KEY" in os.environ:
+            del os.environ["GROQ_API_KEY"]
+        self.groq_status_label.setText("Groq key cleared.")
+        self.groq_status_label.setStyleSheet("color: #94A3B8; border: none;")
+        self.groq_key_input.setFocus()
+
     def _purge_expired_history(self):
         sec_cfg = self.config.get("security", {})
         days = self.retention_combo.currentData() if hasattr(self, 'retention_combo') and self.retention_combo else sec_cfg.get("history_retention_days", 30)
@@ -3180,7 +3380,7 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(14)
 
-        header = QLabel("🧭 Intelligent AI Model Router")
+        header = QLabel("🎯 AI Model Selection & Performance Matrix")
         header.setStyleSheet("font-size: 16px; font-weight: bold; color: #38BDF8;")
         layout.addWidget(header)
 
@@ -3199,7 +3399,7 @@ class SettingsDialog(QDialog):
         sf_layout = QVBoxLayout(status_frame)
         sf_layout.setSpacing(6)
 
-        self.router_active_badge = QLabel("🟢 Router Status: Active (Intelligent Dynamic Selection Enabled)", self)
+        self.router_active_badge = QLabel("🟢 Active AI Model: Gemini 2.5 Flash (Ultra Fast & Recommended)", self)
         self.router_active_badge.setObjectName("routerActiveBadge")
         sf_layout.addWidget(self.router_active_badge)
 
@@ -3220,24 +3420,32 @@ class SettingsDialog(QDialog):
         sel_layout = QVBoxLayout(sel_card)
         sel_layout.setSpacing(6)
 
-        sel_title = QLabel("🎯 Select Active AI Model or Auto-Intelligence Router:", sel_card)
+        sel_title = QLabel("🎯 Select Active AI Model:", sel_card)
         sel_title.setObjectName("blueSectionHeader")
         sel_layout.addWidget(sel_title)
 
-        self.router_model_combo = QComboBox(sel_card)
-        rmv = QListView(self.router_model_combo)
+        self.router_model_combo = SafeComboBox(sel_card)
+        rmv = self.router_model_combo.view()
         rmv.setTextElideMode(Qt.TextElideMode.ElideRight)
         rmv.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         rmv.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.router_model_combo.setView(rmv)
+        # configured native view
         self.router_model_combo.setMaxVisibleItems(10)
-        self.router_model_combo.addItems([
-            "auto (Intelligent AI Model Router — Dynamic Per-Task Selection)",
-            "gemini-2.5-flash (Dedicated Speech & Multimodal — Ultra Fast < 1.5s — Recommended)",
-            "gemini-3.5-flash-lite (Lowest Latency < 1.0s)",
-            "offline-whisper (Offline Whisper AI — 100% Local On-Device / No Internet)",
-            "ollama-gemma2 (Ollama Gemma 2B — 100% Local GPU Offline Brain)"
-        ])
+        for text, data in [
+            ("Offline Whisper AI (Faster-Whisper int8 — Sub-300ms — Default Recommended)", "offline-whisper"),
+            ("Groq Whisper Large V3 Turbo (Ultra-Low Latency < 0.25s — Groq LPU)", "groq-whisper-turbo"),
+            ("Moonshine ONNX (Sub-100ms Edge Dictation — Low Compute)", "moonshine-onnx"),
+            ("Sherpa-ONNX (Universal Offline Streaming Zipformer)", "sherpa-onnx"),
+            ("gemini-2.5-flash (Dedicated Speech & Multimodal — Ultra Fast < 1.5s)", "gemini-2.5-flash"),
+            ("gemini-3.5-flash-lite (Lowest Latency < 1.0s)", "gemini-3.5-flash-lite"),
+            ("ollama-qwen2.5 (Ollama Qwen 2.5 3B — 100% Local GPU Offline Brain)", "ollama-qwen2.5")
+        ]:
+            self.router_model_combo.addItem(text, data)
+        for _i in range(self.router_model_combo.count()):
+            _d = self.router_model_combo.itemData(_i)
+            if _d in _diag_tips:
+                self.router_model_combo.setItemData(_i, _diag_tips[_d], Qt.ItemDataRole.ToolTipRole)
+
         self.router_model_combo.currentIndexChanged.connect(self._on_router_model_combo_changed)
         sel_layout.addWidget(self.router_model_combo)
         layout.addWidget(sel_card)
@@ -3329,9 +3537,9 @@ class SettingsDialog(QDialog):
                 "Zero-internet offline dictation, confidential documents, travel mode, and private offline typing."
             ),
             (
-                "4. ollama-gemma2 (Ollama Gemma 2B — 100% Local GPU Offline Brain)",
+                "4. ollama-qwen2.5 (Ollama Qwen 2.5 3B — 100% Local GPU Offline Brain)",
                 "🧠 ~0.5s – 1.8s (Local LLM Refinement)",
-                "Coupled with Faster-Whisper, sends transcripts to local Gemma 2B (or on-device AI Polish Brain with 0ms delay if daemon is offline) for deep restructuring.",
+                "Coupled with Faster-Whisper, sends transcripts to local Qwen 2.5 3B (or on-device AI Polish Brain with 0ms delay if daemon is offline) for deep restructuring.",
                 "Hey, could you explain how to use this AI dictation tool?\n\nStatus:\n• API Backend: In progress\n• Frontend UI: Almost done\n• Datasets: Provided two sets for comparison\n\nAction: Please analyze both and reply to the team today. Thanks!",
                 "Local AI structuring, converting spoken thoughts into clean bullet points with zero API usage."
             ),
@@ -3665,8 +3873,8 @@ class SettingsDialog(QDialog):
 
         tc_controls = QHBoxLayout()
         from app.commands import COMMAND_REGISTRY
-        self.cmd_test_combo = QComboBox(test_cmd_card)
-        self.cmd_test_combo.setView(QListView())
+        self.cmd_test_combo = SafeComboBox(test_cmd_card)
+        # self.cmd_test_combo uses native view
         for c in COMMAND_REGISTRY:
             self.cmd_test_combo.addItem(f"{c.name}", c.id)
         self.cmd_test_combo.currentIndexChanged.connect(self._on_test_cmd_changed)
@@ -3717,8 +3925,8 @@ class SettingsDialog(QDialog):
         # Profile combo
         sel_box = QHBoxLayout()
         sel_box.addWidget(QLabel("Active Profile:"))
-        self.profile_combo = QComboBox(self)
-        self.profile_combo.setView(QListView())
+        self.profile_combo = SafeComboBox(self)
+        # self.profile_combo uses native view
         for p in BUILTIN_PROFILES.values():
             self.profile_combo.addItem(f"{p.icon}  {p.name}", p.id)
         self.profile_combo.currentIndexChanged.connect(self._on_profile_combo_changed)
@@ -3873,7 +4081,7 @@ class SettingsDialog(QDialog):
     def _refresh_vocab_table(self):
         self.vocab_table.setRowCount(0)
         try:
-            ve = VocabularyEngine()
+            ve = VocabularyEngine.get_instance()
             entries = ve.entries
             for row, e in enumerate(entries):
                 self.vocab_table.insertRow(row)
@@ -3898,7 +4106,7 @@ class SettingsDialog(QDialog):
         dlg = VocabEditDialog(parent=self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             data = dlg.get_data()
-            ve = VocabularyEngine()
+            ve = VocabularyEngine.get_instance()
             ve.add_entry(
                 canonical_term=data["canonical_term"],
                 aliases=data["aliases"],
@@ -3917,7 +4125,7 @@ class SettingsDialog(QDialog):
         if not item:
             return
         c_term = item.text()
-        ve = VocabularyEngine()
+        ve = VocabularyEngine.get_instance()
         entry = next((e for e in ve.entries if e.canonical_term.lower() == c_term.lower()), None)
         if not entry:
             return
@@ -3950,14 +4158,14 @@ class SettingsDialog(QDialog):
         c_term = item.text()
         res = QMessageBox.question(self, "Delete Term", f"Delete '{c_term}' from your vocabulary engine?")
         if res == QMessageBox.StandardButton.Yes:
-            ve = VocabularyEngine()
+            ve = VocabularyEngine.get_instance()
             ve.delete_entry(c_term)
             self._refresh_vocab_table()
             self._on_vocab_test_changed(self.vocab_test_input.text())
 
     def _on_vocab_test_changed(self, text: str):
         try:
-            ve = VocabularyEngine()
+            ve = VocabularyEngine.get_instance()
             norm = ve.normalize(text)
             self.vocab_test_output.setText(norm)
         except Exception:
@@ -4016,8 +4224,8 @@ class SettingsDialog(QDialog):
 
         runner_box = QHBoxLayout()
         runner_box.addWidget(QLabel("Target Model:", self))
-        self.bench_target_combo = QComboBox(self)
-        self.bench_target_combo.setView(QListView())
+        self.bench_target_combo = SafeComboBox(self)
+        # self.bench_target_combo uses native view
         for m in MODEL_REGISTRY.keys():
             self.bench_target_combo.addItem(m, m)
         runner_box.addWidget(self.bench_target_combo, stretch=2)
@@ -4170,8 +4378,8 @@ class SettingsDialog(QDialog):
         sel_lbl = QLabel("Choose Dictation Style / Prompt:", prompt_card)
         sel_lbl.setStyleSheet("font-weight: 600;")
         sel_row.addWidget(sel_lbl)
-        self.saved_prompts_combo = QComboBox(prompt_card)
-        self.saved_prompts_combo.setView(QListView())
+        self.saved_prompts_combo = SafeComboBox(prompt_card)
+        # self.saved_prompts_combo uses native view
         self.saved_prompts_combo.currentIndexChanged.connect(self._on_saved_prompt_selected)
         sel_row.addWidget(self.saved_prompts_combo, stretch=2)
         pc_layout.addLayout(sel_row)
@@ -4282,8 +4490,8 @@ class SettingsDialog(QDialog):
         sel_combo_lbl.setStyleSheet("font-weight: 600; font-size: 13px; border: none;")
         sel_combo_row.addWidget(sel_combo_lbl)
 
-        self.showcase_combo = QComboBox(showcase_card)
-        self.showcase_combo.setView(QListView())
+        self.showcase_combo = SafeComboBox(showcase_card)
+        # self.showcase_combo uses native view
         for idx, item in enumerate(COMBINATION_SHOWCASE_DATA):
             self.showcase_combo.addItem(item["title"], idx)
         self.showcase_combo.currentIndexChanged.connect(self._on_showcase_combo_changed)
@@ -4518,8 +4726,8 @@ class SettingsDialog(QDialog):
         # Device selector row with refresh button
         mic_row = QHBoxLayout()
         mic_row.setSpacing(10)
-        self.mic_combo = QComboBox(mic_card)
-        self.mic_combo.setView(QListView())
+        self.mic_combo = SafeComboBox(mic_card)
+        # self.mic_combo uses native view
         self._populate_mics()
         mic_row.addWidget(self.mic_combo, stretch=4)
 
@@ -5531,20 +5739,31 @@ class SettingsDialog(QDialog):
             self.api_status_label.setText("🔑 Key loaded. Click '⚡ Test & Save' or press Enter to verify connection anytime.")
             self.api_status_label.setStyleSheet("color: #94A3B8; border: none;")
 
-        # Model / Routing Mode
-        model_mode = self.config.get("model_mode", "auto")
-        if model_mode == "auto":
+        # Groq API Key
+        if hasattr(self, 'groq_key_input'):
+            groq_k = self.config.get("groq_api_key", "") or os.environ.get("GROQ_API_KEY", "")
+            self.groq_key_input.setText(groq_k)
+            if groq_k:
+                self.groq_status_label.setText("⚡ Groq API key loaded. Ultra-low latency LPU ready.")
+                self.groq_status_label.setStyleSheet("color: #10B981; border: none;")
+            else:
+                self.groq_status_label.setText("ℹ️ Optional: Add a free Groq API key to enable < 0.25s Whisper LPU.")
+                self.groq_status_label.setStyleSheet("color: #64748B; border: none;")
+
+        # Model Selection (4 Production Models)
+        model_name = self.config.get("model_name", "gemini-2.5-flash")
+        if not model_name or model_name == "auto":
+            model_name = "gemini-2.5-flash"
+        found = False
+        for i in range(self.model_combo.count()):
+            m_data = self.model_combo.itemData(i)
+            m_text = self.model_combo.itemText(i)
+            if (m_data and m_data == model_name) or m_text.startswith(model_name):
+                self.model_combo.setCurrentIndex(i)
+                found = True
+                break
+        if not found:
             self.model_combo.setCurrentIndex(0)
-        else:
-            model_name = self.config.get("model_name", "gemini-3.5-transcribe")
-            found = False
-            for i in range(1, self.model_combo.count()):
-                if self.model_combo.itemText(i).startswith(model_name):
-                    self.model_combo.setCurrentIndex(i)
-                    found = True
-                    break
-            if not found:
-                self.model_combo.setCurrentIndex(0)
 
         if hasattr(self, 'whisper_model_combo'):
             wm = self.config.get("whisper_model", "small.en")
@@ -5559,6 +5778,8 @@ class SettingsDialog(QDialog):
             self.router_model_combo.blockSignals(True)
             self.router_model_combo.setCurrentIndex(self.model_combo.currentIndex())
             self.router_model_combo.blockSignals(False)
+        active_code = self.model_combo.itemData(self.model_combo.currentIndex()) or "gemini-2.5-flash"
+        self._update_active_model_status_display(active_code)
 
         # Modes
         mode = self.config.get("hotkey_mode", "toggle")
@@ -5571,12 +5792,12 @@ class SettingsDialog(QDialog):
         hotkey_inter = self.config.get("hotkey", "<ctrl>+<cmd>")
         self.hotkey_btn.set_hotkey(hotkey_disp, hotkey_inter)
 
-        prompt_disp = self.config.get("prompt_hotkey_display", "Ctrl + Shift + P")
-        prompt_inter = self.config.get("prompt_hotkey", "<ctrl>+<shift>+p")
+        prompt_disp = self.config.get("prompt_hotkey_display", "Alt + P")
+        prompt_inter = self.config.get("prompt_hotkey", "<alt>+p")
         self.prompt_hotkey_btn.set_hotkey(prompt_disp, prompt_inter)
 
-        trans_disp = self.config.get("transform_hotkey_display", "Ctrl + Shift + T")
-        trans_inter = self.config.get("transform_hotkey", "<ctrl>+<shift>+t")
+        trans_disp = self.config.get("transform_hotkey_display", "Alt + T")
+        trans_inter = self.config.get("transform_hotkey", "<alt>+t")
         self.transform_hotkey_btn.set_hotkey(trans_disp, trans_inter)
 
         # Profiles
@@ -5885,13 +6106,27 @@ class SettingsDialog(QDialog):
             self.showcase_status_label.setStyleSheet("color: #10B981; font-weight: bold; font-size: 12px; border: none;")
             QTimer.singleShot(4000, lambda: self.showcase_status_label.setText("") if hasattr(self, "showcase_status_label") else None)
 
+    def _update_active_model_status_display(self, model_code: str):
+        """Updates active model badge and status indicators dynamically to reflect current engine execution."""
+        display_names = {
+            "offline-whisper": "Offline Whisper AI (Faster-Whisper INT8 CPU — Default)",
+            "groq-whisper-turbo": "Groq Whisper Large V3 Turbo (< 0.25s LPU — Ultra-Fast)",
+            "moonshine-onnx": "Moonshine ONNX (Sub-100ms Edge Dictation — Low Compute)",
+            "sherpa-onnx": "Sherpa-ONNX (Universal Streaming Zipformer)",
+            "gemini-2.5-flash": "Gemini 2.5 Flash (Flagship Speech & Multimodal — Ultra Fast)",
+            "gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite (Lowest Latency Cloud Speech)",
+            "ollama-qwen2.5": "Ollama Qwen 2.5 3B (100% Local GPU Offline Brain)"
+        }
+        name = display_names.get(model_code, model_code)
+        if hasattr(self, "router_active_badge") and self.router_active_badge:
+            self.router_active_badge.setText(f"🟢 Active AI Model: {name}")
+
     def _on_general_model_combo_changed(self, index: int):
         if hasattr(self, 'router_model_combo') and self.router_model_combo.currentIndex() != index:
             self.router_model_combo.blockSignals(True)
             self.router_model_combo.setCurrentIndex(index)
             self.router_model_combo.blockSignals(False)
-        raw_text = self.model_combo.itemText(index)
-        model_code = raw_text.split()[0] if raw_text else "auto"
+        model_code = self.model_combo.itemData(index) or (self.model_combo.itemText(index).split()[0] if self.model_combo.itemText(index) else "auto")
         if model_code == "auto":
             self.config.set("model_mode", "auto")
             self.config.set("model_name", "gemini-3.5-flash-lite")
@@ -5900,14 +6135,14 @@ class SettingsDialog(QDialog):
             self.config.set("model_name", model_code)
         if hasattr(self, 'gemini') and self.gemini:
             self.gemini.set_model(model_code)
+        self._update_active_model_status_display(model_code)
 
     def _on_router_model_combo_changed(self, index: int):
         if hasattr(self, 'model_combo') and self.model_combo.currentIndex() != index:
             self.model_combo.blockSignals(True)
             self.model_combo.setCurrentIndex(index)
             self.model_combo.blockSignals(False)
-        raw_text = self.router_model_combo.itemText(index)
-        model_code = raw_text.split()[0] if raw_text else "auto"
+        model_code = self.router_model_combo.itemData(index) or (self.router_model_combo.itemText(index).split()[0] if self.router_model_combo.itemText(index) else "auto")
         if model_code == "auto":
             self.config.set("model_mode", "auto")
             self.config.set("model_name", "gemini-3.5-flash-lite")
@@ -5916,6 +6151,7 @@ class SettingsDialog(QDialog):
             self.config.set("model_name", model_code)
         if hasattr(self, 'gemini') and self.gemini:
             self.gemini.set_model(model_code)
+        self._update_active_model_status_display(model_code)
 
     def notify_history_changed(self):
         """Called live by main coordinator when new transcription or prompt finishes."""
@@ -6824,8 +7060,8 @@ class SettingsDialog(QDialog):
         ret_lbl.setStyleSheet("font-size: 13px; font-weight: 600;")
         ret_box.addWidget(ret_lbl)
 
-        ret_combo = QComboBox(dlg)
-        ret_combo.setView(QListView())
+        ret_combo = SafeComboBox(dlg)
+        # ret_combo uses native view
         ret_combo.addItem("7 Days", 7)
         ret_combo.addItem("14 Days", 14)
         ret_combo.addItem("30 Days (Recommended)", 30)
@@ -6907,8 +7143,9 @@ class SettingsDialog(QDialog):
         self.api_status_label.setText("⏳ Testing connection to Google Gemini API (verifying models & latency)...")
         self.api_status_label.setStyleSheet("color: #38BDF8; border: none;")
 
-        model_code = self.model_combo.currentText().split()[0]
-        self.gemini.set_model(model_code)
+        model_code = self.model_combo.itemData(self.model_combo.currentIndex()) or self.model_combo.currentText().split()[0]
+        gemini_test_model = model_code if str(model_code).startswith("gemini-") else "gemini-2.5-flash"
+        self.gemini.set_model(gemini_test_model)
 
         def _bg_test():
             ok, msg = self.gemini.test_connection(key)
@@ -6966,6 +7203,10 @@ class SettingsDialog(QDialog):
             self.mic_level_label.setText("0%")
             self.mic_level_label.setStyleSheet("color: #94A3B8; font-size: 12px;")
 
+    def save_settings(self):
+        """Public alias for _save_settings to support programmatic saves and automated testing."""
+        return self._save_settings()
+
     def _save_settings(self):
         self._stop_mic_test()
 
@@ -6973,7 +7214,9 @@ class SettingsDialog(QDialog):
         from ..config import sanitize_api_key
         key = sanitize_api_key(self.api_key_input.text())
         self.api_key_input.setText(key)
-        model_code = self.model_combo.currentText().split()[0]
+        model_code = self.model_combo.itemData(self.model_combo.currentIndex()) or self.model_combo.currentText().split()[0]
+        if not model_code or model_code == "auto":
+            model_code = "gemini-2.5-flash"
         mode = "push_to_talk" if self.radio_ptt.isChecked() else "toggle"
         hotkey_disp = self.hotkey_btn.display_str
         hotkey_inter = self.hotkey_btn.internal_str
@@ -6993,6 +7236,16 @@ class SettingsDialog(QDialog):
 
         # Secure key persistence (Windows DPAPI)
         self.config.set_api_key(key)
+        if key.startswith("gsk_"):
+            self.config.set("groq_api_key", key)
+            os.environ["GROQ_API_KEY"] = key
+        if hasattr(self, 'groq_key_input'):
+            g_key = sanitize_api_key(self.groq_key_input.text())
+            self.config.set("groq_api_key", g_key)
+            if g_key:
+                os.environ["GROQ_API_KEY"] = g_key
+            elif "GROQ_API_KEY" in os.environ:
+                del os.environ["GROQ_API_KEY"]
         self.gemini.set_api_key(key)
         self.gemini.warm_connection()
 
@@ -7003,6 +7256,7 @@ class SettingsDialog(QDialog):
         else:
             self.config.set("model_mode", model_code)
             self.config.set("model_name", model_code)
+        self._update_active_model_status_display(model_code)
 
         if hasattr(self, 'whisper_model_combo'):
             wm_idx = self.whisper_model_combo.currentIndex()
@@ -7290,6 +7544,9 @@ class SettingsDialog(QDialog):
 
     def _run_interactive_command_test(self):
         from app.commands import COMMAND_MAP
+        from app.config import sanitize_api_key
+        from app.transformation.gemini_transform_service import GeminiTransformService
+
         cmd_id = self.cmd_test_combo.currentData()
         if cmd_id not in COMMAND_MAP:
             return
@@ -7299,45 +7556,41 @@ class SettingsDialog(QDialog):
             self.lbl_cmd_validation_status.setText("⚠️ Please enter sample input.")
             return
 
-        self.lbl_cmd_validation_status.setText("⏳ Running transformation & validator...")
+        key_override = sanitize_api_key(self.api_key_input.text()) if hasattr(self, "api_key_input") else ""
+        self.lbl_cmd_validation_status.setText("⏳ Running Gemini command & validator...")
+        self.lbl_cmd_validation_status.setStyleSheet("color: #38BDF8; font-weight: 700;")
         self.btn_run_test_cmd.setEnabled(False)
 
         def _worker():
             try:
-                api_key = self.config.get_api_key()
-                active_model = self.config.get("model_name") or "gemini-2.5-flash"
-                if api_key and "offline" not in active_model.lower() and hasattr(self.main_app, "_execute_voice_command"):
-                    success, out = self.main_app._execute_voice_command(cmd, inp)
-                else:
-                    success, out = True, f"[{cmd.name} output preview for]: {inp}"
-                    is_v, reason = cmd.validator(inp, out)
-                    if not is_v:
-                        out = f"Processed {cmd.name}: {inp}"
-
-                from PyQt6.QtCore import QTimer
-                def _update_ui():
-                    self.btn_run_test_cmd.setEnabled(True)
-                    if success:
-                        self.txt_test_cmd_output.setText(out)
-                        is_valid, reason = cmd.validator(inp, out)
-                        if is_valid:
-                            self.lbl_cmd_validation_status.setText("✅ Passed Validator")
-                            self.lbl_cmd_validation_status.setStyleSheet("color: #10B981; font-weight: 700;")
-                        else:
-                            self.lbl_cmd_validation_status.setText(f"⚠️ Validator note: {reason}")
-                            self.lbl_cmd_validation_status.setStyleSheet("color: #F59E0B; font-weight: 700;")
-                    else:
-                        self.txt_test_cmd_output.setText(f"Error: {out}")
-                        self.lbl_cmd_validation_status.setText("❌ Failed")
-                        self.lbl_cmd_validation_status.setStyleSheet("color: #EF4444; font-weight: 700;")
-
-                QTimer.singleShot(0, _update_ui)
+                service = getattr(self.main_app, "gemini_transform_service", None)
+                if service is None:
+                    service = GeminiTransformService(config_manager=self.config, api_key=key_override)
+                res = service.execute_command_category(
+                    cmd=cmd,
+                    payload=inp,
+                    api_key_override=key_override,
+                )
+                out_or_err = res.text if res.success else (res.error_message or f"{cmd.name} failed.")
+                self.command_test_finished.emit(bool(res.success), out_or_err, inp, cmd)
             except Exception as e:
-                from PyQt6.QtCore import QTimer
-                def _err():
-                    self.btn_run_test_cmd.setEnabled(True)
-                    self.lbl_cmd_validation_status.setText(f"❌ Error: {e}")
-                QTimer.singleShot(0, _err)
+                self.command_test_finished.emit(False, str(e), inp, cmd)
 
         import threading
-        threading.Thread(target=_worker, daemon=True).start()
+        threading.Thread(target=_worker, daemon=True, name="InteractiveCommandTest").start()
+
+    def _on_interactive_command_test_result(self, success: bool, out_or_err: str, inp: str, cmd: object):
+        self.btn_run_test_cmd.setEnabled(True)
+        if success:
+            self.txt_test_cmd_output.setText(out_or_err)
+            is_valid, reason = cmd.validator(inp, out_or_err)
+            if is_valid:
+                self.lbl_cmd_validation_status.setText("✅ Passed Validator (Gemini API)")
+                self.lbl_cmd_validation_status.setStyleSheet("color: #10B981; font-weight: 700;")
+            else:
+                self.lbl_cmd_validation_status.setText(f"⚠️ Validator note: {reason}")
+                self.lbl_cmd_validation_status.setStyleSheet("color: #F59E0B; font-weight: 700;")
+        else:
+            self.txt_test_cmd_output.setText(f"Error: {out_or_err}")
+            self.lbl_cmd_validation_status.setText("❌ Gemini API Error")
+            self.lbl_cmd_validation_status.setStyleSheet("color: #EF4444; font-weight: 700;")

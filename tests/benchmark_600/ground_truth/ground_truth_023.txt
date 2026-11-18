@@ -1,0 +1,1 @@
+Wait, did anyone actually test the Stripe webhook on the sandbox environment yet?

@@ -18,12 +18,15 @@ if exist ".\.venv\Scripts\python.exe" (
 )
 
 if "%PYTHON_EXE%"=="" (
-    echo [ERROR] Virtual environment not found!
-    echo.
-    echo Please run scripts\setup_windows.ps1 first to set up Gemini Flow.
-    echo In PowerShell, execute:
-    echo     powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1
-    echo.
+    where python >nul 2>&1
+    if !ERRORLEVEL! EQU 0 (
+        set "PYTHON_EXE=python"
+    )
+)
+
+if "%PYTHON_EXE%"=="" (
+    echo [ERROR] Python not found!
+    echo Please install Python 3.10+ or run scripts\setup_windows.ps1.
     pause
     exit /b 1
 )

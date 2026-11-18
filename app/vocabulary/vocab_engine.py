@@ -146,8 +146,12 @@ class VocabularyEngine:
         if vocab_file:
             self.file_path = vocab_file
         else:
-            import os
-            app_dir = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow"
+            try:
+                from ..config import APP_DIR
+                app_dir = APP_DIR
+            except Exception:
+                import os
+                app_dir = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow"
             app_dir.mkdir(parents=True, exist_ok=True)
             self.file_path = app_dir / "vocabulary.json"
 
@@ -211,6 +215,13 @@ class VocabularyEngine:
         try:
             with open(self.file_path, "w", encoding="utf-8") as f:
                 json.dump([e.to_dict() for e in self.entries], f, indent=2)
+            # Keep singleton instance in sync when any VocabularyEngine instance saves
+            if (
+                VocabularyEngine._cached_instance is not None
+                and VocabularyEngine._cached_instance is not self
+                and VocabularyEngine._cached_instance.file_path == self.file_path
+            ):
+                VocabularyEngine._cached_instance.entries = list(self.entries)
             return True
         except Exception as e:
             logger.error(f"Failed to save vocabulary: {e}")
@@ -624,4 +635,5 @@ class VocabularyEngine:
         return engine.normalize(text)
 
 
+VocabularyEngine.apply_replacements = VocabularyEngine.normalize
 VocabEngine = VocabularyEngine

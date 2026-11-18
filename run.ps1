@@ -18,14 +18,14 @@ if (Test-Path (Join-Path $ProjectRoot ".venv\Scripts\python.exe")) {
 }
 
 if (-not $VenvPython) {
-    Write-Host "[ERROR] Virtual environment not found!" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Please run scripts\setup_windows.ps1 first to set up Gemini Flow." -ForegroundColor Yellow
-    Write-Host "Command:" -ForegroundColor White
-    Write-Host "    powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1" -ForegroundColor Cyan
-    Write-Host ""
-    Read-Host "Press Enter to exit..."
-    exit 1
+    if (Get-Command python -ErrorAction SilentlyContinue) {
+        $VenvPython = "python"
+    } else {
+        Write-Host "[ERROR] Python not found!" -ForegroundColor Red
+        Write-Host "Please install Python 3.10+ or run scripts\setup_windows.ps1." -ForegroundColor Yellow
+        Read-Host "Press Enter to exit..."
+        exit 1
+    }
 }
 
 Write-Host "[*] Launching Gemini Flow via virtual environment..." -ForegroundColor Green

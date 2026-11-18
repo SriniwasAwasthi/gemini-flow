@@ -1,0 +1,14 @@
+{
+  "database_type": "SQLite3 (Serverless Embedded Database)",
+  "python_module": "sqlite3",
+  "database_path": "tests/benchmark_600/benchmark_ledger.db",
+  "first_initialized_date": "2026-10-29",
+  "first_initialized_time": "22:34:31 (10:34:31 PM)",
+  "latest_benchmark_run_date": "2026-10-30",
+  "latest_benchmark_run_time": "18:28:13 (06:28:13 PM)",
+  "total_records_stored": 600,
+  "tables": [
+    "benchmark_runs"
+  ],
+  "note": "SQLite requires no external server or separate installation; it runs natively in Python and writes directly to local disk."
+}

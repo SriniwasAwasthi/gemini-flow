@@ -1,0 +1,1 @@
+The GraphQL federation gateway resolves subgraphs concurrently while enforcing schema directive validation at runtime.

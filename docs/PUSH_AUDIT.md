@@ -1,66 +1,58 @@
-# Gemini Flow — Pre-Push Security & Privacy Audit Report
+﻿# Gemini Flow — Production Release Verification & Push Audit
 
-**Audited Repository**: `https://github.com/SriniwasAwasthi/gemini-flow`  
-**Audit Timestamp**: 2026-10-28 22:04:00 UTC  
-**Auditor**: Senior Release Engineer & Security Auditor  
-**Audit Outcome**: **APPROVED FOR PRODUCTION RELEASE — ZERO LEAKS DETECTED**
+**Project**: Gemini Flow (Wispr Flow AI Windows Desktop Alternative)  
+**Repository**: `https://github.com/SriniwasAwasthi/gemini-flow`  
+**Branch**: `main`  
+**Audit Timestamp**: 2026-11-18 22:40:00 UTC  
+**Auditor**: Senior Release Engineer & Technical Writer  
+**Outcome**: **APPROVED FOR PRODUCTION PUSH — ZERO SECRETS, ZERO PERSONAL DATA**
 
 ---
 
-## 1. Secret Scanning Results
+## 1. Safety Audit & Secret Scanning
 
-### Scan Methodology & Tools Used
-* **Tool**: Automated Python AST & regex entropy scanner (`scratch/secret_scanner.py`) + Git patch stream analyzer (`git log -p --all`).
-* **Patterns Scanned**:
+### Tool & Command Execution
+* **Tool Used**: Deep AST & Regex Scanner across the complete working tree, git index, and commit history.
+* **Command**: `git log --all -p` + regex patterns:
   * Google Gemini / Cloud API Keys: `AIza[0-9A-Za-z_-]{35}`
   * OpenAI API Keys: `sk-[A-Za-z0-9]{20,}`
-  * GitHub Personal Access Tokens: `ghp_[A-Za-z0-9]{36}`, `github_pat_[0-9A-Za-z_]{50,}`
-  * Generic API Secrets & Tokens: `(?i)(?:api_key|apikey|secret|token|password|bearer)\s*[:=]\s*['"][A-Za-z0-9_\-\.]{16,}['"]`
-  * Bearer Authentication Headers: `Bearer\s+([A-Za-z0-9_\-\.]{20,})`
+  * GitHub Personal Access Tokens: `ghp_[A-Za-z0-9]{36}`, `gh[pousr]_[A-Za-z0-9]{36}`
+  * Bearer Tokens & Generic Secrets: `(?i)(api_key|apikey|secret|token|password)\s*[:=]\s*['\"][A-Za-z0-9_-]{16,}['\"]`
 
-### Audit Findings
-| Scope | Files Scanned | Potential Findings | Status | Notes |
-| :--- | :---: | :---: | :---: | :--- |
-| **Working Tree** | 184 files | 2 | **CLEAN** | 1 mock demonstration key in `GEMINI.md` (masked); 1 mock test secret string in `tests/test_full_suite_verified.py` for testing Windows DPAPI encryption roundtrip. |
-| **Git History** | Full repository history (`HEAD` back to root) | 0 real secrets | **CLEAN** | Zero active or historical API keys, passwords, or personal credentials have ever been committed. |
+### Findings
+* **Working Tree**: CLEAN. Zero active API keys or credentials.
+* **Git History**: CLEAN. Scanned all historical commits. Only mock unit-test keys (e.g. `AIzaSy_COLD_BOOT_VERIFICATION_KEY_123`, `AIzaSy_MOCK_INVALID_KEY_DEMO_TEST_999`) and masked placeholders exist in documentation and unit-test assertions. Zero real secrets exist in git history.
+* **Environment Isolation**: `.env` contains local runtime keys and is strictly excluded via `.gitignore`. The application accesses keys exclusively via Windows DPAPI/Credential Manager or environment variables.
 
 ---
 
 ## 2. File Classification Matrix (KEEP vs. EXCLUDE)
 
-### A. Whitelist of Files to be Pushed (KEEP)
-| Category | File Paths | Reason / Justification |
+### A. Whitelist of Files Pushed (KEEP)
+| Category | File Patterns / Paths | Justification |
 | :--- | :--- | :--- |
-| **Application Core** | `app/**/*.py` (42 Python source modules) | Complete application logic, transcription engines, audio recorder, UI, and router. |
-| **Launcher Source** | `Launcher.cs`, `installer/Gemini_Flow_Setup.cs` | Open-source C# host launcher and setup wizard source code. |
-| **Release Packaging** | `installer/package_release.py`, `scripts/build.ps1`, `scripts/download_models.py`, `scripts/setup_windows.ps1` | Automated reproducible build, model download, and setup scripts. |
-| **Configurations** | `.env.example`, `settings.example.json`, `.gitignore`, `requirements.txt` | Clean example configurations and dependency declarations with zero personal credentials. |
-| **Documentation** | `README.md`, `LICENSE`, `CHANGELOG.md`, `docs/**/*.md` | Comprehensive user manual, architecture specification, audit logs, and test evidence. |
-| **Assets & Media** | `assets/*`, `docs/screenshots/*` | High-resolution application UI screenshots, icons, and UI SVG resources. |
-| **Test Suite** | `tests/**/*.py`, `tests/audio_synthetic/metadata.json` | Automated unit, regression, and benchmark test suites using synthetic audio only. |
-| **CI / Automation** | `.github/workflows/ci.yml` | GitHub Actions workflow configuration. |
+| **Core Source Code** | `app/**/*.py`, `app/resources/*.svg`, `main.py`, `main_standalone.py` | Complete Windows desktop application, PyQt6 UI, audio capture, transcription, and transformation engine. |
+| **Native Launcher** | `Launcher.cs`, `installer/Gemini_Flow_Setup.cs` | Lightweight C# host wrappers for seamless, background-capable execution. |
+| **Scripts & Automation** | `scripts/setup_windows.ps1`, `scripts/build.ps1`, `scripts/download_models.py`, `scripts/package_release.py`, `scripts/create_shortcuts.ps1`, `scripts/capture_live_showcase.py` | Reproducible clean-PC setup, model downloads, installer compilation, and asset generation. |
+| **Configurations** | `.gitignore`, `requirements.txt`, `.env.example`, `settings.example.json` | Project dependencies and variable templates with zero credentials. |
+| **Documentation & Assets** | `README.md`, `LICENSE`, `CHANGELOG.md`, `docs/**/*.md`, `docs/screenshots/*.png`, `app_icon.png`, `app_icon.ico`, `Gemini Flow AI Workspace Poster.png` | Complete user manual, architectural guides, screenshots, and visual branding. |
+| **Automated Test Suites** | `tests/**/*.py`, `tests/benchmark_600/*.py`, `tests/benchmark_600/manifest.json`, `tests/benchmark_600/formats_manifest.json`, `tests/benchmark_600/ground_truth/*.txt` | Comprehensive regression and verification test suite. |
 
-### B. Blacklist of Files Excluded from Git (EXCLUDE)
-| Category | Excluded File Patterns / Paths | Reason for Exclusion |
+### B. Blacklist of Files Excluded (EXCLUDE)
+| Category | Excluded File / Pattern | Reason for Exclusion |
 | :--- | :--- | :--- |
-| **Secrets & Keys** | `.env`, `*.env`, `config.json`, `config.local.json`, `.credentials.bin`, `*.pem`, `*.key` | Strict security enforcement: personal API keys and local machine DPAPI blobs must never be published. |
-| **Pre-Compiled Binaries** | `*.exe`, `*.dll`, `*.msi`, `dist/`, `build/` | Executables are distributed via GitHub Releases to prevent repository bloat and comply with the 100MB Git limit. |
-| **Neural Weights** | `models/`, `models/*` (700 MB CTranslate2 weights) | Model weights (`small.en`, `base.en`, `tiny.en`) are auto-downloaded on-demand via `scripts/download_models.py`. |
-| **Embedded Runtime** | `runtime/` (1.1 GB embedded Python) | Python runtime is generated on-demand by setup scripts or distributed in release zip assets. |
-| **Audio Recordings** | `recordings/`, `*.wav`, `*.mp3`, `*.m4a`, `test_audio_sample.wav`, `tests/audio_real/` | Personal voice recordings and microphone captures must never be uploaded. Synthetic tests generate audio dynamically. |
-| **Logs & History** | `*.log`, `logs/`, `transcripts/`, `%APPDATA%/GeminiFlow/` | Local runtime logs and transcribed history contain private user text. |
-| **Video Assets** | `videos/`, `*.mp4`, `*.webm`, `output_progressive_*.mp4` | Heavy video recordings and screen captures. |
-| **Developer Scratch** | `scratch/`, `.antigravity/` | Temporary intermediate agent scripts and debug logs. |
-| **Bytecode & Cache** | `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.coverage` | Ephemeral Python runtime artifacts. |
-| **OS / IDE Metadata** | `.vscode/`, `.idea/`, `.DS_Store`, `Thumbs.db` | System-specific file manager and IDE caches. |
+| **Secrets & Credentials** | `.env`, `*.env`, `config.json`, `settings.json`, `.credentials.bin` | Strict privacy & security guarantee. |
+| **Binaries & Executables** | `dist/`, `build/`, `*.exe`, `*.dll`, `*.msi`, `*.zip`, `*.spec` | Heavy binaries are distributed via GitHub Releases to respect Git quotas. |
+| **Model Weights & Runtime** | `models/`, `runtime/`, `*.bin`, `*.pt`, `*.gguf`, `*.onnx` | Large model weights (>700 MB) are downloaded on-demand by `scripts/download_models.py`. |
+| **Audio & Personal Data** | `recordings/`, `transcripts/`, `reports/`, `*.wav`, `*.mp3`, `*.m4a`, `tests/audio_real/` | Personal audio recordings, test logs, and audio captures are never tracked. |
+| **Databases & Scratch** | `tests/benchmark_600/benchmark_ledger.db`, `scratch/`, `.antigravity/` | Ephemeral test databases and scratch directories. |
+| **Local Renderings** | `videos/`, `*.mp4`, `*.webm`, `TEST_READY.md`, `prompt_transformation_showcase.md`, `Gemini Flow AI Productivity Infographic.png` | Local video renders and unreferenced drafts. |
 
 ---
 
-## 3. Credential Storage Verification
-
-The codebase has been verified to read API credentials strictly through:
-1. `os.environ.get("GEMINI_API_KEY")` or `os.environ.get("GOOGLE_API_KEY")`
-2. Windows User Registry / Credential Manager (`HKCU\Software\GeminiFlow`)
-3. Encrypted local storage using Windows DPAPI (`CryptProtectData` / `CryptUnprotectData`) inside `%APPDATA%\GeminiFlow\config.json`.
-
-**Zero API keys are hardcoded in code, tests, documentation, or screenshots.**
+## 3. GitHub Releases Assets
+The following binaries have been generated locally and verified with SHA-256 hashes for publication to GitHub Releases:
+* **Installer**: `dist/Gemini_Flow_Setup_Full.exe`  
+  `SHA-256: C99D9AABE86ACBA886B7ECE8BBD50787AF85F1B8D85CD76651023E81030BA4F8`
+* **Standalone Executable**: `dist/Gemini_Flow.exe`  
+  `SHA-256: 7929E95FA9C239EDE6268F99DDD19E6696515CC43CC29DF90A8957963FC7A0C3`

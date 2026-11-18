@@ -41,7 +41,14 @@ class SecurityManager:
     log redaction, data retention, and privacy controls.
     """
     def __init__(self, app_dir: Optional[Path] = None):
-        self.app_dir = app_dir or (Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow")
+        if app_dir is not None:
+            self.app_dir = app_dir
+        else:
+            try:
+                from ..config import APP_DIR
+                self.app_dir = APP_DIR
+            except Exception:
+                self.app_dir = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow"
         self.app_dir.mkdir(parents=True, exist_ok=True)
         self.cred_file = self.app_dir / ".credentials.bin"
         self._setup_log_sanitization()
@@ -186,6 +193,28 @@ class SecurityManager:
             logger.error(f"Failed to securely persist API key: {e}")
             return False
 
+    def load_encrypted_api_key(self) -> str:
+        """Reads only the explicit DPAPI/encrypted credential file without falling back to env/registry."""
+        if not self.cred_file.exists():
+            return ""
+        try:
+            with open(self.cred_file, "rb") as f:
+                data = f.read()
+            if data.startswith(b"DPAPI:"):
+                decrypted = self._decrypt_dpapi(data[6:])
+                if decrypted:
+                    cleaned = self._clean_key(decrypted)
+                    if cleaned and not any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd", "KKjYK0n"]):
+                        return cleaned
+            elif data.startswith(b"B64:"):
+                dec = base64.b64decode(data[4:]).decode("utf-8", errors="ignore")
+                cleaned = self._clean_key(dec)
+                if cleaned and not any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd", "KKjYK0n"]):
+                    return cleaned
+        except Exception as e:
+            logger.error(f"Error reading secure credentials: {e}")
+        return ""
+
     def load_api_key(self, fallback_key: str = "") -> str:
         """
         Loads API key prioritizing:
@@ -194,23 +223,9 @@ class SecurityManager:
         3. Passed-in configuration fallback
         """
         # 1. Secure credential file (explicitly saved by user inside Gemini Flow)
-        if self.cred_file.exists():
-            try:
-                with open(self.cred_file, "rb") as f:
-                    data = f.read()
-                if data.startswith(b"DPAPI:"):
-                    decrypted = self._decrypt_dpapi(data[6:])
-                    if decrypted:
-                        cleaned = self._clean_key(decrypted)
-                        if cleaned and not any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd", "KKjYK0n"]):
-                            return cleaned
-                elif data.startswith(b"B64:"):
-                    dec = base64.b64decode(data[4:]).decode("utf-8", errors="ignore")
-                    cleaned = self._clean_key(dec)
-                    if cleaned and not any(bad in cleaned for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd", "KKjYK0n"]):
-                        return cleaned
-            except Exception as e:
-                logger.error(f"Error reading secure credentials: {e}")
+        encrypted_key = self.load_encrypted_api_key()
+        if encrypted_key:
+            return encrypted_key
 
         # 2. Environment Variable & Windows User Registry
         env_key = os.environ.get("GEMINI_API_KEY", "").strip()

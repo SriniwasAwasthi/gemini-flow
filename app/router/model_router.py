@@ -28,6 +28,26 @@ class ModelMetadata:
 
 
 MODEL_REGISTRY: Dict[str, ModelMetadata] = {
+    "groq-whisper-turbo": ModelMetadata(
+        model_name="groq-whisper-turbo",
+        display_name="Groq Whisper Turbo (Ultra-Low Latency < 0.25s — Groq LPU)",
+        speed_rating=5,
+        typical_latency="< 0.25s",
+        punctuation_style="Near-instant cloud transcription powered by Groq LPU silicon",
+        reasoning_capability="high",
+        technical_capability="expert",
+        recommended_tasks=["Instant dictation", "Ultra-fast voice notes", "Zero-lag typing"]
+    ),
+    "moonshine-onnx": ModelMetadata(
+        model_name="moonshine-onnx",
+        display_name="Moonshine ONNX (Sub-100ms Edge Dictation — Low Compute)",
+        speed_rating=5,
+        typical_latency="< 0.10s",
+        punctuation_style="Edge on-device speech recognition without internet dependency",
+        reasoning_capability="balanced",
+        technical_capability="high",
+        recommended_tasks=["Offline dictation", "Low compute edge speech", "Zero cloud latency"]
+    ),
     "gemini-2.5-flash": ModelMetadata(
         model_name="gemini-2.5-flash",
         display_name="Gemini 2.5 Flash (Flagship Speech & Multimodal — Ultra Fast — Recommended)",
@@ -58,11 +78,21 @@ MODEL_REGISTRY: Dict[str, ModelMetadata] = {
         technical_capability="high",
         recommended_tasks=["Offline dictation", "Airplane mode", "Zero latency local notes"]
     ),
+    "ollama-qwen2.5": ModelMetadata(
+        model_name="ollama-qwen2.5",
+        display_name="Ollama Qwen 2.5 3B (100% Local GPU Offline Brain)",
+        speed_rating=5,
+        typical_latency="~0.4s – 1.2s",
+        punctuation_style="Direct local LLM text refinement + on-device AI Polish Brain fallback, 100% offline privacy",
+        reasoning_capability="high",
+        technical_capability="high",
+        recommended_tasks=["100% Offline Dictation", "Local AI Polish", "Zero API Key"]
+    ),
     "ollama-gemma2": ModelMetadata(
         model_name="ollama-gemma2",
-        display_name="Ollama Gemma 2B (100% Local GPU Offline Brain)",
+        display_name="Ollama Qwen 2.5 3B (100% Local GPU Offline Brain)",
         speed_rating=5,
-        typical_latency="~0.5s – 1.8s",
+        typical_latency="~0.4s – 1.2s",
         punctuation_style="Direct local LLM text refinement + on-device AI Polish Brain fallback, 100% offline privacy",
         reasoning_capability="high",
         technical_capability="high",

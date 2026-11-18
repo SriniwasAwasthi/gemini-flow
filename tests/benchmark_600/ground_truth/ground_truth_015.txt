@@ -1,0 +1,1 @@
+By migrating our columnar data warehouse from Snowflake to Google BigQuery, our data engineering pipeline achieved a forty percent latency reduction in real-time aggregation queries, while partition pruning eliminated ninety gigabytes of unneeded scanned bytes per hour.

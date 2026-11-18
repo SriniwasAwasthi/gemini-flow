@@ -1,0 +1,1 @@
+curl -X POST https://api.gemini.internal/v1/transcribe -H 'Authorization: Bearer SECRET' -d @audio.wav

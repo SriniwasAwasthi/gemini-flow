@@ -1,0 +1,1 @@
+class AudioBufferPool: def __init__(self, max_capacity: int = 100): self.pool = collections.deque(maxlen=max_capacity)

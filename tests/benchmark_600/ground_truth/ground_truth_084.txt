@@ -1,0 +1,4 @@
+cat << 'EOF' > /etc/systemd/system/geminiflow.service
+[Unit]
+Description=Gemini Flow Daemon
+EOF

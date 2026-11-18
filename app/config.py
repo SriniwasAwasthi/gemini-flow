@@ -1,9 +1,10 @@
-"""
+﻿"""
 Config Manager for Gemini Flow (Wispr Flow AI Alternative)
 Handles settings persistence, JSON storage, dictionary mappings, snippets, and history logging.
 """
 import os
 import sys
+import copy
 import time
 import json
 import logging
@@ -12,12 +13,29 @@ from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("GeminiFlow.Config")
 
-try:
-    APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / "GeminiFlow"
-    APP_DIR.mkdir(parents=True, exist_ok=True)
-except Exception:
-    APP_DIR = Path(__file__).parent.parent / "recordings"
-    APP_DIR.mkdir(parents=True, exist_ok=True)
+def _resolve_writable_app_dir() -> Path:
+    candidates = []
+    if os.environ.get("APPDATA"):
+        candidates.append(Path(os.environ["APPDATA"]) / "GeminiFlow")
+    if os.environ.get("LOCALAPPDATA"):
+        candidates.append(Path(os.environ["LOCALAPPDATA"]) / "GeminiFlow")
+    candidates.append(Path(__file__).resolve().parent.parent / "runtime")
+    candidates.append(Path(__file__).resolve().parent.parent / "recordings")
+
+    for cand in candidates:
+        try:
+            cand.mkdir(parents=True, exist_ok=True)
+            probe = cand / f".probe_{os.getpid()}_{int(time.time() * 1000)}.tmp"
+            probe.write_text("probe", encoding="utf-8")
+            probe.unlink(missing_ok=True)
+            return cand
+        except Exception:
+            continue
+    fallback = Path.cwd() / "runtime"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+APP_DIR = _resolve_writable_app_dir()
 
 RECORDINGS_DIR = APP_DIR / "recordings"
 try:
@@ -40,9 +58,9 @@ try:
     from dotenv import load_dotenv
     _env_path = Path(__file__).parent.parent / ".env"
     if _env_path.exists():
-        load_dotenv(dotenv_path=_env_path, override=True)
+        load_dotenv(dotenv_path=_env_path, override=False)
     else:
-        load_dotenv(override=True)
+        load_dotenv(override=False)
 except Exception:
     pass
 
@@ -76,20 +94,20 @@ DEFAULT_PROMPTS = {
         "Your mission is to transcribe the user's spoken audio into accurate, natural, and beautifully structured text in the authentic language spoken.\n\n"
         "Strict Conversion Rules:\n"
         "1. Active Language & Selection Enforcement: Strictly adhere to the Active Spoken Language Constraints specified at the end of this prompt. Output exclusively in the user's authorized language(s) and script. If the speaker speaks an unselected foreign or regional language that is NOT in the active authorized list, do NOT output in that unselected language's script; instead, translate the speech into the primary authorized language.\n"
-        "2. Intelligent Dictation, Speech Override & Self-Correction Resolution (Wispr Flow AI Brain): Completely REMOVE all verbal fillers, hesitation sounds, stutters, and verbal re-takes ('uh', 'um', 'ah', 'er', 'eh', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'so like', 'etcetera etcetera', 'and and', 'if if', 'na', 'ya', 'मतलब', 'म्हणजे', false starts). "
+        "2. Intelligent Dictation, Speech Override & Self-Correction Resolution (Wispr Flow AI Brain): Completely REMOVE all verbal fillers, hesitation sounds, stutters, and verbal re-takes ('uh', 'um', 'ah', 'er', 'eh', 'like', 'you know', 'basically', 'actually', 'mean', 'means', 'so like', 'etcetera etcetera', 'and and', 'if if', 'na', 'ya', 'à¤®à¤¤à¤²à¤¬', 'à¤®à¥à¤¹à¤£à¤œà¥‡', false starts). "
         "CRITICAL SELF-CORRECTION & OVERRIDE RULE: When the speaker changes their mind, makes a mistake, slips of the tongue, or corrects a word, date, number, time, name, or statement, you MUST ALWAYS OVERRIDE the mistake with the correction. NEVER output the mistaken phrase, and NEVER output apology words ('sorry', 'oh sorry', 'my bad', 'no wait', 'actually'). Examples: "
         "- Saying 'today is Monday... sorry today is Tuesday' -> Output strictly: 'today is Tuesday.' "
         "- Saying 'convert this whole data under 4 seconds... no sorry under 3 seconds' -> Output strictly: 'convert this whole data under 3 seconds.' "
         "- Saying 'I am in 11th standard... sorry I am in 12th standard' -> Output strictly: 'I am in 12th standard.' "
         "- Saying 'the budget is $500... actually $750' -> Output strictly: 'the budget is $750.' "
-        "- Saying 'total budget was around ₹550. Oh wait, the total budget was ₹750.' -> Output strictly: 'the total budget was ₹750.' "
+        "- Saying 'total budget was around â‚¹550. Oh wait, the total budget was â‚¹750.' -> Output strictly: 'the total budget was â‚¹750.' "
         "- Saying 'the budget is $500... actually $750' -> Output strictly: 'the budget is $750.' "
         "- Saying 'the meeting is at 2 p.m. Sorry, the meeting is at 3 p.m.' -> Output strictly: 'the meeting is at 3 p.m.' "
         "- Saying 'convert this whole data under 4 seconds or no, sorry, under 3 seconds' -> Output strictly: 'convert this whole data under 3 seconds.' "
         "If a sentence or thought is repeated with additions or refinements (e.g. saying 'I just want 100% data. If I just want 100% accurate data.'), collapse the repetition into the single finalized refined thought ('I want 100% accurate data.'). Eliminate stray mic-check greetings ('hello', 'mic check') spoken during pauses.\n"
         "3. Adaptive AI Brain Structuring & Smart Point-Wise Bullet Formatting (Wispr Flow Intelligence): Intelligently detect whether the speaker is conveying continuous narrative or structured point-wise content:\n"
-        "   - Structured & Multi-Point Content: When the speaker dictates sequential points, advantages/disadvantages, pros/cons, numbered items ('firstly, secondly', 'one, two, three', 'points are', 'features are'), action items, steps, or multi-point comparisons, DO NOT merge them into one dense wall of text. Automatically identify natural section headers where appropriate (e.g., 'Advantages:', 'Key Points:', 'Next Steps:'), insert clean line breaks, and format each distinct point on its own new line using a clean bullet point ('• ').\n"
-        "   - CRITICAL BULLET POINT NUMBERING RULE: When formatting bullet points ('• '), you MUST OMIT the spoken numbering or ordinal words ('First is', 'Second is', 'And third is', 'First point is', 'Point 1:', '1.') from the beginning of each bullet item, because the bullet marker '• ' itself denotes the numbering. Example: Spoken 'first is Antigravity, second is I made changes in Wispr, and third is I used an API key' -> formatted into bullet items '• Antigravity.', '• I made changes in Wispr.', '• I used an API key.'\n"
+        "   - Structured & Multi-Point Content: When the speaker dictates sequential points, advantages/disadvantages, pros/cons, numbered items ('firstly, secondly', 'one, two, three', 'points are', 'features are'), action items, steps, or multi-point comparisons, DO NOT merge them into one dense wall of text. Automatically identify natural section headers where appropriate (e.g., 'Advantages:', 'Key Points:', 'Next Steps:'), insert clean line breaks, and format each distinct point on its own new line using a clean bullet point ('â€¢ ').\n"
+        "   - CRITICAL BULLET POINT NUMBERING RULE: When formatting bullet points ('â€¢ '), you MUST OMIT the spoken numbering or ordinal words ('First is', 'Second is', 'And third is', 'First point is', 'Point 1:', '1.') from the beginning of each bullet item, because the bullet marker 'â€¢ ' itself denotes the numbering. Example: Spoken 'first is Antigravity, second is I made changes in Wispr, and third is I used an API key' -> formatted into bullet items 'â€¢ Antigravity.', 'â€¢ I made changes in Wispr.', 'â€¢ I used an API key.'\n"
         "   - Continuous Narrative: When the speaker is conveying ordinary conversational sentences, explanations, or continuous narrative, format as clean, flowing paragraphs with natural double-newline paragraph breaks.\n"
         "   - Spoken Formatting Commands: If the speaker explicitly says formatting or punctuation commands ('bullet point', 'new line', 'next line', 'colon', 'semicolon', 'comma', 'period', 'question mark'), immediately apply that exact formatting and symbol.\n"
         "4. Strict Vocabulary & Verb Integrity (NEVER Substitute Words): You MUST transcribe the EXACT verbs, nouns, and terminology spoken by the user. NEVER substitute verbs with synonyms: when the user says 'analyze', you MUST transcribe 'analyze' (NEVER substitute with 'list' or 'enumerate'). When the user says 'localhost', transcribe 'localhost' (NEVER substitute with 'token' or 'server'). When the user says 'in my Chrome', transcribe 'in my Chrome' (NEVER rephrase into an action command like 'Opening Chrome' or split with an unintended period).\n"
@@ -105,7 +123,7 @@ DEFAULT_PROMPTS = {
         "Transform the user's raw spoken thoughts, rambling ideas, or meeting notes into impeccably polished, structured, executive-grade business writing.\n\n"
         "Mandatory Rules:\n"
         "1. Complete Filler & Repetition Elimination: Remove all verbal fillers ('uh', 'ah', 'um', 'like', 'you know', 'basically', 'means') and stutters ('12 12' -> '12').\n"
-        "2. Structural Organization & Bullet Points: When the user lists items, steps, priorities, or multi-point thoughts, you MUST format them as clear bullet points ('• ') on separate new lines. Never collapse lists into a single continuous sentence.\n"
+        "2. Structural Organization & Bullet Points: When the user lists items, steps, priorities, or multi-point thoughts, you MUST format them as clear bullet points ('â€¢ ') on separate new lines. Never collapse lists into a single continuous sentence.\n"
         "3. Paragraph Breaks: Use clean paragraph breaks (double newlines) between introductory context, bulleted items, and concluding thoughts.\n"
         "4. Syntax & Executive Grammar Polish: Fix all grammar, insert precise punctuation including semicolons (;), colons (:), elevate Indian English/Hinglish to articulate standard executive English, and refine cadence.\n"
         "5. 100% Content Completeness: Preserve every single topic, discussion point, and idea spoken without omitting or summarizing anything.\n"
@@ -164,11 +182,11 @@ GOLDEN_ANCHOR_EXAMPLES = """--- 22 FEW-SHOT GOLDEN ANCHOR DEMONSTRATIONS ---
 
 [Input]: "buy milk bread eggs butter and apples from store"
 [Output]: "Buy from the store:
-• Milk
-• Bread
-• Eggs
-• Butter
-• Apples"
+â€¢ Milk
+â€¢ Bread
+â€¢ Eggs
+â€¢ Butter
+â€¢ Apples"
 
 [Input]: "first install python second setup venv third run the app"
 [Output]: "Here are the steps:
@@ -178,15 +196,15 @@ GOLDEN_ANCHOR_EXAMPLES = """--- 22 FEW-SHOT GOLDEN ANCHOR DEMONSTRATIONS ---
 
 [Input]: "agenda today is review sales discuss budget and plan sprint"
 [Output]: "Today\'s agenda:
-• Review sales
-• Discuss budget
-• Plan sprint"
+â€¢ Review sales
+â€¢ Discuss budget
+â€¢ Plan sprint"
 
 [Input]: "bugs are crash on login missing icon and slow loading"
 [Output]: "Bug report:
-• Crash on login
-• Missing icon
-• Slow loading"
+â€¢ Crash on login
+â€¢ Missing icon
+â€¢ Slow loading"
 
 [Input]: "hi sarah thanks for the proposal i reviewed slide four"
 [Output]: "Hi Sarah, thanks for the proposal. I reviewed slide 4."
@@ -242,6 +260,10 @@ DEFAULT_DICTIONARY = [
 
 DEFAULT_SNIPPETS = [
     {
+        "trigger": "Hey I am Sriniwas LinkedIn GitHub",
+        "content": "Hey, hello, I am Sri Srinivas Awasthi, and this is my LinkedIn: https://www.linkedin.com/in/srinivas-awasthi/, my GitHub: https://github.com/srinivas-awasthi"
+    },
+    {
         "trigger": "Hey I am Srinivas LinkedIn GitHub Instagram",
         "content": "Hey, hello, I am Sri Srinivas Awasthi, and this is my LinkedIn: https://www.linkedin.com/in/srinivas-awasthi/, my GitHub: https://github.com/srinivas-awasthi, and my Instagram: https://instagram.com/srinivas_awasthi"
     },
@@ -284,17 +306,21 @@ DEFAULT_SAVED_PROMPTS = [
 
 
 DEFAULT_CONFIG: Dict[str, Any] = {
-    "api_key": "",
-    "model_name": "auto",
-    "model_mode": "auto",
+    "api_key": os.environ.get("GEMINI_API_KEY", ""),
+    "groq_api_key": os.environ.get("GROQ_API_KEY", ""),
+    "model_name": "groq-whisper-turbo",
+    "model_mode": "groq-whisper-turbo",
+    "whisper_model": "tiny.en",
     "active_profile": "casual",
     "hotkey": "<ctrl>+<space>",
     "hotkey_display": "Ctrl + Space",
     "hotkey_mode": "toggle",  # "toggle" (press to start/stop) or "push_to_talk" (hold while speaking)
     "prompt_hotkey": "<alt>+p",
     "prompt_hotkey_display": "Alt + P",
+    "hotkey_prompt": "<alt>+p",
     "transform_hotkey": "<alt>+t",
     "transform_hotkey_display": "Alt + T",
+    "hotkey_transform": "<alt>+t",
     "voice_hotkey_history": [
         {"display": "Ctrl + Space", "internal": "<ctrl>+<space>"},
         {"display": "Ctrl + Win", "internal": "<ctrl>+<cmd>"},
@@ -311,7 +337,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         {"display": "Ctrl + Shift + T", "internal": "<ctrl>+<shift>+t"},
         {"display": "Ctrl + Alt + T", "internal": "<ctrl>+<alt>+t"}
     ],
-    "mode_preset": "clean_dictation",
+    "mode_preset": "ai_polish",
     "custom_prompt": "",
     "saved_prompts": DEFAULT_SAVED_PROMPTS,
     "custom_vocabulary": ["Gemini Flow", "Faster-Whisper", "Ollama", "Wispr Flow", "localhost", "PyTorch", "LeetCode", "TypeScript"],
@@ -342,6 +368,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "dsp_noise_gate_enabled": False,  # Dynamic noise gate (OFF by default to avoid degrading Whisper WER)
     "dsp_noise_gate_threshold_db": -52.0,  # Noise gate cutoff threshold in dB
     "offline_fallback_enabled": True,  # Offline speech recognition fallback when network drops
+    "gemini_transform_model": "gemini-2.5-flash",  # Dedicated Gemini model for Hotkey Mode & 16 Command Categories
+    "translate_target_language": "English",  # Default target language when spoken Translate command omits one
     "selected_languages": ["English"],  # Selected spoken languages (defaults to English only, or custom subset of 200+)
     "security": {
         "encrypt_keys": True,
@@ -453,7 +481,7 @@ def ensure_desktop_shortcuts() -> None:
                         shortcut.WorkingDirectory = str(app_dir)
                         if icon_path.exists():
                             shortcut.IconLocation = f"{str(icon_path)},0"
-                        shortcut.Description = "Gemini Flow — Voice AI (Ctrl+Space)"
+                        shortcut.Description = "Gemini Flow â€” Voice AI (Ctrl+Space)"
                         shortcut.Save()
                 except Exception as ex:
                     logger.debug(f"Could not create desktop shortcut in {dt}: {ex}")
@@ -474,89 +502,148 @@ def is_windows_startup_enabled() -> bool:
 
 
 class ConfigManager:
+    _instance: Optional["ConfigManager"] = None
+
     def __init__(self):
-        self.config: Dict[str, Any] = DEFAULT_CONFIG.copy()
+        self.config: Dict[str, Any] = copy.deepcopy(DEFAULT_CONFIG)
         self.load_config()
+
+    @classmethod
+    def get_instance(cls) -> "ConfigManager":
+        """Returns the shared ConfigManager singleton instance."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def get_all(self) -> Dict[str, Any]:
+        """Returns a shallow copy of the current configuration dictionary."""
+        return dict(self.config)
+
+    @staticmethod
+    def _deep_merge_defaults(target: Dict[str, Any], defaults: Dict[str, Any]) -> bool:
+        """Non-destructively populates missing nested dict defaults without schema drift."""
+        changed = False
+        for key, default_val in defaults.items():
+            if key not in target:
+                target[key] = copy.deepcopy(default_val)
+                changed = True
+            elif isinstance(default_val, dict) and isinstance(target.get(key), dict):
+                if ConfigManager._deep_merge_defaults(target[key], default_val):
+                    changed = True
+        return changed
 
     def load_config(self) -> Dict[str, Any]:
         needs_save = False
-        if CONFIG_FILE.exists():
+        loaded = None
+        bak_file = CONFIG_FILE.with_suffix(".json.bak")
+
+        for candidate in (CONFIG_FILE, bak_file):
+            if candidate.exists():
+                try:
+                    with open(candidate, "r", encoding="utf-8") as f:
+                        parsed = json.load(f)
+                    if isinstance(parsed, dict):
+                        loaded = parsed
+                        if candidate == bak_file:
+                            logger.warning("Primary config.json was unreadable; recovered configuration from backup.")
+                            needs_save = True
+                        break
+                except Exception as e:
+                    logger.error(f"Failed to load config from {candidate.name}: {e}")
+
+        if loaded is not None:
             try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                    self.config.update(loaded)
-                    # Enforce valid Gemini API Key (retain config key or load from Windows Registry / DPAPI)
-                    curr_key = self.config.get("api_key", "").strip()
-                    if not curr_key or any(bad in curr_key for bad in ["KLd4Prd", "ISb0Ozd", "mock_working_key", "KKjYK0n"]):
-                        try:
-                            from app.security.security_manager import SecurityManager
-                            sec_key = SecurityManager(APP_DIR).load_api_key("")
-                            if sec_key:
-                                self.config["api_key"] = sec_key
-                                needs_save = True
-                        except Exception:
-                            pass
-                    # Default high-speed model configuration (Gemini 3.5 Flash Lite)
-                    if not self.config.get("model_name") or self.config.get("model_name") in ("gemini-2.5-flash", "gemini-3.5-transcribe"):
-                        self.config["model_name"] = "gemini-3.5-flash-lite"
-                        needs_save = True
-                    if not self.config.get("model_mode") or self.config.get("model_mode") in ("gemini-2.5-flash", "gemini-3.5-transcribe"):
-                        self.config["model_mode"] = "gemini-3.5-flash-lite"
-                        needs_save = True
-                    if "active_profile" not in self.config:
-                        self.config["active_profile"] = "coding"
-                        needs_save = True
-                    if "hotkey" not in self.config:
-                        self.config["hotkey"] = "<ctrl>+<space>"
-                        self.config["hotkey_display"] = "Ctrl + Space"
-                        needs_save = True
-                    if "transform_hotkey" not in self.config:
-                        self.config["transform_hotkey"] = "<ctrl>+<shift>+t"
-                        self.config["transform_hotkey_display"] = "Ctrl + Shift + T"
-                        needs_save = True
-                    if "transform_hotkey_history" not in self.config or not self.config["transform_hotkey_history"]:
-                        self.config["transform_hotkey_history"] = DEFAULT_CONFIG["transform_hotkey_history"].copy()
-                        needs_save = True
-                    if "security" not in self.config:
-                        self.config["security"] = DEFAULT_CONFIG["security"].copy()
-                        needs_save = True
-                    # Ensure dictionary and snippets exist
-                    if "dictionary" not in self.config or not self.config["dictionary"]:
-                        self.config["dictionary"] = DEFAULT_DICTIONARY.copy()
-                        needs_save = True
-                    if "snippets" not in self.config or not self.config["snippets"]:
-                        self.config["snippets"] = DEFAULT_SNIPPETS.copy()
-                        needs_save = True
-                    if "prompt_hotkey" not in self.config:
-                        self.config["prompt_hotkey"] = "<ctrl>+<shift>+p"
-                        self.config["prompt_hotkey_display"] = "Ctrl + Shift + P"
-                        needs_save = True
-                    if "voice_hotkey_history" not in self.config or not self.config["voice_hotkey_history"]:
-                        self.config["voice_hotkey_history"] = DEFAULT_CONFIG["voice_hotkey_history"].copy()
-                        needs_save = True
-                    if "prompt_hotkey_history" not in self.config or not self.config["prompt_hotkey_history"]:
-                        self.config["prompt_hotkey_history"] = DEFAULT_CONFIG["prompt_hotkey_history"].copy()
-                        needs_save = True
-                    if "saved_prompts" not in self.config or not self.config["saved_prompts"]:
-                        self.config["saved_prompts"] = [p.copy() for p in DEFAULT_SAVED_PROMPTS]
-                        needs_save = True
-                    if "auto_cost_mode" not in self.config:
-                        self.config["auto_cost_mode"] = True
-                        needs_save = True
-                    if "auto_prompt_conversion" not in self.config:
-                        self.config["auto_prompt_conversion"] = False
-                        needs_save = True
-                    if "selected_languages" not in self.config or not isinstance(self.config.get("selected_languages"), list):
-                        self.config["selected_languages"] = ["English"]
-                        needs_save = True
-                    if "settings_window_state" not in self.config:
-                        self.config["settings_window_state"] = DEFAULT_CONFIG["settings_window_state"].copy()
-                        needs_save = True
-                    if needs_save:
-                        self.save_config()
-                    logger.debug("Configuration loaded.")
+                self.config.update(loaded)
+                if self._deep_merge_defaults(self.config, DEFAULT_CONFIG):
+                    needs_save = True
+
+                # Enforce valid Gemini API Key (retain config key or load from Windows Registry / DPAPI)
+                curr_key = self.config.get("api_key", "").strip()
+                if not curr_key or any(bad in curr_key for bad in ["KLd4Prd", "ISb0Ozd", "mock_working_key", "KKjYK0n", "mock_revoked_key"]):
+                    self.config["api_key"] = DEFAULT_CONFIG["api_key"]
+                    needs_save = True
+                else:
+                    try:
+                        from app.security.security_manager import SecurityManager
+                        sec_key = SecurityManager(APP_DIR).load_api_key("")
+                        if sec_key and sec_key != curr_key:
+                            self.config["api_key"] = sec_key
+                            needs_save = True
+                    except Exception:
+                        pass
+
+                # Default production model configuration (preserve user's choice across all 7 models)
+                if not self.config.get("model_name") or self.config.get("model_name") in ("auto", "gemini-3.5-transcribe"):
+                    self.config["model_name"] = "gemini-2.5-flash"
+                    needs_save = True
+                if not self.config.get("model_mode") or self.config.get("model_mode") in ("auto", "gemini-3.5-transcribe"):
+                    self.config["model_mode"] = "gemini-2.5-flash"
+                    needs_save = True
+                if "active_profile" not in self.config or not self.config.get("active_profile"):
+                    self.config["active_profile"] = "coding"
+                    needs_save = True
+                if "hotkey" not in self.config or not self.config.get("hotkey"):
+                    self.config["hotkey"] = "<ctrl>+<space>"
+                    self.config["hotkey_display"] = "Ctrl + Space"
+                    needs_save = True
+                # Only populate hotkey defaults when missing/empty â€” preserve user-chosen presets such as Ctrl+Shift+T / Ctrl+Shift+P
+                if not self.config.get("transform_hotkey"):
+                    self.config["transform_hotkey"] = "<alt>+t"
+                    self.config["transform_hotkey_display"] = "Alt + T"
+                    needs_save = True
+                if not self.config.get("hotkey_transform"):
+                    self.config["hotkey_transform"] = self.config.get("transform_hotkey", "<alt>+t")
+                    needs_save = True
+                if not self.config.get("transform_hotkey_history"):
+                    self.config["transform_hotkey_history"] = copy.deepcopy(DEFAULT_CONFIG["transform_hotkey_history"])
+                    needs_save = True
+                if not self.config.get("dictionary"):
+                    self.config["dictionary"] = copy.deepcopy(DEFAULT_DICTIONARY)
+                    needs_save = True
+                if not self.config.get("snippets"):
+                    self.config["snippets"] = copy.deepcopy(DEFAULT_SNIPPETS)
+                    needs_save = True
+                if not self.config.get("prompt_hotkey"):
+                    self.config["prompt_hotkey"] = "<alt>+p"
+                    self.config["prompt_hotkey_display"] = "Alt + P"
+                    needs_save = True
+                if not self.config.get("hotkey_prompt"):
+                    self.config["hotkey_prompt"] = self.config.get("prompt_hotkey", "<alt>+p")
+                    needs_save = True
+                if not self.config.get("voice_hotkey_history"):
+                    self.config["voice_hotkey_history"] = copy.deepcopy(DEFAULT_CONFIG["voice_hotkey_history"])
+                    needs_save = True
+                if not self.config.get("prompt_hotkey_history"):
+                    self.config["prompt_hotkey_history"] = copy.deepcopy(DEFAULT_CONFIG["prompt_hotkey_history"])
+                    needs_save = True
+                if not self.config.get("saved_prompts"):
+                    self.config["saved_prompts"] = [p.copy() for p in DEFAULT_SAVED_PROMPTS]
+                    needs_save = True
+                if not isinstance(self.config.get("selected_languages"), list):
+                    self.config["selected_languages"] = ["English"]
+                    needs_save = True
+                stale_transform_models = {
+                    "",
+                    "gemini-2.0-flash",
+                    "gemini-2.0-flash-exp",
+                    "gemini-2.0-flash-lite",
+                    "gemini-2.0-flash-001",
+                    "gemini-2.5-flash-lite",
+                    "gemini-flash-latest",
+                }
+                curr_tx_model = str(self.config.get("gemini_transform_model", "") or "").strip()
+                if curr_tx_model in stale_transform_models:
+                    self.config["gemini_transform_model"] = "gemini-2.5-flash"
+                    needs_save = True
+                if not self.config.get("translate_target_language"):
+                    self.config["translate_target_language"] = "English"
+                    needs_save = True
+
+                if needs_save:
+                    self.save_config()
+                logger.debug("Configuration loaded.")
             except Exception as e:
-                logger.error(f"Failed to load config: {e}")
+                logger.error(f"Failed to normalize loaded config: {e}")
         else:
             self.save_config()
 
@@ -565,30 +652,60 @@ class ConfigManager:
         return self.config
 
     def save_config(self) -> bool:
+        """Saves configuration atomically to disk using os.replace and maintains a recovery backup."""
         try:
-            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            import os
+            import shutil
+            CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            if CONFIG_FILE.exists():
+                try:
+                    shutil.copy2(CONFIG_FILE, CONFIG_FILE.with_suffix(".json.bak"))
+                except Exception:
+                    pass
+            tmp_file = CONFIG_FILE.with_suffix(".tmp")
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(self.config, f, indent=4)
+            os.replace(tmp_file, CONFIG_FILE)
             return True
         except Exception as e:
             logger.error(f"Failed to save config: {e}")
             return False
 
     def get_api_key(self) -> str:
-        """Retrieves active Gemini API key from environment (.env), DPAPI encrypted storage, or config."""
+        """
+        Retrieves active Gemini API key prioritizing persisted user configuration:
+        1. Encrypted DPAPI credential store (.credentials.bin)
+        2. Persisted config.json ('api_key' / 'gemini_api_key')
+        3. Environment (.env / GEMINI_API_KEY / GOOGLE_API_KEY / Windows User Registry)
+        """
+        try:
+            from app.security.security_manager import SecurityManager
+            sec = SecurityManager(APP_DIR)
+            encrypted = sec.load_encrypted_api_key()
+            if encrypted:
+                return sanitize_api_key(encrypted)
+        except Exception as e:
+            logger.error(f"Error retrieving DPAPI credential: {e}")
+
+        cfg_key = sanitize_api_key(self.config.get("api_key") or self.config.get("gemini_api_key", ""))
+        if cfg_key and not any(bad in cfg_key for bad in ["mock_working_key", "KLd4Prd", "ISb0Ozd", "KKjYK0n"]):
+            return cfg_key
+
+        try:
+            from app.security.security_manager import SecurityManager
+            sec = SecurityManager(APP_DIR)
+            raw = sec.load_api_key("")
+            if raw:
+                return sanitize_api_key(raw)
+        except Exception as e:
+            logger.error(f"Error retrieving env/registry API key: {e}")
+
         env_k = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         if env_k:
             cleaned_env = sanitize_api_key(env_k)
             if cleaned_env:
                 return cleaned_env
-        try:
-            from app.security.security_manager import SecurityManager
-            sec = SecurityManager(APP_DIR)
-            raw = sec.load_api_key(self.config.get("api_key") or self.config.get("gemini_api_key", ""))
-            if raw:
-                return sanitize_api_key(raw)
-        except Exception as e:
-            logger.error(f"Error retrieving secure API key: {e}")
-        return sanitize_api_key(self.config.get("api_key") or self.config.get("gemini_api_key", ""))
+        return ""
 
     def set_api_key(self, api_key: str) -> None:
         """Securely stores API key using Windows DPAPI if enabled."""
@@ -601,6 +718,19 @@ class ConfigManager:
             logger.error(f"Failed to persist secure key: {e}")
         self.config["api_key"] = cleaned
         self.config["gemini_api_key"] = cleaned
+        self.save_config()
+
+    def get_groq_api_key(self) -> str:
+        """Retrieves configured Groq API key from settings or environment."""
+        k = self.config.get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
+        return sanitize_api_key(k)
+
+    def set_groq_api_key(self, api_key: str) -> None:
+        """Persists Groq API key to configuration and environment."""
+        cleaned = sanitize_api_key(api_key)
+        self.config["groq_api_key"] = cleaned
+        if cleaned:
+            os.environ["GROQ_API_KEY"] = cleaned
         self.save_config()
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -653,6 +783,12 @@ class ConfigManager:
         history.insert(0, {"display": display, "internal": internal})
         self.config["transform_hotkey_history"] = history[:8]
         self.save_config()
+
+    def get_transform_hotkey(self) -> str:
+        return self.config.get("transform_hotkey") or self.config.get("hotkey_transform", "<alt>+t")
+
+    def get_prompt_hotkey(self) -> str:
+        return self.config.get("prompt_hotkey") or self.config.get("hotkey_prompt", "<alt>+p")
 
     def get_auto_prompt_conversion(self) -> bool:
         return bool(self.config.get("auto_prompt_conversion", False))

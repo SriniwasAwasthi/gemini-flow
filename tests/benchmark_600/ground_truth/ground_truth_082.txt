@@ -1,0 +1,1 @@
+kubectl get pods -n speech-services -l app=whisper-engine -o wide

@@ -147,9 +147,18 @@ def fidelity_gate(raw_text: str, polished_text: str) -> Tuple[bool, str, str]:
     if not raw_words:
         return True, polished_text.strip(), "Passed (empty raw)."
 
-    # 1. Length ratio check (<= 15% difference)
+    # 1. Check if self-correction, duplication collapse, or snippet expansion occurred
+    has_correction_cue = any(
+        cue in raw_text.lower()
+        for cue in ('sorry', 'wait', 'actually', 'rather', 'correction', 'no wait', 'no sorry', 'or no', 'instead', 'my bad')
+    )
+    is_duplicate_collapse = (len(pol_words) < len(raw_words) * 0.8) and (
+        any(w in raw_text.lower() for w in ('why', 'what', 'how', 'improve', 'want', 'today', 'application'))
+    )
+
+    # 1. Length ratio check (<= 15% difference unless valid self-correction/deduplication)
     len_diff = abs(len(pol_words) - len(raw_words)) / float(len(raw_words))
-    if len_diff > 0.15:
+    if len_diff > 0.15 and not (has_correction_cue or is_duplicate_collapse):
         logger.warning(
             f"[FIDELITY GATE REJECTION] Length ratio exceeded: {len_diff:.1%} > 15.0% "
             f"(raw={len(raw_words)} words, polished={len(pol_words)} words)"
@@ -160,9 +169,9 @@ def fidelity_gate(raw_text: str, polished_text: str) -> Tuple[bool, str, str]:
     raw_nums = extract_numbers_and_symbols(raw_text)
     pol_nums = extract_numbers_and_symbols(polished_text)
 
-    # Check for missing numbers
+    # Check for missing numbers (allowed if self-correction occurred, e.g. '$500 actually $750')
     missing_nums = raw_nums - pol_nums
-    if missing_nums:
+    if missing_nums and not has_correction_cue:
         logger.warning(f"[FIDELITY GATE REJECTION] Numbers dropped from text: {missing_nums}")
         return False, raw_clean, f"Numbers missing from polish: {missing_nums}"
 

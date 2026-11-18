@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -42,7 +42,7 @@ namespace GeminiFlow
         [STAThread]
         static void Main(string[] args)
         {
-            string defaultDir = @"E:\W c One Drive\Wisper";
+            string defaultDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             try
             {
                 // 0. If Gemini Flow is already running in background or system tray, notify it to SHOW window instantly
@@ -126,7 +126,7 @@ namespace GeminiFlow
                 {
                     MessageBox.Show(
                         "Could not locate 'main_standalone.py' or 'main.py' in:\n" + exeDir + "\n\nPlease ensure all repository files are extracted completely.",
-                        "Gemini Flow — Error",
+                        "Gemini Flow â€” Error",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error
                     );
@@ -225,7 +225,7 @@ namespace GeminiFlow
             {
                 MessageBox.Show(
                     "Python was not detected on your system.\n\nPlease double-click 'run.bat' once to automatically set up the virtual environment and install all dependencies from requirements.txt, or install Python 3.10+ from https://www.python.org/ (ensure 'Add Python to PATH' is checked).",
-                    "Gemini Flow — Python Required",
+                    "Gemini Flow â€” Python Required",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
@@ -234,7 +234,7 @@ namespace GeminiFlow
             {
                 MessageBox.Show(
                     "Error launching Gemini Flow:\n" + ex.Message,
-                    "Gemini Flow — Launch Error",
+                    "Gemini Flow â€” Launch Error",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
                 );

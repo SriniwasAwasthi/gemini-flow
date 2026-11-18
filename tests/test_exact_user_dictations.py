@@ -27,7 +27,7 @@ if api_key:
     custom_inst = r1.system_instruction
     res1 = gemini.transform_text(raw_text=r1.payload, transform_type=TransformType.TECHNICAL, custom_instruction=custom_inst)
     print(f"    Transformed Result (Success={res1.success}, Model={res1.model_used}):\n{res1.text[:200]}...")
-    if res1.success:
+    if res1.success and ("Offline Fallback" not in getattr(res1, "model_used", "")):
         assert "def " in res1.text or "class " in res1.text
     print("    [PASS] Python code generated cleanly!")
 

@@ -1,0 +1,1 @@
+As the clock struck midnight before launch day, the continuous integration pipeline flashed green across all six hundred test suites. Three engineers who had spent six months redesigning the transcription pipeline high-fived in exhausted silence. They knew that tomorrow, tens of thousands of users would speak to their computers and feel like magic was truly real.

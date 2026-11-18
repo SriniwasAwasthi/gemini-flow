@@ -20,11 +20,24 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import os
+from unittest.mock import patch
+
 from app.commands import (
     COMMAND_REGISTRY,
     COMMAND_MAP,
+    ACTION_COMMANDS,
+    ACTION_MAP,
+    ALL_COMMANDS,
     match_spoken_command,
     CommandDefinition
+)
+from app.main import (
+    MUTEX_NAME,
+    IPC_PIPE_NAME,
+    acquire_app_mutex,
+    release_app_mutex,
+    terminate_other_gemini_flow_instances
 )
 
 
@@ -120,6 +133,140 @@ class TestPhase4Commands(unittest.TestCase):
             self.assertIsNotNone(cmd.system_prompt)
             self.assertIsNotNone(cmd.validator)
             self.assertIn(cmd.default_temperature, (0.0, 0.2))
+
+    # -------------------------------------------------------------------------
+    # Feature 19: Strictly Remove 3 Spoken Triggers
+    # -------------------------------------------------------------------------
+    def test_feature_19_removed_spoken_triggers(self):
+        """F19: Removed spoken triggers ('start dictation', 'stop dictation', 'new line', 'cancel dictation', 'new paragraph') must NEVER be intercepted."""
+        removed_phrases = [
+            "start dictation",
+            "stop dictation",
+            "new line",
+            "start recording",
+            "stop recording",
+            "start",
+            "stop",
+            "next line",
+            "start new line",
+            "cancel dictation",
+            "cancel",
+            "new paragraph",
+            "start new paragraph",
+            "please start dictation",
+            "please stop dictation",
+            "please new line",
+            "please cancel dictation",
+            "please new paragraph"
+        ]
+        for phrase in removed_phrases:
+            res = match_spoken_command(phrase)
+            self.assertIsNone(res, f"Removed trigger '{phrase}' must return None (treated as dictation)")
+
+    # -------------------------------------------------------------------------
+    # Feature 20: Decouple Action Commands from Profile Commands
+    # -------------------------------------------------------------------------
+    def test_feature_20_action_commands_decoupled(self):
+        """F20: Action commands are decoupled into ACTION_COMMANDS; COMMAND_REGISTRY has strictly 16."""
+        self.assertEqual(len(COMMAND_REGISTRY), 16, "COMMAND_REGISTRY must contain strictly 16 profile commands")
+        for cmd in COMMAND_REGISTRY:
+            self.assertFalse(getattr(cmd, "is_action", False), f"Profile command {cmd.id} must have is_action=False")
+
+        self.assertGreaterEqual(len(ACTION_COMMANDS), 6, "ACTION_COMMANDS must contain the decoupled actions")
+        for cmd in ACTION_COMMANDS:
+            self.assertTrue(getattr(cmd, "is_action", False), f"Action command {cmd.id} must have is_action=True")
+
+        action_ids = {c.id for c in ACTION_COMMANDS}
+        expected_retained_actions = {
+            "action_bullet_point",
+            "action_numbered_list",
+            "action_undo",
+            "action_select_all",
+            "action_copy_all",
+            "action_clear_all"
+        }
+        for expected_id in expected_retained_actions:
+            self.assertIn(expected_id, action_ids, f"Retained action '{expected_id}' must exist in ACTION_COMMANDS")
+
+        # Removed triggers must NOT exist in ACTION_COMMANDS
+        self.assertNotIn("action_start_dictation", action_ids)
+        self.assertNotIn("action_stop_dictation", action_ids)
+        self.assertNotIn("action_new_line", action_ids)
+        self.assertNotIn("action_cancel_dictation", action_ids)
+        self.assertNotIn("action_new_paragraph", action_ids)
+
+    # -------------------------------------------------------------------------
+    # Feature 21: Retain Other Spoken Action Commands
+    # -------------------------------------------------------------------------
+    def test_feature_21_retained_action_commands(self):
+        """F21: Retained action commands must be intercepted correctly."""
+        test_cases = [
+            ("bullet point", "action_bullet_point"),
+            ("numbered list", "action_numbered_list"),
+            ("undo that", "action_undo"),
+            ("delete that", "action_undo"),
+            ("select all", "action_select_all"),
+            ("copy all", "action_copy_all"),
+            ("clear all", "action_clear_all"),
+        ]
+        for utterance, expected_id in test_cases:
+            res = match_spoken_command(utterance)
+            self.assertIsNotNone(res, f"Retained action '{utterance}' failed to match")
+            cmd, _ = res
+            self.assertEqual(cmd.id, expected_id)
+            self.assertTrue(cmd.is_action)
+
+    # -------------------------------------------------------------------------
+    # Feature 22: Contextual Protection for Mid-Sentence Speech
+    # -------------------------------------------------------------------------
+    def test_feature_22_mid_sentence_protection(self):
+        """F22: Trigger words mid-sentence must NEVER be falsely intercepted as commands."""
+        mid_sentence_phrases = [
+            "We need to start the project today",
+            "Please stop by my office after lunch",
+            "Our company has a new line of products",
+            "They decided to cancel the flight due to weather",
+            "According to our plan, summarize this document",
+            "Tomorrow we start the refactoring",
+            "We cannot stop until tests pass",
+            "This creates a new line of opportunities",
+            "In our retrospective today we agreed to start the new sprint on Monday, stop using obsolete libraries, and introduce a new line of automated E2E tests.",
+            "let us start dictation now"
+        ]
+        for phrase in mid_sentence_phrases:
+            res = match_spoken_command(phrase)
+            self.assertIsNone(res, f"Mid-sentence speech '{phrase}' must return None")
+
+    # -------------------------------------------------------------------------
+    # Feature 23: Single-Instance Mutex Audit
+    # -------------------------------------------------------------------------
+    def test_feature_23_single_instance_mutex(self):
+        """F23: Single-instance Win32 Named Mutex and IPC pipe constants and methods."""
+        self.assertEqual(MUTEX_NAME, "Global\\GeminiFlow_SingleInstance_Mutex")
+        self.assertEqual(IPC_PIPE_NAME, "GeminiFlow_SingleInstance_IPC")
+        
+        # Test acquire / release cycle
+        primary = acquire_app_mutex()
+        self.assertIsInstance(primary, bool)
+        release_app_mutex()
+        
+        # Double release should be completely safe
+        try:
+            release_app_mutex()
+        except Exception as e:
+            self.fail(f"Double release_app_mutex threw exception: {e}")
+
+    # -------------------------------------------------------------------------
+    # Feature 24: Safe Zombie/Orphan Process Cleanup
+    # -------------------------------------------------------------------------
+    def test_feature_24_safe_process_cleanup(self):
+        """F24: Process cleanup excludes current PID and executes safely without terminating unrelated processes."""
+        curr_pid = os.getpid()
+        with patch("subprocess.run") as mock_run:
+            terminate_other_gemini_flow_instances(exclude_pid=curr_pid)
+            for call_args in mock_run.call_args_list:
+                args = call_args[0][0]
+                self.assertNotIn(str(curr_pid), args, "Current PID must never be targeted by taskkill")
 
 
 if __name__ == "__main__":

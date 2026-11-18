@@ -226,6 +226,13 @@ class FloatingHUD(QWidget):
         else:
             self.reposition()
 
+    def set_partial_text(self, partial_text: str):
+        """Displays real-time partial streaming transcription words."""
+        if not partial_text:
+            return
+        disp = partial_text[-35:] if len(partial_text) > 35 else partial_text
+        self.state_signal.emit(self.STATE_PROCESSING, disp)
+
     def show_state(self, state: str, message: str = ""):
         """Thread-safe state change trigger."""
         self.state_signal.emit(state, message)

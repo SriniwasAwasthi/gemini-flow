@@ -1,0 +1,1 @@
+Ten years ago, nobody believed that a language model could run inside a smartphone browser. Today, we execute billions of neural inferences on everyday consumer laptops without breaking a sweat.

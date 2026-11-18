@@ -1,6 +1,6 @@
 """
 Acoustic Audio Chunker and Suffix-Prefix Transcript Merger.
-Provides silence-aligned audio chunking (max 25s, 1.5s overlap) and
+Provides dynamic audio chunking (configurable 2.5s window, 0.4s overlap) and
 overlap deduplication via longest common word-suffix/prefix matching.
 """
 import io
@@ -23,6 +23,27 @@ def get_audio_info(wav_bytes: bytes) -> Tuple[float, int, int, int]:
         return dur, fr, nc, nf
 
 
+def divide_into_dynamic_chunks(
+    wav_bytes: bytes,
+    chunk_sec: float = 2.5,
+    overlap_sec: float = 0.4
+) -> List[Tuple[float, float, bytes]]:
+    """
+    Universally divides audio of ANY duration (10s, 30s, 1m, 2m, 5m, 10m, 20m+)
+    into dynamic, silence-aligned chunks (default ~2.5s, hard max 3.0s) with boundary overlap (0.4s).
+    Returns list of (start_sec, end_sec, chunk_wav_bytes).
+    """
+    capped_chunk_sec = min(max(1.2, float(chunk_sec)), 3.0)
+    capped_overlap = min(float(overlap_sec), capped_chunk_sec * 0.25)
+    min_chunk = max(1.0, capped_chunk_sec * 0.7)
+    return split_at_silence_boundaries(
+        wav_bytes,
+        max_chunk_sec=capped_chunk_sec,
+        min_chunk_sec=min_chunk,
+        overlap_sec=capped_overlap
+    )
+
+
 def split_at_silence_boundaries(
     wav_bytes: bytes,
     max_chunk_sec: float = 25.0,
@@ -30,7 +51,7 @@ def split_at_silence_boundaries(
     overlap_sec: float = 1.5
 ) -> List[Tuple[float, float, bytes]]:
     """
-    Splits audio longer than 25s into chunks of at most 25s with 1.5s overlap at natural silence pauses.
+    Splits audio into chunks of at most max_chunk_sec with overlap_sec at natural silence pauses.
     Returns list of (start_sec, end_sec, chunk_wav_bytes).
     """
     if not wav_bytes or len(wav_bytes) < 1000:
@@ -85,8 +106,9 @@ def split_at_silence_boundaries(
             num_blocks = len(search_samples) // block_size
             blocks = search_samples[: num_blocks * block_size].reshape(num_blocks, block_size)
             rms = np.sqrt(np.mean(blocks.astype(np.float32) ** 2, axis=1) + 1e-9)
-            best_block = int(np.argmin(rms))
-            split_frame = search_start_f + best_block * block_size + (block_size // 2)
+            if np.ptp(rms) > 1e-4:
+                best_block = int(np.argmin(rms))
+                split_frame = search_start_f + best_block * block_size + (block_size // 2)
 
         start_sec = current_frame / float(fr)
         end_sec = split_frame / float(fr)
@@ -102,7 +124,7 @@ def split_at_silence_boundaries(
 
         # Advance with overlap: next start = split_frame - overlap_sec
         overlap_frames = int(overlap_sec * fr)
-        current_frame = max(current_frame + int(min_chunk_sec * fr), split_frame - overlap_frames)
+        current_frame = max(current_frame + int(min_chunk_sec * 0.5 * fr), split_frame - overlap_frames)
 
     return chunks
 
@@ -110,54 +132,34 @@ def split_at_silence_boundaries(
 def merge_overlapping_transcripts(transcripts: List[str]) -> str:
     """
     Merges a list of transcripts from overlapping chunks by computing
-    the longest common word-suffix/prefix match and removing duplicated overlap words.
+    the longest common word-suffix/prefix match, removing duplicated overlap words,
+    and reconciling boundary punctuation and clause conjunctions via ContextReconciler.
     """
     if not transcripts:
         return ""
     if len(transcripts) == 1:
         return transcripts[0].strip()
 
-    merged = transcripts[0].strip()
+    try:
+        from app.transcription.context_reconciler import CumulativeContextReconciler
+        reconciler = CumulativeContextReconciler()
+        for idx, t in enumerate(transcripts):
+            reconciler.add_chunk(chunk_id=idx, raw_text=t)
+        return reconciler.finalize()
+    except Exception as ex:
+        logger.debug(f"Context reconciler fallback note: {ex}")
 
-    for next_raw in transcripts[1:]:
-        next_chunk = next_raw.strip()
-        if not next_chunk:
-            continue
-        if not merged:
-            merged = next_chunk
-            continue
-
-        prev_words = merged.split()
-        next_words = next_chunk.split()
-
-        # Search for longest common suffix of prev_words matching prefix of next_words
-        max_overlap_words = min(12, len(prev_words), len(next_words))
-        best_match_k = 0
-
-        for k in range(max_overlap_words, 0, -1):
-            p_slice = [re.sub(r'[^\w]', '', w).lower() for w in prev_words[-k:]]
-            n_slice = [re.sub(r'[^\w]', '', w).lower() for w in next_words[:k]]
-            if p_slice == n_slice and all(len(w) > 0 for w in p_slice):
-                best_match_k = k
-                break
-
-        if best_match_k > 0:
-            remaining_next = " ".join(next_words[best_match_k:])
-            if remaining_next:
-                if merged.endswith((".", "!", "?", ",", ";", ":")):
-                    merged = merged + " " + remaining_next
-                else:
-                    merged = merged + " " + remaining_next
-        else:
-            # No word overlap match; append with appropriate spacing
-            if merged.endswith(("\n", "\n\n")):
-                merged = merged + next_chunk
-            elif merged.endswith((".", "!", "?", ",", ";", ":")):
-                merged = merged + " " + next_chunk
-            else:
-                merged = merged + " " + next_chunk
-
-    return merged.strip()
+    try:
+        from app.transcription.universal_pipeline import OverlapDuplicateResolver
+        return OverlapDuplicateResolver.merge_transcripts(transcripts)
+    except Exception:
+        merged = transcripts[0].strip()
+        for next_raw in transcripts[1:]:
+            next_chunk = next_raw.strip()
+            if not next_chunk:
+                continue
+            merged = f"{merged} {next_chunk}".strip()
+        return merged
 
 
 def detect_hallucination_loop(text: str) -> bool:
@@ -182,7 +184,6 @@ def detect_hallucination_loop(text: str) -> bool:
 
     words = lower.split()
     if len(words) >= 6:
-        # Check for 3-gram repetition 3 or more times
         triplets = [" ".join(words[i:i+3]) for i in range(len(words)-2)]
         for t in triplets:
             if triplets.count(t) >= 3:

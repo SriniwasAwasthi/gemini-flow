@@ -1,0 +1,1 @@
+Please ensure that your sprint velocity estimates account for the upcoming company holiday on Friday. All pull requests must be merged by Wednesday noon.

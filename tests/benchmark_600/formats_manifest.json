@@ -1,0 +1,502 @@
+[
+  {
+    "id": 1,
+    "name": "Verbatim Raw",
+    "instruction": "Output the raw verbatim transcription exactly as spoken with no formatting or alterations."
+  },
+  {
+    "id": 2,
+    "name": "Professional Business Memo",
+    "instruction": "Format this text into an executive business memo with TO, FROM, DATE, SUBJECT, and MEMORANDUM BODY sections."
+  },
+  {
+    "id": 3,
+    "name": "Bulleted Executive Summary",
+    "instruction": "Format this text into a bulleted executive summary with Key Takeaways (\u2022) and Action Items (\u2022)."
+  },
+  {
+    "id": 4,
+    "name": "Grammar & Punctuation Auto-Repair",
+    "instruction": "Correct all grammar, remove filler words (um, uh, like), fix verb tenses, and ensure flawless punctuation."
+  },
+  {
+    "id": 5,
+    "name": "Developer Technical Documentation",
+    "instruction": "Format as developer technical documentation in clean Markdown with headers, code blocks, and parameter descriptions."
+  },
+  {
+    "id": 6,
+    "name": "Legal Deposition Format",
+    "instruction": "Format into formal legal deposition transcript style with timestamps [00:00:00], speaker tags, and line numbers."
+  },
+  {
+    "id": 7,
+    "name": "Strict JSON Schema Output",
+    "instruction": "Output strictly valid JSON matching schema: {\"transcript\": string, \"sentiment\": string, \"entities\": list, \"word_count\": int}."
+  },
+  {
+    "id": 8,
+    "name": "Meeting Minutes with Deadlines",
+    "instruction": "Format into Meeting Minutes with Attendees, Discussion Topics, Decisions Made, and Action Items with Deadlines."
+  },
+  {
+    "id": 9,
+    "name": "Social Media Thread Format",
+    "instruction": "Format as an engaging social media post / viral X thread with a strong hook, 3 numbered points, and 3 hashtags."
+  },
+  {
+    "id": 10,
+    "name": "Academic Formal Abstract",
+    "instruction": "Format into a formal academic paper abstract with Background, Methods, Results, and Conclusion."
+  },
+  {
+    "id": 11,
+    "name": "Slack Direct Message",
+    "instruction": "Format as a warm, concise Slack direct message using bullet points and professional emoji anchors."
+  },
+  {
+    "id": 12,
+    "name": "Customer Support Ticket",
+    "instruction": "Format as a helpful customer support ticket resolution with empathetic greeting, step-by-step fix, and closing."
+  },
+  {
+    "id": 13,
+    "name": "Incident Post-Mortem RCA",
+    "instruction": "Format as an engineering Root Cause Analysis (RCA) with Incident Summary, Root Cause, Impact, and Remediation Items."
+  },
+  {
+    "id": 14,
+    "name": "GitHub Pull Request Description",
+    "instruction": "Format as a GitHub PR description with ## Summary of Changes, ## Motivation, ## Testing Steps, and [x] Checklist."
+  },
+  {
+    "id": 15,
+    "name": "Daily Standup Update",
+    "instruction": "Format as an agile daily standup update with Yesterday's Accomplishments, Today's Focus, and Blockers."
+  },
+  {
+    "id": 16,
+    "name": "Product Requirements Document",
+    "instruction": "Format as a PRD snippet with Problem Statement, Target User Story, and Acceptance Criteria."
+  },
+  {
+    "id": 17,
+    "name": "Press Release Announcement",
+    "instruction": "Format as a corporate press release with FOR IMMEDIATE RELEASE, Dateline, Headline, Body, and Media Contact."
+  },
+  {
+    "id": 18,
+    "name": "Sales Call Email Follow-Up",
+    "instruction": "Format as a high-conversion sales follow-up email with thank you, summary of pain points, and next steps call to action."
+  },
+  {
+    "id": 19,
+    "name": "YAML Configuration Schema",
+    "instruction": "Convert the information into a valid YAML configuration schema with version, metadata, and spec fields."
+  },
+  {
+    "id": 20,
+    "name": "Markdown Table Structure",
+    "instruction": "Structure the core entities and attributes of the text into a clean Markdown table with headers and pipe (|) delimiters."
+  },
+  {
+    "id": 21,
+    "name": "FAQ Q&A Format",
+    "instruction": "Extract the core concepts into a Frequently Asked Questions (FAQ) format with Q: and A: pairs."
+  },
+  {
+    "id": 22,
+    "name": "Key-Value Dictionary",
+    "instruction": "Extract key attributes from the speech into a clear Key: Value format, one attribute per line."
+  },
+  {
+    "id": 23,
+    "name": "Interview Candidate Assessment",
+    "instruction": "Format as a hiring interview assessment with Candidate, Role, Key Strengths, Areas for Growth, and Recommendation."
+  },
+  {
+    "id": 24,
+    "name": "Concise One-Sentence TL;DR",
+    "instruction": "Synthesize the entire text into a single, punchy TL;DR sentence of twenty-five words or fewer."
+  },
+  {
+    "id": 25,
+    "name": "Standard Operating Procedure (SOP)",
+    "instruction": "Format as a Standard Operating Procedure (SOP) with Purpose, Scope, Prerequisites, and Numbered Procedure Steps."
+  },
+  {
+    "id": 26,
+    "name": "Security Advisory Bulletin",
+    "instruction": "Format as a CVE-style security advisory bulletin with Title, Severity (Low/Med/High/Critical), Affected Component, and Mitigation."
+  },
+  {
+    "id": 27,
+    "name": "Sprint Retrospective Notes",
+    "instruction": "Format as agile sprint retro notes with What Went Well (\u2022), What Could Be Improved (\u2022), and Action Items (\u2022)."
+  },
+  {
+    "id": 28,
+    "name": "Board of Directors Brief",
+    "instruction": "Format as an executive brief for the Board of Directors with Strategic Context, Financial Impact, and Decision Requested."
+  },
+  {
+    "id": 29,
+    "name": "Medical SOAP Note",
+    "instruction": "Format into clinical SOAP note structure: Subjective (S), Objective (O), Assessment (A), and Plan (P)."
+  },
+  {
+    "id": 30,
+    "name": "Financial Earnings Summary",
+    "instruction": "Format as a quarterly financial earnings recap with Revenue, Margin Highlights, Key Drivers, and FY Guidance."
+  },
+  {
+    "id": 31,
+    "name": "Podcast Episode Show Notes",
+    "instruction": "Format as podcast show notes with Episode Title, Overview, Key Discussion Timestamps, and Guest/Resource Links."
+  },
+  {
+    "id": 32,
+    "name": "Formal Service Apology Letter",
+    "instruction": "Format as a formal executive apology letter with sincere acknowledgment of error, root cause explanation, and remedy."
+  },
+  {
+    "id": 33,
+    "name": "Feature Flag Rollout Plan",
+    "instruction": "Format as a software feature flag announcement with Flag Name, Rollout Percentage, Target Cohort, and Kill Switch Guide."
+  },
+  {
+    "id": 34,
+    "name": "Architecture Decision Record (ADR)",
+    "instruction": "Format as an ADR with Title, Status (Proposed/Accepted), Context, Decision, and Consequences."
+  },
+  {
+    "id": 35,
+    "name": "Knowledge Base Troubleshooting",
+    "instruction": "Format as a knowledge base article with Issue Description, Cause, and Step-by-Step Resolution."
+  },
+  {
+    "id": 36,
+    "name": "Cold Outreach Sales Email",
+    "instruction": "Format as a personalized, punchy cold outreach email with hook, value proposition, and low-friction call to action."
+  },
+  {
+    "id": 37,
+    "name": "Weekly Status Report",
+    "instruction": "Format as a weekly team status report with Key Wins, Work in Progress, Blockers/Risks, and Next Week's Priorities."
+  },
+  {
+    "id": 38,
+    "name": "Code Review Feedback",
+    "instruction": "Format as constructive GitHub code review feedback with File, Line Context, Severity, Feedback, and Suggested Code Patch."
+  },
+  {
+    "id": 39,
+    "name": "Keep-a-Changelog Entry",
+    "instruction": "Format into Keep a Changelog standard with ## [Unreleased] section containing Added, Changed, Fixed, or Removed."
+  },
+  {
+    "id": 40,
+    "name": "Strict XML Schema Output",
+    "instruction": "Output strictly valid XML matching schema: <report><transcript>...</transcript><category>...</category><metrics>...</metrics></report>."
+  },
+  {
+    "id": 41,
+    "name": "Project Milestone Tracker",
+    "instruction": "Format as a project tracker with Milestone Name, Owner, Due Date, Status (On Track/At Risk/Completed), and Notes."
+  },
+  {
+    "id": 42,
+    "name": "Pitch Deck Slide Outline",
+    "instruction": "Format into a 3-slide pitch outline with Slide 1 (Problem), Slide 2 (Solution), and Slide 3 (Market Traction)."
+  },
+  {
+    "id": 43,
+    "name": "User Persona Profile",
+    "instruction": "Format as a UX User Persona with Name/Title, Core Goals, Frustrations/Pain Points, and Preferred Tech Stack."
+  },
+  {
+    "id": 44,
+    "name": "Bug Triage Report",
+    "instruction": "Format as a software bug report with Bug ID, Severity, Steps to Reproduce, Expected Behavior, and Actual Behavior."
+  },
+  {
+    "id": 45,
+    "name": "Customer Case Study",
+    "instruction": "Format as a customer success case study with Customer Profile, The Challenge, The Solution, and Measurable Results."
+  },
+  {
+    "id": 46,
+    "name": "All-Hands Keynote Speech",
+    "instruction": "Format as an inspiring CEO all-hands speech transcript with Opening Hook, Strategic Vision, Team Recognition, and Call to Action."
+  },
+  {
+    "id": 47,
+    "name": "REST API Endpoint Spec",
+    "instruction": "Format as an OpenAPI REST endpoint specification with HTTP Method, Path, Request Parameters, and 200 OK Response schema."
+  },
+  {
+    "id": 48,
+    "name": "Non-Disclosure Agreement Summary",
+    "instruction": "Format as a legal NDA summary with Disclosing Party, Receiving Party, Confidential Information Definition, and Term Length."
+  },
+  {
+    "id": 49,
+    "name": "New Hire Onboarding Checklist",
+    "instruction": "Format as an employee onboarding checklist divided into Day 1 Tasks, Week 1 Milestones, and Month 1 Goals."
+  },
+  {
+    "id": 50,
+    "name": "Performance Review Self-Eval",
+    "instruction": "Format as an annual performance review self-evaluation with Major Contributions, Overcoming Challenges, and Goals for Next Year."
+  },
+  {
+    "id": 51,
+    "name": "Customer Feedback Sentiment Log",
+    "instruction": "Format into a feedback log with Raw Quote, Sentiment (Positive/Neutral/Negative), Key Themes, and Follow-Up Priority."
+  },
+  {
+    "id": 52,
+    "name": "Product Launch Announcement Email",
+    "instruction": "Format as a marketing product launch email with bold Headline, New Capabilities (\u2022), and Get Started Button."
+  },
+  {
+    "id": 53,
+    "name": "Risk Assessment Matrix",
+    "instruction": "Format as a risk analysis with Risk Description, Likelihood (1-5), Severity (1-5), and Mitigation Strategy."
+  },
+  {
+    "id": 54,
+    "name": "DevOps Runbook Procedure",
+    "instruction": "Format as an on-call DevOps runbook with Trigger Alert, Severity Level, Initial Triage Steps, and Escalation Path."
+  },
+  {
+    "id": 55,
+    "name": "Beginner Educational Tutorial",
+    "instruction": "Format as a beginner-friendly tutorial with Conceptual Explanation, Real-World Analogy, Code Example, and Quick Quiz."
+  },
+  {
+    "id": 56,
+    "name": "Newsletter Curated Feature",
+    "instruction": "Format as an email newsletter segment with Catchy Header, 3-Sentence Analytical Breakdown, and Read More Link."
+  },
+  {
+    "id": 57,
+    "name": "Executive Decision Memo",
+    "instruction": "Format as an executive decision paper with Decision Required, Background Context, Options Considered, and Recommendation."
+  },
+  {
+    "id": 58,
+    "name": "Data Governance Policy Addendum",
+    "instruction": "Format as a data governance policy with Data Classification Level, Retention Period, Encryption Requirement, and Audit Policy."
+  },
+  {
+    "id": 59,
+    "name": "Marketing Creative Brief",
+    "instruction": "Format as an advertising creative brief with Campaign Objective, Target Demographic, Core Message, Tone, and Deliverables."
+  },
+  {
+    "id": 60,
+    "name": "Job Description Posting",
+    "instruction": "Format as a high-impact job description with Role Title, Team Mission, Core Responsibilities, and Required Qualifications."
+  },
+  {
+    "id": 61,
+    "name": "Micro-Learning Flashcard",
+    "instruction": "Format as an educational flashcard with Front (Prompt/Question) and Back (Key Concept + Memory Tip)."
+  },
+  {
+    "id": 62,
+    "name": "User Research Interview Notes",
+    "instruction": "Format as user research notes with Participant ID, Key Quotes, Observed Behaviors, and UX Recommendations."
+  },
+  {
+    "id": 63,
+    "name": "Competitive Intelligence Brief",
+    "instruction": "Format as a competitor intelligence brief with Competitor Name, Recent Move, Market Threat Level, and Counter-Strategy."
+  },
+  {
+    "id": 64,
+    "name": "App Store Release Notes",
+    "instruction": "Format as consumer app store release notes with What's New in Version 3.0 and bulleted feature highlights with emojis."
+  },
+  {
+    "id": 65,
+    "name": "Infrastructure as Code HCL",
+    "instruction": "Format the infrastructure resources discussed into clean Terraform HCL resource blocks."
+  },
+  {
+    "id": 66,
+    "name": "OKR Goal Template",
+    "instruction": "Format into Objectives and Key Results (OKR) format with 1 Inspiring Objective and 3 Measurable Key Results with % targets."
+  },
+  {
+    "id": 67,
+    "name": "Privacy Policy Statement",
+    "instruction": "Format as a formal GDPR/CCPA privacy policy statement with Information Collected, Legal Basis, and User Rights."
+  },
+  {
+    "id": 68,
+    "name": "Quarterly Budget Variance Report",
+    "instruction": "Format as a financial budget variance report with Expense Category, Allocated Budget, Actual Spend, and Variance %."
+  },
+  {
+    "id": 69,
+    "name": "Hardware Benchmark Spec Sheet",
+    "instruction": "Format as a hardware benchmark specification sheet with Component, Test Metric, Benchmark Score, and Delta vs Baseline."
+  },
+  {
+    "id": 70,
+    "name": "Gherkin BDD Feature File",
+    "instruction": "Format into Gherkin BDD syntax with Feature:, Scenario:, Given, When, and Then statements."
+  },
+  {
+    "id": 71,
+    "name": "Cloud Status Page Update",
+    "instruction": "Format as a public cloud status update with Component Affected, Status (Investigating/Identified/Resolved), and Timestamp."
+  },
+  {
+    "id": 72,
+    "name": "Sales Objection Handling Script",
+    "instruction": "Format as a sales battlecard with Customer Objection, Root Concern, and Recommended Response Strategy."
+  },
+  {
+    "id": 73,
+    "name": "Event Logistics Invitation",
+    "instruction": "Format as an executive event invitation with Event Name, Date & Time, Location/Link, Dress Code, and Agenda."
+  },
+  {
+    "id": 74,
+    "name": "Product Roadmap Epics Overview",
+    "instruction": "Format into a product roadmap view with Now (In Progress), Next (Coming Soon), and Later (Future Vision) epics."
+  },
+  {
+    "id": 75,
+    "name": "Cloud Migration Strategy Plan",
+    "instruction": "Format as a cloud migration plan with Workload Name, Current State, Target Cloud Architecture, and Migration Phases."
+  },
+  {
+    "id": 76,
+    "name": "Customer Offboarding Analysis",
+    "instruction": "Format as customer churn analysis with Account Name, Churn Reason, Primary Pain Point, and Win-Back Eligibility."
+  },
+  {
+    "id": 77,
+    "name": "SQL DDL & Query Explanation",
+    "instruction": "Format as SQL DDL/DML statements accompanied by a clean plain-English explanation of table relationships."
+  },
+  {
+    "id": 78,
+    "name": "Contract Milestone Payment Schedule",
+    "instruction": "Format as a commercial contract payment schedule with Milestone Number, Deliverable Description, % Payment, and Target Date."
+  },
+  {
+    "id": 79,
+    "name": "Webinar Intro & Speaker Bio",
+    "instruction": "Format as a webinar host script with Welcome Remarks, Housekeeping Notes, Topic Teaser, and Speaker Biography."
+  },
+  {
+    "id": 80,
+    "name": "WCAG Accessibility Audit",
+    "instruction": "Format as an accessibility compliance report with WCAG Guideline (e.g. 1.4.3 Contrast), Conformance Level, Finding, and Remediation."
+  },
+  {
+    "id": 81,
+    "name": "Vendor Risk Assessment",
+    "instruction": "Format as a third-party vendor review with Vendor Name, Service Provided, Security Risk Tier, and Compliance Status."
+  },
+  {
+    "id": 82,
+    "name": "Brand Voice & Tone Guidelines",
+    "instruction": "Format as brand voice guidelines with Brand Attribute, Do (Positive Example), and Don't (Negative Example)."
+  },
+  {
+    "id": 83,
+    "name": "AI Ethics & Safety Audit",
+    "instruction": "Format as an AI governance audit with Model Name, Fairness Check, Bias Mitigation, Privacy Guarantee, and Transparency Tier."
+  },
+  {
+    "id": 84,
+    "name": "Employee Recognition Kudos",
+    "instruction": "Format as an authentic peer recognition message celebrating specific achievements and values demonstrated."
+  },
+  {
+    "id": 85,
+    "name": "Penetration Testing Finding",
+    "instruction": "Format as a cybersecurity pen-test finding with Finding Title, Risk Rating, Vulnerability Description, and Proof of Concept."
+  },
+  {
+    "id": 86,
+    "name": "Customer Journey Touchpoint Map",
+    "instruction": "Format as a customer journey map with Stage (Awareness/Consideration/Purchase), User Action, Emotional State, and Pain Point."
+  },
+  {
+    "id": 87,
+    "name": "Open-Source Contribution Guide",
+    "instruction": "Format as an open-source CONTRIBUTING.md guide with Forking Instructions, Coding Standards, and Pull Request Guidelines."
+  },
+  {
+    "id": 88,
+    "name": "Disaster Recovery Playbook",
+    "instruction": "Format as a disaster recovery playbook with Disaster Scenario, Recovery Time Objective (RTO), and Failover Execution Steps."
+  },
+  {
+    "id": 89,
+    "name": "Knowledge Transfer Handover",
+    "instruction": "Format as a project handover doc with System Name, Repository Links, Key Team Contacts, and Known Technical Quirks."
+  },
+  {
+    "id": 90,
+    "name": "Email Subject Line Variations",
+    "instruction": "Generate 5 distinct email subject line variations: 1. Curiosity Hook, 2. Urgent, 3. Benefit-Driven, 4. Direct, 5. Question."
+  },
+  {
+    "id": 91,
+    "name": "SEO Content Strategy Brief",
+    "instruction": "Format as an SEO content brief with Target Keyword, Search Intent, Suggested Title, H2 Outline, and Target Word Count."
+  },
+  {
+    "id": 92,
+    "name": "Data Pipeline Architecture Blueprint",
+    "instruction": "Format as a data pipeline architecture doc with Source Systems, Ingestion Method, Transformation Stage, Storage, and BI Consumers."
+  },
+  {
+    "id": 93,
+    "name": "Executive Elevator Pitch",
+    "instruction": "Format as a crisp 30-second elevator pitch with Hook, Problem, Unique Value Proposition, and Call to Action."
+  },
+  {
+    "id": 94,
+    "name": "Conventional Commit Message",
+    "instruction": "Format as a Conventional Commit message with type(scope): subject, detailed body, and BREAKING CHANGE footer if applicable."
+  },
+  {
+    "id": 95,
+    "name": "Legal Definitions Section",
+    "instruction": "Format as a legal contract Definitions section with alphabetical defined terms in quotation marks followed by formal meanings."
+  },
+  {
+    "id": 96,
+    "name": "Usability Testing Moderator Script",
+    "instruction": "Format as a user testing script with Welcome Script, Scenario Instructions, Think-Aloud Prompt, and Post-Task Question."
+  },
+  {
+    "id": 97,
+    "name": "Quarterly Customer Health Scorecard",
+    "instruction": "Format as a Customer Success scorecard with Account Name, ARR, Health Rating (Green/Yellow/Red), and Retention Risk Plan."
+  },
+  {
+    "id": 98,
+    "name": "Machine Learning Model Card",
+    "instruction": "Format as an ML Model Card with Model Architecture, Intended Use Cases, Training Data, Performance Metrics, and Known Limitations."
+  },
+  {
+    "id": 99,
+    "name": "Crisis Communications Press Statement",
+    "instruction": "Format as a corporate crisis management statement with Factual Summary, Immediate Corrective Actions, Safety Reassurance, and Spokesperson."
+  },
+  {
+    "id": 100,
+    "name": "Synthesis Takeaway Matrix",
+    "instruction": "Format into a comprehensive synthesis matrix with Dimension, Audio Fact Extracted, Practical Application, and Strategic Priority."
+  }
+]

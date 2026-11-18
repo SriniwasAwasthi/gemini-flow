@@ -35,7 +35,7 @@ FALLBACK_MODELS = [
 
 
 class GeminiEngine:
-    def __init__(self, api_key: Any = "", model_name: str = "auto"):
+    def __init__(self, api_key: Any = "", model_name: str = "Offline Local Speech (Whisper AI)"):
         from .config import sanitize_api_key
         if hasattr(api_key, "get_api_key"):
             self.api_key = sanitize_api_key(api_key.get_api_key())
@@ -119,7 +119,7 @@ class GeminiEngine:
             "gemini-3.5-flash-lite",
             "gemini-3.5-flash"
         ]
-        if self.model_name and self.model_name not in models_to_try and self.model_name != "auto":
+        if self.model_name and self.model_name not in models_to_try:
             models_to_try.insert(0, self.model_name)
 
         last_error = ""
@@ -201,9 +201,35 @@ class GeminiEngine:
             return False, "Audio is too short or empty."
 
 # Check if user explicitly chose offline mode, or if API key is not configured
-        is_explicit_offline = any(k in str(self.model_name).lower() for k in ("offline", "whisper", "local", "on-device", "ollama", "gemma"))
+        # Check if user selected Groq Whisper Turbo for ultra-fast LPU processing
+        if "groq" in str(self.model_name).lower():
+            logger.info("Executing ultra-low latency Groq Whisper Turbo pipeline (< 0.25s)...")
+            t_groq_start = time.time()
+            ok, groq_text = self._transcribe_with_groq(wav_bytes, prompt=system_instruction)
+            if ok:
+                self.last_latency = time.time() - t_groq_start
+                self.last_model_used = "Groq Whisper Turbo (LPU Cloud)"
+                self.last_fallback = False
+                if groq_text:
+                    try:
+                        from app.intelligence.ai_polish_brain import AIPolishBrain
+                        groq_text = AIPolishBrain.polish_speech(groq_text)
+                    except Exception:
+                        pass
+                    try:
+                        from app.vocabulary.vocab_engine import VocabEngine
+                        groq_text = VocabEngine.normalize_text(groq_text)
+                    except Exception:
+                        pass
+                return True, groq_text
+            logger.warning(f"Groq Whisper Turbo execution failed ({groq_text}). Seamless fallback to local Whisper...")
 
-        if not self.api_key or is_explicit_offline:
+        # Stage 1: Enforce acoustic Faster-Whisper as primary engine for speech dictation
+        # Cloud LLMs are only used for text-level Prompt/Transform modes or when explicitly requested
+        is_cloud_gemini_dictation = bool(self.api_key and "gemini" in str(self.model_name).lower())
+        is_explicit_offline = not is_cloud_gemini_dictation or "offline" in str(self.model_name).lower()
+
+        if not is_cloud_gemini_dictation:
             if offline_fallback_enabled or is_explicit_offline:
                 is_ollama = any(k in str(self.model_name).lower() for k in ("ollama", "gemma"))
                 logger.info(f"Executing on-device speech pipeline (Model: {self.model_name})...")
@@ -253,7 +279,7 @@ class GeminiEngine:
             app_name=app_name,
             app_category=app_cat,
             profile_name=profile_id,
-            manual_override=None if self.model_name in ("auto", None, "") else self.model_name,
+            manual_override=self.model_name,
             auto_cost_mode=auto_cost_mode
         )
         primary_model = routing.model_name
@@ -487,8 +513,62 @@ class GeminiEngine:
                 return str(at["text"])
         return ""
 
+    def _transcribe_with_groq(self, wav_bytes: bytes, prompt: str = "") -> Tuple[bool, str]:
+        """Ultra-low latency transcription on Groq LPUs (< 0.25s SLA) using whisper-large-v3-turbo."""
+        import os
+        from app.config import ConfigManager
+        try:
+            cfg = ConfigManager.get_instance().get_all()
+            groq_key = cfg.get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
+        except Exception:
+            groq_key = os.environ.get("GROQ_API_KEY", "")
+
+        if not groq_key:
+            # Check if self.api_key is a Groq key (starts with gsk_)
+            if str(self.api_key).startswith("gsk_"):
+                groq_key = str(self.api_key)
+            else:
+                return False, "Groq API key not configured. Add groq_api_key in Settings."
+
+        url = "https://api.groq.com/openai/v1/audio/transcriptions"
+        headers = {"Authorization": f"Bearer {groq_key}"}
+        files = {
+            "file": ("audio.wav", wav_bytes, "audio/wav")
+        }
+        data = {
+            "model": "whisper-large-v3-turbo",
+            "response_format": "json",
+            "temperature": "0.0"
+        }
+        if prompt:
+            data["prompt"] = prompt[:400]
+
+        start_t = time.time()
+        try:
+            resp = self.session.post(url, headers=headers, files=files, data=data, timeout=(3.0, 15.0))
+            elapsed = time.time() - start_t
+            if resp.status_code == 200:
+                txt = resp.json().get("text", "").strip()
+                logger.info(f"Groq Whisper Turbo completed in {elapsed:.2f}s: {txt[:60]}...")
+                return True, txt
+            elif resp.status_code == 401:
+                logger.error(f"Groq API 401 Unauthorized: {resp.text}")
+                return False, "Groq API 401 Unauthorized: Invalid API key"
+            else:
+                logger.warning(f"Groq API error ({resp.status_code}): {resp.text}")
+                return False, f"Groq error ({resp.status_code}): {resp.text[:100]}"
+        except requests.exceptions.Timeout as to_ex:
+            logger.error(f"Groq transcription timed out: {to_ex}")
+            return False, f"Groq API request timed out after 15.0s: {to_ex}"
+        except Exception as ex:
+            logger.error(f"Groq transcription network error: {ex}")
+            return False, str(ex)
+
     def _try_transcribe_with_model(self, model: str, wav_bytes: bytes, system_instruction: str) -> Tuple[bool, str]:
         """Direct REST API implementation with Keep-Alive session, parallel chunking, and resilient fallback."""
+        if "groq" in model.lower():
+            return self._transcribe_with_groq(wav_bytes, system_instruction)
+
         chunks = self._split_wav_into_chunks(wav_bytes, target_chunk_sec=35.0, max_chunk_sec=50.0)
 
         # Single chunk path (standard speech <= 22s)
@@ -741,10 +821,11 @@ class GeminiEngine:
             custom_instruction=custom_instruction
         )
 
-        # 2. Resolve Primary Model for text transformations (default to gemini-3.5-flash-lite for instant sub-second quota-available execution)
-        if not self.model_name or self.model_name in ("auto", "gemini-3.5-transcribe"):
+        # 2. Resolve Primary Model for text transformations (ensuring valid text LLM model)
+        is_audio_only = any(k in (self.model_name or "").lower() for k in ("offline", "whisper", "moonshine", "sherpa", "transcribe"))
+        if not self.model_name or self.model_name in ("auto", "gemini-3.5-transcribe") or is_audio_only:
             routing = ModelRouter.route_model(task_type="text", profile_name=profile_id, auto_cost_mode=auto_cost_mode)
-            primary_model = routing.model_name
+            primary_model = routing.model_name or "gemini-2.5-flash"
         else:
             primary_model = self.model_name
         is_code = (transform_type == TransformType.TECHNICAL or "code" in (custom_instruction or "").lower() or "function" in (custom_instruction or "").lower())
@@ -826,35 +907,44 @@ class GeminiEngine:
 
         # 5. Local Intelligence Fallback on total online transformation failure (Guaranteed Zero-Failure)
         if not exec_res.success:
-            try:
-                from app.intelligence.ollama_engine import OllamaEngine
-                if OllamaEngine.is_available(timeout=0.4):
-                    prompt = f"{instruction}\n\nCONTENT TO TRANSFORM:\n\"\"\"\n{raw_text}\n\"\"\"\n\nOUTPUT ONLY THE TRANSFORMED TEXT:"
-                    ok_ol, txt_ol = OllamaEngine.polish_text(raw_text=raw_text, prompt_override=prompt, timeout=12.0)
-                    if ok_ol and txt_ol and len(txt_ol.strip()) > 5:
-                        exec_res.success = True
-                        exec_res.text = self._clean_output(txt_ol, is_code=is_code)
-                        exec_res.model_used = "Ollama Gemma 2B (Local Offline Fallback)"
-                        exec_res.fallback_occurred = True
-            except Exception as ol_err:
-                logger.debug(f"Ollama transform fallback note: {ol_err}")
-
-            if not exec_res.success:
+            if transform_type in (TransformType.CONVERT_PROMPT, TransformType.PROMPT):
+                prompt_5 = TransformEngine._build_5_part_prompt_from_content(raw_text)
+                exec_res.success = True
+                exec_res.text = prompt_5
+                exec_res.model_used = "Offline 5-Part Prompt Blueprint Fallback"
+                exec_res.fallback_occurred = True
+            else:
                 try:
-                    from app.intelligence.ai_polish_brain import AIPolishBrain
-                    cleaned = AIPolishBrain.polish_speech(raw_text)
-                    cleaned = self._clean_output(cleaned)
-                    if cleaned:
-                        exec_res.success = True
-                        exec_res.text = cleaned
-                        exec_res.model_used = "Local Intelligence Polish (Offline Fallback)"
-                        exec_res.fallback_occurred = True
-                except Exception as loc_err:
-                    logger.debug(f"Local intelligence transform fallback note: {loc_err}")
+                    from app.intelligence.ollama_engine import OllamaEngine
+                    if OllamaEngine.is_available(timeout=0.4):
+                        prompt = f"{instruction}\n\nCONTENT TO TRANSFORM:\n\"\"\"\n{raw_text}\n\"\"\"\n\nOUTPUT ONLY THE TRANSFORMED TEXT:"
+                        ok_ol, txt_ol = OllamaEngine.polish_text(raw_text=raw_text, prompt_override=prompt, timeout=12.0)
+                        if ok_ol and txt_ol and len(txt_ol.strip()) > 5:
+                            exec_res.success = True
+                            exec_res.text = self._clean_output(txt_ol, is_code=is_code)
+                            exec_res.model_used = "Ollama Gemma 2B (Local Offline Fallback)"
+                            exec_res.fallback_occurred = True
+                except Exception as ol_err:
+                    logger.debug(f"Ollama transform fallback note: {ol_err}")
 
-        # 5b. Vocabulary Normalization & Metrics
+                if not exec_res.success:
+                    try:
+                        from app.intelligence.ai_polish_brain import AIPolishBrain
+                        cleaned = AIPolishBrain.polish_speech(raw_text)
+                        cleaned = self._clean_output(cleaned)
+                        if cleaned:
+                            exec_res.success = True
+                            exec_res.text = cleaned
+                            exec_res.model_used = "Local Intelligence Polish (Offline Fallback)"
+                            exec_res.fallback_occurred = True
+                    except Exception as loc_err:
+                        logger.debug(f"Local intelligence transform fallback note: {loc_err}")
+
+        # 5b. Vocabulary Normalization & 15-Section Enforcement
         if exec_res.success and exec_res.text:
-            if not is_code and transform_type not in (TransformType.TECHNICAL, TransformType.CUSTOM, TransformType.CONVERT_PROMPT):
+            if transform_type in (TransformType.CONVERT_PROMPT, TransformType.PROMPT):
+                                exec_res.text = TransformEngine.enforce_5_part_prompt(exec_res.text, raw_input=raw_text)
+            elif not is_code and transform_type not in (TransformType.TECHNICAL, TransformType.CUSTOM):
                 try:
                     exec_res.text = VocabEngine.normalize_text(exec_res.text)
                 except Exception:
@@ -880,11 +970,11 @@ class GeminiEngine:
         return exec_res
 
     def enhance_to_ai_prompt(self, raw_text: str) -> Tuple[bool, str]:
-        """Transforms messy dictation or raw notes into a world-class, structured AI Prompt."""
+        """Transforms messy dictation or raw notes into a 5-Part Master Prompt Blueprint with XML tags."""
         res = self.transform_text(raw_text, transform_type=TransformType.CONVERT_PROMPT)
-        if res.success:
-            return True, res.text
-        return False, res.error_message or "Prompt enhancement failed."
+        if res.success and res.text:
+            return True, TransformEngine.enforce_5_part_prompt(res.text, raw_input=raw_text)
+        return True, TransformEngine._build_5_part_prompt_from_content(raw_text)
 
     @staticmethod
     def apply_dictionary(text: str, dictionary: List[Dict[str, str]]) -> str:
@@ -901,43 +991,45 @@ class GeminiEngine:
             if not spoken or not replacement:
                 continue
 
-            # Clean core token (stripping trailing/leading punctuation from entries like 'Srinivas Awasthi.')
+            # Clean core token (stripping trailing/leading punctuation from spoken trigger)
+            # Preserve exact replacement string (e.g. 'C++', 'Node.js', 'FastAPI')
             core_spoken = re.sub(r'^[^\w]+|[^\w]+$', '', spoken)
-            core_replacement = re.sub(r'^[^\w]+|[^\w]+$', '', replacement)
 
-            if core_spoken and re.match(r'^\w+(?:\s+\w+)*$', core_spoken):
-                pat = re.compile(r'\b' + re.escape(core_spoken) + r'\b', re.IGNORECASE)
-                result = pat.sub(core_replacement, result)
+            if core_spoken:
+                pat = re.compile(r'(?<!\w)' + re.escape(core_spoken) + r'(?!\w)', re.IGNORECASE)
+                result = pat.sub(lambda _m, rep=replacement: rep, result)
 
             if spoken != core_spoken:
                 pat_lit = re.compile(re.escape(spoken), re.IGNORECASE)
-                result = pat_lit.sub(replacement, result)
+                result = pat_lit.sub(lambda _m, rep=replacement: rep, result)
 
         return result
 
     @staticmethod
     def apply_snippets(text: str, snippets: List[Dict[str, str]]) -> str:
-        """Checks if the transcribed text matches a snippet trigger phrase."""
+        """
+        Universally matches and expands voice trigger phrases anywhere inside an utterance:
+        - Works at beginning, middle, or end of speech
+        - Preserves surrounding sentences and context
+        - Normalizes case, punctuation, and phonetic variations
+        """
         if not text or not snippets:
             return text
-
-        normalized_text = re.sub(r'[^\w\s]', '', text).strip().lower()
-        for snip in snippets:
-            trigger = snip.get("trigger", "").strip()
-            content = snip.get("content", "").strip()
-            if not trigger or not content:
-                continue
-
-            normalized_trigger = re.sub(r'[^\w\s]', '', trigger).strip().lower()
-            if normalized_text == normalized_trigger:
-                logger.info(f"Snippet trigger exact matched: '{trigger}' -> Expanding snippet.")
-                return content
-            elif normalized_trigger in normalized_text and len(normalized_text.split()) <= len(normalized_trigger.split()) + 3:
-                # Trigger spoken with brief surrounding words (e.g. "hey snippet trigger please")
-                logger.info(f"Snippet trigger matched in context: '{trigger}' -> Expanding snippet.")
-                return content
-
-        return text
+        try:
+            from app.transcription.universal_pipeline import VoiceTriggerExpander
+            return VoiceTriggerExpander.expand_triggers(text, snippets)
+        except Exception as ex:
+            logger.debug(f"VoiceTriggerExpander fallback note: {ex}")
+            normalized_text = re.sub(r'[^\w\s]', '', text).strip().lower()
+            for snip in snippets:
+                trigger = snip.get("trigger", "").strip()
+                content = snip.get("content", "").strip()
+                if not trigger or not content:
+                    continue
+                normalized_trigger = re.sub(r'[^\w\s]', '', trigger).strip().lower()
+                if normalized_text == normalized_trigger or normalized_trigger in normalized_text:
+                    return content
+            return text
 
     def _clean_output(self, raw_text: str, is_code: bool = False) -> str:
         """

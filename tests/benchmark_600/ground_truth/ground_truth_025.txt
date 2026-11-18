@@ -1,0 +1,1 @@
+Look, I know everyone is stressed about the Q3 launch date, but if we rush the payment gateway refactor without full unit test coverage, we are going to end up fighting fires all weekend. I'd rather tell the product manager we need three more days and ship something bulletproof.

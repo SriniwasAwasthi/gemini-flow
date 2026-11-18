@@ -50,16 +50,18 @@ AUDIO_FALLBACK_CHAINS = {
     "gemini-3.5-flash-lite": ["gemini-3.5-flash-lite", "gemini-2.5-flash", "offline-whisper"],
     "auto": ["gemini-2.5-flash", "gemini-3.5-flash-lite", "offline-whisper"],
     "offline-whisper": ["offline-whisper"],
-    "ollama-gemma2": ["ollama-gemma2", "offline-whisper"]
+    "ollama-qwen2.5": ["ollama-qwen2.5", "offline-whisper"],
+    "ollama-gemma2": ["ollama-qwen2.5", "offline-whisper"]
 }
 
 TEXT_FALLBACK_CHAINS = {
-    "gemini-2.5-flash": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-gemma2"],
-    "gemini-3.5-flash": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-gemma2"],
-    "gemini-3.5-flash-lite": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-gemma2"],
-    "auto": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-gemma2"],
+    "gemini-2.5-flash": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-qwen2.5"],
+    "gemini-3.5-flash": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-qwen2.5"],
+    "gemini-3.5-flash-lite": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-qwen2.5"],
+    "auto": ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash", "ollama-qwen2.5"],
     "offline-whisper": ["offline-whisper"],
-    "ollama-gemma2": ["ollama-gemma2"]
+    "ollama-qwen2.5": ["ollama-qwen2.5"],
+    "ollama-gemma2": ["ollama-qwen2.5"]
 }
 
 MODEL_FALLBACK_CHAINS = AUDIO_FALLBACK_CHAINS

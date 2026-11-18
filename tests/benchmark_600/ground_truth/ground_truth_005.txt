@@ -1,0 +1,1 @@
+We implemented Redis caching with a write-through strategy to guarantee cache consistency across multiple regional deployment zones.

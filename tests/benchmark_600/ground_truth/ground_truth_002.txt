@@ -1,0 +1,1 @@
+We optimized the PyTorch tensor operations with CUDA kernels to eliminate redundant memory transfers.

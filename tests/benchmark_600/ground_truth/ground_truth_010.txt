@@ -1,0 +1,1 @@
+The Elasticsearch cluster experienced high JVM garbage collection pressure during the hourly log re-indexing cycle. We tuned the heap allocation to thirty-two gigabytes, disabled swap memory entirely, and adjusted the shard count to prevent segment thrashing.

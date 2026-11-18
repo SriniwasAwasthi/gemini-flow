@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  whisper:
+    image: faster-whisper:int8
+    ports:
+      - '8080:8080'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

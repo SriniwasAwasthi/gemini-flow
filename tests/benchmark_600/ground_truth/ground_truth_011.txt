@@ -1,0 +1,1 @@
+We configured Prometheus to scrape telemetry metrics from our FastAPI application at fifteen-second intervals.

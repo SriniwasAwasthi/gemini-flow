@@ -44,6 +44,42 @@ def _is_any_vk_down(vk_codes: list) -> bool:
     return any(_is_win32_key_down(vk) for vk in vk_codes)
 
 
+def _is_hotkey_physically_down(hotkey_str: str) -> bool:
+    """Verifies with Windows OS kernel if all components of the hotkey are physically pressed."""
+    if not hotkey_str:
+        return False
+    parts = [p.strip().lower() for p in hotkey_str.split("+") if p.strip()]
+    if not parts:
+        return False
+    for part in parts:
+        if part in ("<ctrl>", "ctrl", "control"):
+            if not _is_any_vk_down([0x11, 0xA2, 0xA3]):
+                return False
+        elif part in ("<alt>", "alt"):
+            if not _is_any_vk_down([0x12, 0xA4, 0xA5]):
+                return False
+        elif part in ("<shift>", "shift"):
+            if not _is_any_vk_down([0x10, 0xA0, 0xA1]):
+                return False
+        elif part in ("<cmd>", "<win>", "win", "cmd", "windows"):
+            if not _is_any_vk_down([0x5B, 0x5C]):
+                return False
+        elif part in ("<space>", "space"):
+            if not _is_win32_key_down(0x20):
+                return False
+        elif part in ("<esc>", "esc", "escape"):
+            if not _is_win32_key_down(0x1B):
+                return False
+        elif part.startswith("f") and part[1:].isdigit():
+            f_num = int(part[1:])
+            if 1 <= f_num <= 12 and not _is_win32_key_down(0x70 + (f_num - 1)):
+                return False
+        elif len(part) == 1:
+            if not _is_win32_key_down(ord(part.upper())):
+                return False
+    return True
+
+
 def _parse_hotkey_to_win32(hotkey_str: str) -> Optional[Tuple[int, int]]:
     """Parses hotkey string (e.g. '<ctrl>+<space>') into (fsModifiers, vkCode) for Win32 RegisterHotKey."""
     if not hotkey_str:
@@ -96,8 +132,8 @@ class HotkeyManager:
         self,
         hotkey_str: str = "<ctrl>+<space>",
         mode: str = "toggle",  # "toggle" or "push_to_talk"
-        prompt_hotkey_str: str = "<ctrl>+<shift>+p",
-        transform_hotkey_str: str = "<ctrl>+<shift>+t",
+        prompt_hotkey_str: str = "<alt>+p",
+        transform_hotkey_str: str = "<alt>+t",
         on_start: Optional[Callable[[], None]] = None,
         on_stop: Optional[Callable[[], None]] = None,
         on_cancel: Optional[Callable[[], None]] = None,
@@ -137,8 +173,8 @@ class HotkeyManager:
         self,
         hotkey_str: str,
         mode: str,
-        prompt_hotkey_str: str = "<ctrl>+<shift>+p",
-        transform_hotkey_str: str = "<ctrl>+<shift>+t"
+        prompt_hotkey_str: str = "<alt>+p",
+        transform_hotkey_str: str = "<alt>+t"
     ):
         with self._lock:
             self.hotkey_str = hotkey_str
@@ -192,6 +228,26 @@ class HotkeyManager:
                     logger.info(f"Push-to-Talk triggered START [Engine: {source}]")
                     if self.on_start:
                         threading.Thread(target=self.on_start, daemon=True, name="HotkeyPushStartThread").start()
+
+                    physically_started = _is_hotkey_physically_down(self.hotkey_str)
+                    def _ptt_watchdog():
+                        if not physically_started:
+                            return
+                        time.sleep(0.12)
+                        while self.is_recording and self.mode == "push_to_talk":
+                            time.sleep(0.035)
+                            if not self.is_recording:
+                                break
+                            if not _is_hotkey_physically_down(self.hotkey_str):
+                                logger.info("Push-to-Talk physical key release detected by kernel watchdog.")
+                                with self._lock:
+                                    if self.is_recording and self.mode == "push_to_talk":
+                                        self.is_recording = False
+                                        self._main_hotkey_active = False
+                                        if self.on_stop:
+                                            threading.Thread(target=self.on_stop, daemon=True, name="HotkeyPushStopThread").start()
+                                break
+                    threading.Thread(target=_ptt_watchdog, daemon=True, name="PTTPhysicalWatchdog").start()
 
     def _handle_prompt_trigger(self, source: str = "unknown"):
         with self._lock:
@@ -372,12 +428,22 @@ class HotkeyManager:
                 if not (is_pynput_down or is_win32_down):
                     return False
             elif len(part) == 1:
-                is_pynput_down = any(
-                    (isinstance(k, keyboard.KeyCode) and k.char and k.char.lower() == part)
-                    for k in self._current_keys
-                )
-                vk = ord(part.upper())
-                is_win32_down = _is_win32_key_down(vk)
+                target_char = part.lower()
+                target_vk = ord(part.upper())
+                is_pynput_down = False
+                for k in self._current_keys:
+                    if isinstance(k, keyboard.KeyCode):
+                        if getattr(k, 'vk', None) == target_vk:
+                            is_pynput_down = True
+                            break
+                        if k.char:
+                            char_val = k.char.lower()
+                            if ord(k.char) < 32:
+                                char_val = chr(ord(k.char) + 64).lower()
+                            if char_val == target_char:
+                                is_pynput_down = True
+                                break
+                is_win32_down = _is_win32_key_down(target_vk)
                 if not (is_pynput_down or is_win32_down):
                     return False
         return True
@@ -512,7 +578,7 @@ class HotkeyManager:
         self._listener.daemon = True
         self._listener.start()
 
-        logger.info(f"Dual-Engine Global Hotkey System started: Main={self.hotkey_str} ({self.mode}), Prompt={self.prompt_hotkey_str}")
+        logger.info(f"Dual-Engine Global Hotkey System started: Main={self.hotkey_str} ({self.mode}), Prompt={self.prompt_hotkey_str}, Transform={self.transform_hotkey_str}")
 
     def stop(self):
         """Stops both hotkey engines cleanly."""

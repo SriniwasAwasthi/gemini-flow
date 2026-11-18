@@ -1,0 +1,1 @@
+import sqlite3; conn = sqlite3.connect('benchmarks.db'); cursor = conn.cursor(); cursor.execute('CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, latency REAL);');

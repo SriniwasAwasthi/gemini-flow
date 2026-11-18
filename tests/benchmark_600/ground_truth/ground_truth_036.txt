@@ -1,0 +1,1 @@
+Check the server log quietly.

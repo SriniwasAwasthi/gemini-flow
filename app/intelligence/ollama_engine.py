@@ -1,21 +1,24 @@
-import threading
-_OLLAMA_LOCK = threading.Lock()
 """
 Ollama Engine for Gemini Flow (Wispr Flow AI Alternative).
+Stage 2 Local Grammar & Self-Correction Engine.
 Provides 100% private, on-device local LLM text polishing, grammar correction,
-and bullet point structuring using Gemma 2B via Ollama (http://localhost:11434).
+and bullet point structuring using Gemma 2B or Qwen 2.5 via Ollama (http://localhost:11434).
+Enforces strict single-turn formatting with temperature=0.0 and a 1.5s timeout.
+If Ollama is offline, falls back instantly to regex-based AIPolishBrain (<1ms).
 """
 import json
 import logging
+import threading
+import time
 import urllib.request
 import urllib.error
 from typing import Tuple, Optional
 
 logger = logging.getLogger("GeminiFlow.OllamaEngine")
 
+_OLLAMA_LOCK = threading.Lock()
 OLLAMA_API_URL = "http://localhost:11434/api/generate"
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
-
 
 OLLAMA_SYSTEM_PROMPT = """You are a fast, highly accurate speech-to-text post-processing and formatting engine.
 Rules:
@@ -48,11 +51,53 @@ Rules:
 """
 
 
-import time
-
 class OllamaEngine:
+    _instance = None
+    _is_available: Optional[bool] = None
+    _default_model: str = "llama3.2:1b"
+    _FAST_MODELS = [
+        "llama3.2:1b",
+        "qwen2.5:1.5b",
+        "qwen2.5:0.5b",
+        "qwen2.5-coder:1.5b",
+        "gemma2:2b",
+        "qwen2.5:3b",
+        "llama3.2:latest"
+    ]
+
     @classmethod
-    def ensure_daemon_running(cls, timeout: float = 5.0) -> bool:
+    def get_available_models(cls, timeout: float = 0.5) -> list:
+        """Returns list of model names currently installed and available in Ollama."""
+        try:
+            req = urllib.request.Request(OLLAMA_TAGS_URL, headers={"User-Agent": "GeminiFlow"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    models = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+                    return models
+        except Exception:
+            pass
+        return []
+
+    @classmethod
+    def get_preferred_model(cls, preferred_candidate: Optional[str] = None) -> str:
+        """
+        Selects the best, lowest-latency model available on the local machine.
+        Prioritizes ultra-fast edge models (1B-2B params, sub-300ms inference).
+        """
+        available = cls.get_available_models(timeout=0.3)
+        if available:
+            if preferred_candidate and any(preferred_candidate in m for m in available):
+                return preferred_candidate
+            for fast in cls._FAST_MODELS:
+                for inst in available:
+                    if fast in inst:
+                        return inst
+            return available[0]
+        return preferred_candidate or cls._default_model
+
+    @classmethod
+    def ensure_daemon_running(cls, timeout: float = 3.0) -> bool:
         """Ensures the Ollama server daemon is active; auto-starts it if installed."""
         if cls.is_available(timeout=0.3):
             return True
@@ -65,12 +110,12 @@ class OllamaEngine:
                 ollama_bin = str(candidate)
         if ollama_bin and os.path.exists(ollama_bin):
             try:
-                creationflags = 0x08000000 | 0x00000008 # CREATE_NO_WINDOW | DETACHED_PROCESS
+                creationflags = 0x08000000 | 0x00000008  # CREATE_NO_WINDOW | DETACHED_PROCESS
                 subprocess.Popen([ollama_bin, "serve"], creationflags=creationflags, close_fds=True)
                 logger.info(f"Spawned Ollama daemon: {ollama_bin} serve")
                 t0 = time.time()
                 while time.time() - t0 < timeout:
-                    time.sleep(0.2)
+                    time.sleep(0.15)
                     if cls.is_available(timeout=0.2):
                         cls._is_available = True
                         return True
@@ -78,12 +123,8 @@ class OllamaEngine:
                 logger.warning(f"Could not auto-start Ollama: {ex}")
         return False
 
-    _instance = None
-    _is_available: Optional[bool] = None
-    _default_model: str = "gemma2:2b"
-
     @classmethod
-    def is_available(cls, timeout: float = 1.0) -> bool:
+    def is_available(cls, timeout: float = 0.5) -> bool:
         """Quickly checks if the Ollama daemon is running at localhost:11434."""
         try:
             req = urllib.request.Request(OLLAMA_TAGS_URL, headers={"User-Agent": "GeminiFlow"})
@@ -96,13 +137,14 @@ class OllamaEngine:
         return False
 
     @classmethod
-    def polish_text(cls, raw_text: str, model_name: str = "gemma2:2b", timeout: float = 18.0, prompt_override: Optional[str] = None) -> Tuple[bool, str]:
+    def polish_text(cls, raw_text: str, model_name: Optional[str] = None, timeout: float = 1.5, prompt_override: Optional[str] = None) -> Tuple[bool, str]:
         """
-        Refines raw transcribed speech using local Ollama (Gemma 2B) on RTX 2050:
-        - Fixes all grammar, irregular verbs, tenses, and plurals.
-        - Formats lists into clean Markdown bullet points.
-        - Strips conversational boilerplate ("Here is the text...").
+        Refines raw transcribed speech using local Ollama (Llama 3.2 1B / Qwen 2.5) with strict single-turn formatting.
+        Enforces temperature=0.0 and 1.5s timeout.
+        If Ollama is offline or times out, falls back instantly to regex-based AIPolishBrain (<1ms).
         """
+        if not model_name:
+            model_name = cls.get_preferred_model()
         if not prompt_override and (not raw_text or not raw_text.strip()):
             return True, ""
 
@@ -138,9 +180,16 @@ class OllamaEngine:
                             logger.info(f"Ollama ({model_name}) polished text successfully ({len(output)} chars).")
                             return True, output
         except Exception as e:
-            logger.warning(f"Ollama local inference failed: {e}")
+            logger.debug(f"Ollama local inference unavailable or timed out ({e}). Falling back to AIPolishBrain...")
 
-        return False, raw_text
+        # Instant sub-millisecond fallback to regex-based AIPolishBrain
+        try:
+            from app.intelligence.ai_polish_brain import AIPolishBrain
+            polished = AIPolishBrain.polish_speech(raw_text)
+            return True, polished
+        except Exception as apb_err:
+            logger.debug(f"AIPolishBrain fallback note: {apb_err}")
+            return False, raw_text
 
     @staticmethod
     def _clean_ollama_output(text: str) -> str:

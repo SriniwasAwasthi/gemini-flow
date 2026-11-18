@@ -1,0 +1,1 @@
+Our distributed microservices architecture communicates via asynchronous gRPC streams backed by an Apache Kafka message bus with idempotent producers.

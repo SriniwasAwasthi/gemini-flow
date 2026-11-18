@@ -1,0 +1,1 @@
+Our Tokyo development team confirmed that the yen currency formatting bug was resolved in release version two point four.

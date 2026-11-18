@@ -2,16 +2,22 @@
 Offline Speech Recognition Engine for Gemini Flow.
 Leverages OpenAI Whisper (via faster-whisper on CPU with int8 quantization) for world-class,
 near-zero latency, accurate on-device offline dictation without any internet connection.
-Gracefully falls back to Windows SAPI / SpeechRecognition if dependencies are missing.
+Gracefully falls back to whisper.cpp, Windows SAPI, and SpeechRecognition if needed.
 """
 import os
 os.environ.setdefault('OMP_WAIT_POLICY', 'PASSIVE')
 os.environ.setdefault('KMP_BLOCKTIME', '0')
 import io
 import time
+import wave
 import logging
 import threading
-from typing import Tuple, Optional, Any, Dict
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Tuple, Optional, Any, Dict, Union
+
+import numpy as np
 
 logger = logging.getLogger("GeminiFlow.OfflineSpeech")
 
@@ -20,11 +26,11 @@ class OfflineSpeechEngine:
     _whisper_instance: Optional[Any] = None
     _whisper_models: Dict[str, Any] = {}
     _model_lock = threading.Lock()
-    _active_model_name: str = "base.en"
+    _active_model_name: str = "tiny.en"
     _is_warming_up: bool = False
 
     @classmethod
-    def get_whisper_model(cls, model_size: str = "base.en") -> Optional[Any]:
+    def get_whisper_model(cls, model_size: str = "tiny.en") -> Optional[Any]:
         """
         Thread-safe singleton accessor for faster-whisper WhisperModel.
         Loads the model once and retains it in memory for instant subsequent transcriptions.
@@ -56,7 +62,7 @@ class OfflineSpeechEngine:
                 logger.info(f"Initializing WhisperModel('{model_target}', device='{device}', compute_type='{compute_type}')...")
                 t0 = time.time()
                 cpu_count = os.cpu_count() or 4
-                optimal_threads = 1 if has_cuda else min(4, cpu_count)
+                optimal_threads = cpu_count
                 optimal_workers = 1
                 try:
                     instance = WhisperModel(
@@ -92,7 +98,6 @@ class OfflineSpeechEngine:
                 cls._whisper_instance = instance
                 cls._active_model_name = model_size
                 try:
-                    import numpy as np
                     dummy = np.zeros(16000, dtype=np.float32)
                     _ = list(instance.transcribe(dummy, beam_size=1, word_timestamps=False)[0])
                 except Exception as prime_err:
@@ -105,7 +110,6 @@ class OfflineSpeechEngine:
                             cpu_threads=min(4, cpu_count),
                             num_workers=1
                         )
-                        import numpy as np
                         dummy = np.zeros(16000, dtype=np.float32)
                         _ = list(instance.transcribe(dummy, beam_size=1, word_timestamps=False)[0])
                         cls._whisper_models[model_size] = instance
@@ -114,23 +118,28 @@ class OfflineSpeechEngine:
                 return instance
             except Exception as e:
                 logger.warning(f"Could not load Whisper model '{model_size}': {e}")
-                if model_size != "tiny.en":
-                    try:
-                        from faster_whisper import WhisperModel
-                        logger.info("Attempting fallback to 'tiny.en' Whisper model...")
-                        cls._whisper_instance = WhisperModel(
-                            "tiny.en",
-                            device="cpu",
-                            compute_type="int8",
-                            cpu_threads=4,
-                            num_workers=2,
-                            local_files_only=True
-                        )
-                        cls._active_model_name = "tiny.en"
-                        logger.info("Local Whisper fallback model 'tiny.en' initialized.")
-                        return cls._whisper_instance
-                    except Exception as e2:
-                        logger.error(f"Fallback to 'tiny.en' also failed: {e2}")
+                for fallback_size in ("base.en", "tiny.en"):
+                    if model_size != fallback_size:
+                        try:
+                            from faster_whisper import WhisperModel
+                            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                            bundled_fallback = os.path.join(project_root, "models", fallback_size)
+                            target = bundled_fallback if os.path.exists(bundled_fallback) else fallback_size
+                            logger.info(f"Attempting fallback to '{target}' Whisper model...")
+                            fallback_inst = WhisperModel(
+                                target,
+                                device="cpu",
+                                compute_type="int8",
+                                cpu_threads=4,
+                                num_workers=1
+                            )
+                            cls._whisper_models[fallback_size] = fallback_inst
+                            cls._whisper_instance = fallback_inst
+                            cls._active_model_name = fallback_size
+                            logger.info(f"Local Whisper fallback model '{fallback_size}' initialized.")
+                            return fallback_inst
+                        except Exception as e2:
+                            logger.error(f"Fallback to '{fallback_size}' also failed: {e2}")
 
         return None
 
@@ -150,7 +159,6 @@ class OfflineSpeechEngine:
                 m = cls.get_whisper_model(model_size)
                 if m is not None:
                     try:
-                        import numpy as np
                         dummy = np.zeros(16000, dtype=np.float32)
                         _ = list(m.transcribe(dummy, beam_size=1, word_timestamps=False)[0])
                     except Exception:
@@ -169,36 +177,58 @@ class OfflineSpeechEngine:
             warmup_thread.start()
 
     @classmethod
-    def transcribe_wav(cls, wav_bytes: bytes, initial_prompt: Optional[str] = None, language: Optional[str] = None) -> Tuple[bool, str]:
+    def transcribe_wav(cls, audio_data: Union[bytes, np.ndarray], initial_prompt: Optional[str] = None, language: Optional[str] = None) -> Tuple[bool, str]:
         """
-        Transcribes WAV audio bytes in offline mode.
-        Tries Whisper AI first. Falls back to Windows SAPI and SpeechRecognition if needed.
+        Transcribes audio (WAV bytes or 16kHz float32 numpy array) in offline mode.
+        Tries Faster-Whisper first, then whisper.cpp CLI, then Windows SAPI, then speech_recognition.
         Returns (success: bool, transcribed_text_or_error: str).
         """
-        if not wav_bytes or len(wav_bytes) < 800:
+        if audio_data is None:
+            return False, "Audio data is None."
+        if isinstance(audio_data, (str, Path)) and os.path.exists(str(audio_data)):
+            try:
+                with open(str(audio_data), "rb") as f:
+                    audio_data = f.read()
+            except Exception as e:
+                return False, f"Could not read audio file: {e}"
+        if isinstance(audio_data, (bytes, bytearray)) and len(audio_data) < 800:
+            return False, "Audio is too short or empty."
+        if isinstance(audio_data, np.ndarray) and len(audio_data) < 1600:
             return False, "Audio is too short or empty."
 
         # 1. Primary: High-accuracy OpenAI Whisper (faster-whisper)
         try:
-            success, text = cls._transcribe_with_whisper(wav_bytes, initial_prompt=initial_prompt, language=language)
+            success, text = cls._transcribe_with_whisper(audio_data, initial_prompt=initial_prompt, language=language)
             if success:
-                logger.info(f"Local Whisper AI offline recognition succeeded ({len(text)} chars): {text[:60]}...")
+                logger.info(f"Local Faster-Whisper offline recognition succeeded ({len(text)} chars): {text[:60]}...")
                 return True, text
         except Exception as we:
             logger.warning(f"Whisper offline transcription exception: {we}")
 
-        # 2. Secondary: Windows SAPI Dictation Grammar Fallback
+        # 2. Secondary: whisper.cpp CLI Fallback
         try:
-            success, text = cls._transcribe_with_sapi(wav_bytes)
+            wav_bytes_conv = audio_data if isinstance(audio_data, (bytes, bytearray)) else cls._to_wav_bytes(audio_data)
+            success, text = cls._transcribe_with_whisper_cpp(wav_bytes_conv)
+            if success and text.strip():
+                logger.info(f"whisper.cpp CLI fallback succeeded: {text[:60]}...")
+                return True, text.strip()
+        except Exception as we_cpp:
+            logger.debug(f"whisper.cpp fallback exception: {we_cpp}")
+
+        # 3. Tertiary: Windows SAPI Dictation Grammar Fallback
+        try:
+            wav_bytes_conv = audio_data if isinstance(audio_data, (bytes, bytearray)) else cls._to_wav_bytes(audio_data)
+            success, text = cls._transcribe_with_sapi(wav_bytes_conv)
             if success and text.strip():
                 logger.info(f"Offline SAPI recognition succeeded: {text[:60]}...")
                 return True, text.strip()
         except Exception as se:
             logger.debug(f"SAPI offline transcription exception: {se}")
 
-        # 3. Tertiary: PocketSphinx / SpeechRecognition Fallback
+        # 4. Quaternary: PocketSphinx / SpeechRecognition Fallback
         try:
-            success, text = cls._transcribe_with_sr(wav_bytes)
+            wav_bytes_conv = audio_data if isinstance(audio_data, (bytes, bytearray)) else cls._to_wav_bytes(audio_data)
+            success, text = cls._transcribe_with_sr(wav_bytes_conv)
             if success and text.strip():
                 logger.info(f"Offline speech_recognition succeeded: {text[:60]}...")
                 return True, text.strip()
@@ -207,52 +237,33 @@ class OfflineSpeechEngine:
 
         return False, "Local offline speech recognition could not decode audio. Please check microphone."
 
-    @classmethod
-    def _split_into_chunks(cls, wav_bytes: bytes, target_sec: float = 24.0, overlap_sec: float = 0.3) -> list[bytes]:
-        import wave
-        import numpy as np
-        try:
-            bio = io.BytesIO(wav_bytes)
-            with wave.open(bio, "rb") as wf:
-                nc = wf.getnchannels()
-                sw = wf.getsampwidth()
-                fr = wf.getframerate()
-                pcm = wf.readframes(wf.getnframes())
-
-            samples = np.frombuffer(pcm, dtype=np.int16 if sw == 2 else np.int8)
-            total_sec = len(samples) / (fr * nc) if fr > 0 else 0
-            if total_sec <= target_sec * 1.25 or total_sec <= 0:
-                return [wav_bytes]
-
-            chunk_len = int(target_sec * fr * nc)
-            overlap_len = int(overlap_sec * fr * nc)
-            chunks = []
-            start = 0
-            while start < len(samples):
-                end = min(len(samples), start + chunk_len)
-                slice_data = samples[start:end].tobytes()
-                out_bio = io.BytesIO()
-                with wave.open(out_bio, "wb") as out_wf:
-                    out_wf.setnchannels(nc)
-                    out_wf.setsampwidth(sw)
-                    out_wf.setframerate(fr)
-                    out_wf.writeframes(slice_data)
-                chunks.append(out_bio.getvalue())
-                if end >= len(samples):
-                    break
-                start = end - overlap_len
-            return chunks if chunks else [wav_bytes]
-        except Exception as ex:
-            logger.debug(f"Audio chunk split note: {ex}")
-            return [wav_bytes]
+    @staticmethod
+    def _to_wav_bytes(samples: np.ndarray, sample_rate: int = 16000) -> bytes:
+        """Converts float32 16kHz numpy array to WAV bytes."""
+        bio = io.BytesIO()
+        with wave.open(bio, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            pcm16 = (np.clip(samples, -1.0, 1.0) * 32767).astype(np.int16)
+            wf.writeframes(pcm16.tobytes())
+        return bio.getvalue()
 
     @classmethod
-    def _transcribe_with_whisper(cls, wav_bytes: bytes, initial_prompt: Optional[str] = None, language: Optional[str] = None) -> Tuple[bool, str]:
+    def _transcribe_with_whisper(cls, audio_data: Union[bytes, np.ndarray, str, Path], initial_prompt: Optional[str] = None, language: Optional[str] = None) -> Tuple[bool, str]:
+        if isinstance(audio_data, (str, Path)) and os.path.exists(str(audio_data)):
+            try:
+                with open(str(audio_data), "rb") as f:
+                    audio_data = f.read()
+            except Exception as e:
+                return False, f"Could not read audio file: {e}"
+
         is_non_english = bool(language and language.lower() not in ("en", "english"))
-        target_model_size = "base" if is_non_english else "base.en"
+        target_model_size = cls._active_model_name if cls._active_model_name in cls._whisper_models else ("tiny" if is_non_english else "tiny.en")
         model = cls.get_whisper_model(model_size=target_model_size)
         if model is None:
-            # Fallback to default model
+            model = cls.get_whisper_model(model_size="tiny.en")
+        if model is None:
             model = cls.get_whisper_model(model_size="base.en")
         if model is None:
             return False, "Whisper model unavailable"
@@ -269,50 +280,45 @@ class OfflineSpeechEngine:
         is_multilingual = getattr(getattr(model, "model", None), "is_multilingual", False)
         kwargs: dict = {
             "beam_size": 1,
-            "condition_on_previous_text": False,
+            "best_of": 1,
             "temperature": 0.0,
-            "repetition_penalty": 1.2,
-            "no_repeat_ngram_size": 3,
-            "vad_filter": True,
-            "vad_parameters": dict(threshold=0.25, min_silence_duration_ms=300, speech_pad_ms=200),
+            "condition_on_previous_text": False,
+            "without_timestamps": True,
+            "vad_filter": False,
             "initial_prompt": prompt
         }
         if is_multilingual and language:
             kwargs["language"] = language
 
-        # Estimate duration in seconds
-        approx_sec = len(wav_bytes) / 32000.0
-
-        # Direct sequential C++ decoding (handles any length seamlessly with zero thread contention)
-
-        # Standard direct high-accuracy transcription (<= 28s)
-        # Fast path: decode 16-bit PCM into float32 numpy array & ensure 16kHz for sub-second Whisper decoding
-        audio_input = None
-        try:
-            import numpy as np
-            with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
-                fr = wf.getframerate()
-                nc = wf.getnchannels()
-                sw = wf.getsampwidth()
-                pcm_data = wf.readframes(wf.getnframes())
-                if sw == 2 and pcm_data:
-                    raw_arr = np.frombuffer(pcm_data, dtype=np.int16).astype(np.float32) / 32768.0
-                    if nc > 1:
-                        raw_arr = raw_arr.reshape(-1, nc).mean(axis=1)
-                    if fr != 16000 and fr > 0:
-                        new_len = int(len(raw_arr) * 16000 / fr)
-                        audio_input = np.interp(
-                            np.linspace(0, len(raw_arr), new_len, endpoint=False),
-                            np.arange(len(raw_arr)),
-                            raw_arr
-                        ).astype(np.float32)
-                    else:
-                        audio_input = raw_arr
-        except Exception:
+        # Format input directly into float32 16kHz array for zero-copy CTranslate2 execution
+        if isinstance(audio_data, np.ndarray):
+            audio_input = audio_data.astype(np.float32)
+        else:
             audio_input = None
+            try:
+                with wave.open(io.BytesIO(audio_data), "rb") as wf:
+                    fr = wf.getframerate()
+                    nc = wf.getnchannels()
+                    sw = wf.getsampwidth()
+                    pcm_data = wf.readframes(wf.getnframes())
+                    if sw == 2 and pcm_data:
+                        raw_arr = np.frombuffer(pcm_data, dtype=np.int16).astype(np.float32) / 32768.0
+                        if nc > 1:
+                            raw_arr = raw_arr.reshape(-1, nc).mean(axis=1)
+                        if fr != 16000 and fr > 0:
+                            new_len = int(len(raw_arr) * 16000 / fr)
+                            audio_input = np.interp(
+                                np.linspace(0, len(raw_arr), new_len, endpoint=False),
+                                np.arange(len(raw_arr)),
+                                raw_arr
+                            ).astype(np.float32)
+                        else:
+                            audio_input = raw_arr
+            except Exception:
+                audio_input = None
 
-        if audio_input is None:
-            audio_input = io.BytesIO(wav_bytes)
+            if audio_input is None:
+                audio_input = io.BytesIO(audio_data)
 
         t0 = time.time()
         segments, info = model.transcribe(audio_input, **kwargs)
@@ -324,6 +330,66 @@ class OfflineSpeechEngine:
         if final_text:
             return True, final_text
         return True, ""  # Clean silence (no speech detected)
+
+    @classmethod
+    def _transcribe_with_whisper_cpp(cls, wav_bytes: bytes) -> Tuple[bool, str]:
+        """Invokes standalone whisper-cli.exe for ultra-lightweight C++ inference fallback."""
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        cli_candidates = [
+            os.path.join(project_root, "runtime", "whisper.cpp", "whisper-cli.exe"),
+            os.path.join(project_root, "runtime", "whisper.cpp", "main.exe"),
+            "whisper-cli.exe"
+        ]
+        exe_path = None
+        for cand in cli_candidates:
+            if os.path.exists(cand):
+                exe_path = cand
+                break
+        if not exe_path:
+            return False, "whisper.cpp binary not found"
+
+        model_candidates = [
+            os.path.join(project_root, "models", "whisper.cpp", "ggml-small.bin"),
+            os.path.join(project_root, "models", "whisper.cpp", "ggml-base.bin"),
+            os.path.join(project_root, "models", "ggml-small.bin"),
+            os.path.join(project_root, "models", "ggml-base.bin"),
+        ]
+        model_path = None
+        for m_cand in model_candidates:
+            if os.path.exists(m_cand):
+                model_path = m_cand
+                break
+        if not model_path:
+            return False, "whisper.cpp ggml model not found"
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf:
+            tf.write(wav_bytes)
+            tmp_wav = tf.name
+
+        try:
+            cmd = [exe_path, "-m", model_path, "-f", tmp_wav, "--output-txt", "-nt"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            txt_file = tmp_wav + ".txt"
+            if os.path.exists(txt_file):
+                with open(txt_file, "r", encoding="utf-8", errors="ignore") as f:
+                    txt = f.read().strip()
+                try:
+                    os.unlink(txt_file)
+                except Exception:
+                    pass
+                if txt:
+                    return True, txt
+            if res.stdout and res.stdout.strip():
+                return True, res.stdout.strip()
+            return False, "whisper.cpp produced no output"
+        except Exception as e:
+            return False, str(e)
+        finally:
+            try:
+                if os.path.exists(tmp_wav):
+                    os.unlink(tmp_wav)
+            except Exception:
+                pass
 
     @classmethod
     def _transcribe_with_sapi(cls, wav_bytes: bytes) -> Tuple[bool, str]:
@@ -361,7 +427,6 @@ class OfflineSpeechEngine:
                 grammar = context.CreateGrammar()
                 grammar.DictationSetState(1)
 
-                # 0 = SSFMOpenForRead
                 stream = win32com.client.Dispatch("SAPI.SpFileStream")
                 stream.Open(tmp_path, 0)
                 recognizer.AudioInputStream = stream

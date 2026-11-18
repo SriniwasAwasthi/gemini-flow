@@ -1,0 +1,1 @@
+Nginx acts as a reverse proxy terminating SSL connections and routing API traffic to the upstream uWSGI application pool.
