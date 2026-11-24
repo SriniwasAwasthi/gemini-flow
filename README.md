@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/app_icon.png" alt="Gemini Flow Logo" width="108" height="108" />
+
 # ⚡ Gemini Flow (Wispr Flow AI Desktop Alternative)
 
 **Supercharge your typing with lightning-fast, context-aware AI voice dictation, local offline intelligence, and prompt engineering powered by Google Gemini, Faster-Whisper, and Ollama.**
@@ -31,13 +33,22 @@ Featuring a luxury **10-Module Left-Sidebar Control Center**, a reactive **Profi
 
 ---
 
-## 🖼️ Architecture Poster
+## 🖼️ Architecture Poster & System Blueprint
 
 <div align="center">
   <a href="Gemini Flow AI Workspace Poster.png">
     <img src="Gemini Flow AI Workspace Poster.png" alt="Gemini Flow AI Workspace Poster" width="100%" />
   </a>
   <p><i>Click to view the high-resolution architectural blueprint of the Gemini Flow engine.</i></p>
+</div>
+
+<br />
+
+<div align="center">
+  <a href="Gemini Flow AI Productivity Infographic.png">
+    <img src="Gemini Flow AI Productivity Infographic.png" alt="Gemini Flow AI Productivity Infographic" width="100%" />
+  </a>
+  <p><i>Comprehensive Productivity & Feature Infographic for Gemini Flow desktop assistant.</i></p>
 </div>
 
 ---
@@ -312,48 +323,54 @@ flowchart TD
         Mic["🎤 Microphone Hardware Input"] --> Resample["🔄 Polyphase Resampler (scipy.signal.resample_poly)"]
         Resample --> ResampledAudio["16 kHz Mono Float32 Audio Stream"]
         ResampledAudio --> WhisperMode{"Whisper Mode Enabled?"}
-        WhisperMode -->|"Yes"| AmpBoost["🤫 +10.88 dB Soft Gain (tanh limiter)"]
-        WhisperMode -->|"No"| DSPFilter["🌀 80 Hz High-Pass Filter (Motor & Fan Hum Filter)"]
+        WhisperMode -->|Yes| AmpBoost["🤫 +10.88 dB Soft Gain (tanh limiter)"]
+        WhisperMode -->|No| DSPFilter["🌀 80 Hz High-Pass Filter (Motor & Fan Hum Filter)"]
         AmpBoost --> DSPFilter
         DSPFilter --> VAD["⚡ Silero VAD (Threshold 0.45, 350ms Padding)"]
     end
 
     subgraph ProcessingTier ["2. Multimodal Routing & Speech-to-Text"]
-        VAD --> BufferCheck{"Utterance Length?"}
-        BufferCheck -->|"< 25s (Normal Dictation)"| SingleBuffer["📦 Continuous In-Memory Single Buffer (Zero Slicing)"]
-        BufferCheck -->|"> 25s (Marathon)"| Slicer["✂️ Natural Silence Slicer (> 500ms Pauses)"]
+        VAD --> BufferCheck{"Utterance Duration"}
+        BufferCheck -->|Under 25s (Normal)| SingleBuffer["📦 Continuous Single Buffer (Zero Slicing)"]
+        BufferCheck -->|Over 25s (Marathon)| Slicer["✂️ Silence-Aligned Slicer (Pauses over 500ms)"]
         
         SingleBuffer --> VisionCheck{"Vision Voice Active?"}
         Slicer --> VisionCheck
         
-        VisionCheck -->|"Yes"| VisionCapture["👁️ VisionEngine Window Capture (< 120 KB JPEG)"]
+        VisionCheck -->|Yes| VisionCapture["👁️ VisionEngine Window Capture (JPEG under 120 KB)"]
         VisionCapture --> CloudGemini["🚀 Google Gemini 2.5 Flash (Multimodal Vision + Audio)"]
         
-        VisionCheck -->|"No"| Router{"Active Engine Mode"}
-        Router -->|"Online Gemini"| CloudGemini
-        Router -->|"Offline / Air-Gap"| OfflineWhisper["💻 Faster-Whisper int8 (4-Thread CPU Capped)"]
+        VisionCheck -->|No| Router{"Engine Mode"}
+        Router -->|Cloud Gemini| CloudGemini
+        Router -->|Offline Air-Gap| OfflineWhisper["💻 Faster-Whisper int8 (CTranslate2 CPU)"]
     end
 
-    subgraph IntelligenceTier ["3. Single-Turn Polish & Caret Awareness"]
-        CloudGemini --> UnifiedPrompt["✨ Unified Prompt (ASR + All 12 Tenses + Self-Correction)"]
-        OfflineWhisper --> FastPath{"Short Utterance (<= 15 words)?"}
-        FastPath -->|"Yes"| LocalPolish["⚡ Local AIPolishBrain (< 1ms, 0ms Cloud Latency)"]
-        FastPath -->|"No"| LocalBrain{"Ollama Enabled?"}
-        LocalBrain -->|"Yes"| Gemma["🤖 Ollama Gemma 2B Local Polish"]
-        LocalBrain -->|"No"| UnifiedPrompt
-        Gemma --> UnifiedPrompt
-        LocalPolish --> CaretGuard
-        UnifiedPrompt --> CaretGuard["🔒 Win32 Caret Context & Password Guard"]
+    subgraph IntelligenceTier ["3. Intelligence, Polish & Hard Fidelity Gate"]
+        CloudGemini --> CloudPolish["✨ Cloud 1-Turn Polish (ASR + 12 Tenses + Self-Correction)"]
+        
+        OfflineWhisper --> LengthCheck{"Utterance Length"}
+        LengthCheck -->|Short (15 words or less)| LocalBrain["⚡ Local AIPolishBrain (Sub-millisecond Deterministic)"]
+        LengthCheck -->|Long (over 15 words)| OllamaCheck{"Ollama Active?"}
+        OllamaCheck -->|Yes| Gemma["🤖 Ollama Gemma 2B Local Polish"]
+        OllamaCheck -->|No| Sanitizer["🧹 Deterministic Sanitizer (Punctuation & Stutter Removal)"]
+        
+        CloudPolish --> FidelityGate{"🛡️ Copy-Editor Fidelity Gate"}
+        Gemma --> FidelityGate
+        Sanitizer --> CaretContext["🔍 Caret Context & Password Guard"]
+        LocalBrain --> CaretContext
+        
+        FidelityGate -->|Pass: Within 15% Length, 25% Edits| CaretContext
+        FidelityGate -->|Fail: Divergent / Hallucination| Sanitizer
     end
 
     subgraph InjectionTier ["4. Win32 Direct OS Injection"]
-        CaretGuard --> Formatter{"Contains Markdown / HTML?"}
-        Formatter -->|"Yes"| RichInject["📝 Dual Win32 CF_HTML & CF_UNICODETEXT Paste"]
-        Formatter -->|"No"| StandardInject["⌨️ Atomic Win32 SendInput (Ctrl+V / Ctrl+Shift+V)"]
-        RichInject --> ActiveApp["🖥️ Active Cursor Focus (Word, VS Code, Slack, Browser)"]
-        StandardInject --> ActiveApp
-        ActiveApp --> AutoLearner["💡 Passive Auto-Learner (5s Post-Paste Monitor)"]
-        ActiveApp --> UndoHook["🔄 Instant Undo AI Edit (Shift + Alt + Z Verbatim Revert)"]
+        CaretContext --> FormatCheck{"Contains Markdown or HTML?"}
+        FormatCheck -->|Yes| RichInject["📝 Dual Win32 CF_HTML & CF_UNICODETEXT Paste"]
+        FormatCheck -->|No| StandardInject["⌨️ Atomic Win32 SendInput Keystroke Typing"]
+        RichInject --> ActiveCursor["🖥️ Active Window Cursor Focus (IDE, Word, Slack, Browser)"]
+        StandardInject --> ActiveCursor
+        ActiveCursor --> AutoLearner["💡 Passive Auto-Learner (5s Post-Paste Monitor)"]
+        ActiveCursor --> UndoHook["🔄 Instant Undo AI Edit (Shift + Alt + Z Revert)"]
     end
 ```
 

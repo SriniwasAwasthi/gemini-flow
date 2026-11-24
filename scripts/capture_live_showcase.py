@@ -166,10 +166,10 @@ def capture_all():
     # 2. Capture Floating HUD (00-floating-hud.png)
     try:
         hud = FloatingHUD(cfg)
-        hud.show_recording()
-        hud.set_amplitude(0.75)
+        hud.show_state(FloatingHUD.STATE_LISTENING)
+        hud.update_volume(0.75)
         hud.show()
-        for _ in range(10):
+        for _ in range(15):
             app.processEvents()
             time.sleep(0.02)
         hud_pix = hud.grab()
