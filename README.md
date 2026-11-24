@@ -205,7 +205,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 1. Minimalist Glassmorphic Floating HUD
 <div align="center">
-  <img src="docs/screenshots/00-floating-hud.png" alt="Glassmorphic Floating HUD" width="480px" />
+  <img src="docs/screenshots/00-floating-hud.png?v=2" alt="Glassmorphic Floating HUD" width="800px" />
 </div>
 
 > **Real-Time Dynamic Audio Waveform**: Displays pulsating sound wave bars in real time as you speak and provides subtle visual status updates during AI processing.  
@@ -215,7 +215,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 2. API Configuration & General Preferences (Luxury Sidebar Navigation)
 <div align="center">
-  <img src="docs/screenshots/01-main-dashboard.png" alt="API Configuration Dashboard" width="100%" />
+  <img src="docs/screenshots/01-main-dashboard.png?v=2" alt="API Configuration Dashboard" width="100%" />
 </div>
 
 > **Secure API Key Management**: Configure your free personal Google Gemini API key with built-in connection validation, latency diagnostics, and Windows DPAPI encryption with securely masked bullet characters.  
@@ -225,7 +225,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 3. Audio Device Hardware Card, 80 Hz Fan Filter & Multilingual Catalog
 <div align="center">
-  <img src="docs/screenshots/02-audio-device.png" alt="Audio Device Hardware Interface" width="100%" />
+  <img src="docs/screenshots/02-audio-device.png?v=2" alt="Audio Device Hardware Interface" width="100%" />
 </div>
 
 > **Real-Time Microphone Diagnostics & Testing**: Select any input microphone and verify live audio reception with the integrated `Test Microphone` button and responsive level progress meter bar.  
@@ -236,7 +236,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 4. Interactive Global Hotkey Recorder
 <div align="center">
-  <img src="docs/screenshots/03-hotkeys-mode.png" alt="Hotkeys & Triggers Configuration" width="100%" />
+  <img src="docs/screenshots/03-hotkeys-mode.png?v=2" alt="Hotkeys & Triggers Configuration" width="100%" />
 </div>
 
 > **Custom Shortcut Hooks**: Record custom key combinations for Push-to-Talk and Hands-Free Toggle modes with an interactive key listener.  
@@ -246,7 +246,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 5. Cost Productivity & Token Economizer
 <div align="center">
-  <img src="docs/screenshots/04-cost-productivity.png" alt="Cost Productivity Dashboard" width="100%" />
+  <img src="docs/screenshots/04-cost-productivity.png?v=2" alt="Cost Productivity Dashboard" width="100%" />
 </div>
 
 > **Real-Time Token Usage Tracking**: Accurately monitors your daily token usage against the 1,000,000 free tokens/day Google Gemini quota with live typing speed (WPM) tracking.  
@@ -256,7 +256,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 6. Contextual Vocabulary & Jargon Engine
 <div align="center">
-  <img src="docs/screenshots/05-vocabulary-engine.png" alt="Vocabulary Engine Dashboard" width="100%" />
+  <img src="docs/screenshots/05-vocabulary-engine.png?v=2" alt="Vocabulary Engine Dashboard" width="100%" />
 </div>
 
 > **Technical Terminology Guarantee**: Define programming libraries, company names, and technical terms to ensure 100% transcription accuracy.  
@@ -266,7 +266,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 7. Custom Phonetic Dictionary & Sound-Alikes
 <div align="center">
-  <img src="docs/screenshots/06-custom-dictionary.png" alt="Custom Dictionary Dashboard" width="100%" />
+  <img src="docs/screenshots/06-custom-dictionary.png?v=2" alt="Custom Dictionary Dashboard" width="100%" />
 </div>
 
 > **Phonetic Sound-Alike Mapping**: Map commonly misheard words, proper nouns, and regional names to their exact intended spellings.  
@@ -276,7 +276,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 8. Quick Text Snippets & Auto-Expansion
 <div align="center">
-  <img src="docs/screenshots/07-quick-text.png" alt="Quick Text Voice Snippets" width="100%" />
+  <img src="docs/screenshots/07-quick-text.png?v=2" alt="Quick Text Voice Snippets" width="100%" />
 </div>
 
 > **Voice-Activated Macro Expansions**: Trigger multi-line templates, email signatures, and boilerplate code using simple spoken shortcut keywords.  
@@ -286,7 +286,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 9. Searchable Dictation History & Inspection Center
 <div align="center">
-  <img src="docs/screenshots/08-history.png" alt="Dictation History Inspector" width="100%" />
+  <img src="docs/screenshots/08-history.png?v=2" alt="Dictation History Inspector" width="100%" />
 </div>
 
 > **Comprehensive Activity Log & Real-Time Audit**: Review, search, and inspect past dictations organized cleanly by date categories. Each record displays the active foreground application (e.g. `VS Code`, `Slack`, `Chrome`), AI model utilized (`gemini-2.5-flash`), exact timestamp, and transcription snippet.  
@@ -297,7 +297,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 10. Voice Commands & Intent Categories (All 16 Built-in Modes)
 <div align="center">
-  <img src="docs/screenshots/09-profiles-commands.png" alt="Voice Commands Profiles Dashboard" width="100%" />
+  <img src="docs/screenshots/09-profiles-commands.png?v=2" alt="Voice Commands Profiles Dashboard" width="100%" />
 </div>
 
 > **16 Universal Spoken Voice Commands**: Seamlessly execute voice commands (*"Make this professional"*, *"Fix my grammar"*, *"Generate code"*, *"Summarize this"*, *"Format as table"*) with automated clipboard fallback for selected on-screen text.  
@@ -307,7 +307,7 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ### 11. Multi-Mode AI Dictation & Combination Showcase (A–F)
 <div align="center">
-  <img src="docs/screenshots/10-ai-dictation.png" alt="AI Dictation Combinations Showcase" width="100%" />
+  <img src="docs/screenshots/10-ai-dictation.png?v=2" alt="AI Dictation Combinations Showcase" width="100%" />
 </div>
 
 > **Profile & Dictation Style Combination Showcase**: Select from 6 pre-engineered combinations (A–F) that instantly align developer profiles, active prompts, and AI models with single-click activation.  
