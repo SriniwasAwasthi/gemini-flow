@@ -175,8 +175,27 @@ def capture_all():
         hud_pix = hud.grab()
         hud_save_p = out_dir / "00-floating-hud.png"
         hud_pix.save(str(hud_save_p), "PNG")
-        print(f"Captured Floating HUD -> {hud_save_p.name} [{hud_pix.width()}x{hud_pix.height()}]")
         hud.close()
+
+        # Composite onto high-resolution dark desktop showcase canvas (800x260)
+        try:
+            from PIL import Image, ImageDraw
+            raw_hud = Image.open(str(hud_save_p))
+            canvas_w, canvas_h = 800, 260
+            canvas = Image.new("RGB", (canvas_w, canvas_h), (11, 15, 25))
+            draw = ImageDraw.Draw(canvas)
+            draw.rectangle([(0, 0), (canvas_w - 1, canvas_h - 1)], outline=(30, 41, 59), width=1)
+            glow_w, glow_h = raw_hud.width + 40, raw_hud.height + 40
+            glow_x = (canvas_w - glow_w) // 2
+            glow_y = (canvas_h - glow_h) // 2
+            draw.rounded_rectangle([(glow_x, glow_y), (glow_x + glow_w, glow_y + glow_h)], radius=24, fill=(24, 33, 56))
+            hud_x = (canvas_w - raw_hud.width) // 2
+            hud_y = (canvas_h - raw_hud.height) // 2
+            canvas.paste(raw_hud, (hud_x, hud_y), raw_hud if raw_hud.mode == "RGBA" else None)
+            canvas.save(str(hud_save_p), "PNG")
+            print(f"Captured Floating HUD -> {hud_save_p.name} [{canvas_w}x{canvas_h}] (Showcase Canvas)")
+        except Exception as e:
+            print(f"Captured Floating HUD -> {hud_save_p.name} [{hud_pix.width()}x{hud_pix.height()}] (Fallback)")
     except Exception as e:
         print(f"HUD capture notice: {e}")
 
