@@ -46,11 +46,42 @@ Featuring a luxury **10-Module Left-Sidebar Control Center**, a reactive **Profi
 
 ### 1. 🛡️ Guaranteed Zero-Truncation Engine (5s to 30m+)
 - **Native Hardware Capture**: Captures audio at the sound card's native sampling rate (44.1 kHz, 48 kHz, etc.) via `sounddevice` and performs a high-fidelity polyphase downsample to 16 kHz mono float32 using `scipy.signal.resample_poly`. Never assumes hardware clock rates.
+- **Continuous Single-Buffer Dictation (<25s)**: Eliminates mid-word slicing and boundary collision errors. Spoken sentences are processed as a single, unbroken 16kHz float32 PCM buffer.
 - **Continuous Background Disk Streaming**: Streams audio continuously into a lock-free producer/consumer queue written as PCM16 WAV in `%LOCALAPPDATA%\GeminiFlow\recordings\<timestamp>.wav`. Frames are never overwritten, trimmed, or dropped.
-- **Silence-Aligned Chunking**: Long speech sessions (>25s) are sliced at natural acoustic silence boundaries with 1.5s overlap deduplication, eliminating phrase clipping.
+- **Silence-Aligned Chunking**: Long speech sessions (>25s) are sliced strictly at natural acoustic silence boundaries (>500ms) with overlap deduplication, eliminating phrase clipping.
 - **Strict 30-Minute Safety Cap**: Hard recording safety limit with audible and visual HUD alerts—no silent cuts, no arbitrary timeout drops.
 
-### 2. 🧠 Copy-Editor Fidelity Gate (Zero Hallucination Guarantee)
+### 2. 👁️ Vision-Guided Voice (Multimodal Active Screen Awareness)
+- **Eyes for Your Voice**: Unlike audio-only dictation tools, Gemini Flow takes an instantaneous, lightweight snapshot of your active window or screen via `VisionEngine` when dictation starts.
+- **Dynamic Multimodal Routing**: Automatically routes to `gemini-2.5-flash` whenever vision is active, passing downscaled screen images (<120 KB JPEG) alongside audio.
+- **Action-Aware Intent Interpretation**: If you say *"Reply to this email"*, *"Fix this terminal error"*, or *"Document this diagram"*, Gemini Flow inspects the visible screen content and generates the complete, professional output ready to be pasted.
+
+### 3. 🔒 Win32 Caret Context & Password Field Guard
+- **Zero-Leak Password Protection**: Uses native Windows API (`GUITHREADINFO`, `ES_PASSWORD`, `EM_GETPASSWORDCHAR`) to detect if your cursor is inside a password field or secure entry box. Automatically blocks recording and displays `🔒 Password Field - Blocked` on the HUD.
+- **Caret Punctuation & Capitalization Harmonization**: Inspects surrounding text at your cursor, intelligently prepending spaces where needed and preserving the English pronoun `"I"` and contractions (`"I'm"`, `"I'll"`, `"I'd"`) inside quotation marks.
+
+### 4. 💡 Passive Auto-Learning Dictionary (Post-Paste Monitor)
+- **Zero-Effort Learning**: Passively monitors typing for 5 seconds following any text paste using a lightweight, non-blocking keyboard listener.
+- **Typo-Resilient Word Matching**: If you backspace over a pasted word and type a correction (e.g. Gemini pasted *"Avasthi"* and you type *"Awasthi"*), it automatically saves the phonetic pair into your custom dictionary and syncs both `ConfigManager` and `VocabEngine` memory and disk (`vocabulary.json`).
+- **Instant Undo (`AutoLearner.undo_last_learned`)**: One-click undo removes learned entries from config, memory, and disk simultaneously.
+
+### 5. 💻 IDE & Vibe-Coding Awareness
+- **Deep Editor Workspace Extraction**: Automatically extracts the active file name, file extension, and project workspace from editor window titles across **VS Code, Cursor, Windsurf, Cline AI, Continue AI, and Zed**.
+- **Space & Dotfile Resilience**: Accurately extracts files with spaces (`"audio recorder.py"`) and dotfiles (`".gitignore"`, `".env"`), injecting relevant syntax guidelines into Gemini's context window.
+
+### 6. 🔄 Instant Undo AI Edit (`Shift + Alt + Z`)
+- **One-Touch Verbatim Recovery**: If Gemini's AI edit transforms your speech into executive prose but you prefer your exact spoken acoustic words, press `Shift + Alt + Z`.
+- **Atomic Revert**: Gemini Flow sends `Ctrl + Z` and immediately pastes your raw, acoustic transcript without requiring you to re-dictate.
+
+### 7. 🤫 Dedicated Adaptive Whisper Mode (+10.88 dB / 3.5x Soft Gain)
+- **Quiet Voice Dictation**: Boosts microphone input gain by **3.5x (+10.88 dB)** with a soft-knee `tanh` saturation limiter.
+- **Library & Public Space Ready**: Engineered for open-plan offices, late-night coding, and coffee shops where speaking at full volume is not possible.
+
+### 8. 📝 Rich-Text `CF_HTML` Formatting
+- **Dual Win32 Clipboard Format**: When speech contains markdown formatting (bolding `**text**`, lists, inline code `` `code` ``, or `<table>`), it registers and injects both standard `CF_UNICODETEXT` and byte-accurate Windows `CF_HTML`.
+- **Seamless Pasting**: In Microsoft Word, Outlook, Google Docs, Notion, and Slack, text pastes as true bold, code, and table elements rather than raw markdown syntax.
+
+### 9. 🧠 Copy-Editor Fidelity Gate (Zero Hallucination Guarantee)
 - **Mathematical Edit Verification**: Validates AI transcripts against raw acoustic speech. Strict length ($\le 15\%$) and token edit distance ($\le 25\%$) boundaries guarantee that the model polishes punctuation, capitalization, and grammar without adding words, answering questions, or generating conversational commentary.
 - **Dictation Text Isolation**: Dictated audio is enclosed in `<dictation>` boundaries, ensuring LLMs treat speech strictly as data, never as prompt instructions.
 
@@ -277,36 +308,52 @@ Explore the live, pixel-perfect interface of Gemini Flow captured directly from 
 
 ```mermaid
 flowchart TD
-    subgraph AudioEngine ["1. Audio Capture & Resampling Tier"]
+    subgraph AudioEngine ["1. Audio Capture & DSP Engine"]
         Mic["🎤 Microphone Hardware Input"] --> Resample["🔄 Polyphase Resampler (scipy.signal.resample_poly)"]
         Resample --> ResampledAudio["16 kHz Mono Float32 Audio Stream"]
-        ResampledAudio --> Queue["📦 Lock-Free Producer / Consumer Queue"]
-        Queue --> Disk["💾 Continuous PCM16 WAV Writer (%LOCALAPPDATA%/GeminiFlow/recordings/)"]
-        Queue --> VAD["⚡ Energy VAD Silence Gate (< 5ms Interception)"]
+        ResampledAudio --> WhisperMode{"Whisper Mode Enabled?"}
+        WhisperMode -->|"Yes"| AmpBoost["🤫 +10.88 dB Soft Gain (tanh limiter)"]
+        WhisperMode -->|"No"| DSPFilter["🌀 80 Hz High-Pass Filter (Motor & Fan Hum Filter)"]
+        AmpBoost --> DSPFilter
+        DSPFilter --> VAD["⚡ Silero VAD (Threshold 0.45, 350ms Padding)"]
     end
 
-    subgraph ProcessingTier ["2. Silence-Aligned Chunking & Speech-to-Text"]
-        VAD --> Slicer["✂️ Silence Boundary Chunk Slicer (<= 25s with 1.5s Overlap)"]
-        Slicer --> Router{"Routing Engine"}
-        Router -->|"Online (Keep-Alive TLS)"| CloudGemini["🚀 Google Gemini 2.5 Flash / Pro"]
-        Router -->|"Offline Mode / Air-Gap"| OfflineWhisper["💻 Faster-Whisper int8 (CTranslate2 Local Engine)"]
+    subgraph ProcessingTier ["2. Multimodal Routing & Speech-to-Text"]
+        VAD --> BufferCheck{"Utterance Length?"}
+        BufferCheck -->|"< 25s (Normal Dictation)"| SingleBuffer["📦 Continuous In-Memory Single Buffer (Zero Slicing)"]
+        BufferCheck -->|"> 25s (Marathon)"| Slicer["✂️ Natural Silence Slicer (> 500ms Pauses)"]
+        
+        SingleBuffer --> VisionCheck{"Vision Voice Active?"}
+        Slicer --> VisionCheck
+        
+        VisionCheck -->|"Yes"| VisionCapture["👁️ VisionEngine Window Capture (< 120 KB JPEG)"]
+        VisionCapture --> CloudGemini["🚀 Google Gemini 2.5 Flash (Multimodal Vision + Audio)"]
+        
+        VisionCheck -->|"No"| Router{"Active Engine Mode"}
+        Router -->|"Online Gemini"| CloudGemini
+        Router -->|"Offline / Air-Gap"| OfflineWhisper["💻 Faster-Whisper int8 (4-Thread CPU Capped)"]
     end
 
-    subgraph IntelligenceTier ["3. Fidelity Gate & Command Execution"]
-        CloudGemini --> FidelityGate["🛡️ Copy-Editor Mathematical Fidelity Gate (<= 15% diff)"]
-        OfflineWhisper --> LocalBrain{"Ollama Local Brain Enabled?"}
-        LocalBrain -->|"Yes"| Gemma["🤖 Ollama Gemma 2B (Text Polish Only)"]
-        LocalBrain -->|"No"| FidelityGate
-        Gemma --> FidelityGate
-        FidelityGate --> CommandRegistry{"16 Voice Commands Match?"}
-        CommandRegistry -->|"Leading Trigger Match"| ExecCmd["⚙️ Execute Command (Format, Table, Email, Code)"]
-        CommandRegistry -->|"Standard Dictation"| StandardText["✨ Polished Dictation"]
+    subgraph IntelligenceTier ["3. Single-Turn Polish & Caret Awareness"]
+        CloudGemini --> UnifiedPrompt["✨ Unified Prompt (ASR + All 12 Tenses + Self-Correction)"]
+        OfflineWhisper --> FastPath{"Short Utterance (<= 15 words)?"}
+        FastPath -->|"Yes"| LocalPolish["⚡ Local AIPolishBrain (< 1ms, 0ms Cloud Latency)"]
+        FastPath -->|"No"| LocalBrain{"Ollama Enabled?"}
+        LocalBrain -->|"Yes"| Gemma["🤖 Ollama Gemma 2B Local Polish"]
+        LocalBrain -->|"No"| UnifiedPrompt
+        Gemma --> UnifiedPrompt
+        LocalPolish --> CaretGuard
+        UnifiedPrompt --> CaretGuard["🔒 Win32 Caret Context & Password Guard"]
     end
 
-    subgraph InjectionTier ["4. Win32 OS Direct Injection"]
-        ExecCmd --> Win32Inject["⌨️ Keystroke & Clipboard Injector"]
-        StandardText --> Win32Inject
-        Win32Inject --> ActiveApp["🖥️ Active Windows Cursor Focus (VS Code, Word, Chrome, Slack)"]
+    subgraph InjectionTier ["4. Win32 Direct OS Injection"]
+        CaretGuard --> Formatter{"Contains Markdown / HTML?"}
+        Formatter -->|"Yes"| RichInject["📝 Dual Win32 CF_HTML & CF_UNICODETEXT Paste"]
+        Formatter -->|"No"| StandardInject["⌨️ Atomic Win32 SendInput (Ctrl+V / Ctrl+Shift+V)"]
+        RichInject --> ActiveApp["🖥️ Active Cursor Focus (Word, VS Code, Slack, Browser)"]
+        StandardInject --> ActiveApp
+        ActiveApp --> AutoLearner["💡 Passive Auto-Learner (5s Post-Paste Monitor)"]
+        ActiveApp --> UndoHook["🔄 Instant Undo AI Edit (Shift + Alt + Z Verbatim Revert)"]
     end
 ```
 

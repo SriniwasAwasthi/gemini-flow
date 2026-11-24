@@ -98,6 +98,8 @@ TEST_READY.md
 prompt_transformation_showcase.md
 Gemini Flow AI Productivity Infographic.png
 Gemini Flow AI Workspace Poster (Legacy Oct 06).png
+*.docx
+*.pdf
 
 # Keep specific project scripts and assets
 !build.ps1
