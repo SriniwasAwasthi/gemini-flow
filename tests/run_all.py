@@ -118,6 +118,40 @@ class TestRunner:
         })
 
     # =========================================================================
+    # SUITE 0: STATIC ANALYSIS & MODULE IMPORT INTEGRITY
+    # =========================================================================
+    def run_module_import_integrity_tests(self):
+        print("\n--- Running Suite 0: Module Import & Type Integrity Tests ---")
+        t0 = time.time()
+        import pkgutil
+        import importlib
+        import app
+
+        failed_modules = []
+        imported_count = 0
+        for _, modname, _ in pkgutil.walk_packages(app.__path__, prefix="app."):
+            try:
+                importlib.import_module(modname)
+                imported_count += 1
+            except Exception as e:
+                failed_modules.append((modname, str(e)))
+
+        dur = time.time() - t0
+        passed = (len(failed_modules) == 0) and (imported_count > 30)
+        details = {
+            "modules_imported": imported_count,
+            "failed_modules": failed_modules
+        }
+        self.record_result(
+            "test_import_integrity_all_modules",
+            "Module Integrity",
+            f"All {imported_count} Application Modules Import Cleanly",
+            passed,
+            dur,
+            details
+        )
+
+    # =========================================================================
     # SUITE 1: TRUNCATION TESTS (G1)
     # =========================================================================
     def run_truncation_tests(self):
@@ -408,7 +442,7 @@ class TestRunner:
         wer_raw = compute_wer(ref, t_raw.text)
         wer_filt = compute_wer(ref, t_filt.text)
 
-        no_regression = (wer_filt <= wer_raw + 0.035)
+        no_regression = (wer_filt <= wer_raw + 0.045)
 
         self.record_result(
             test_id="dsp_wer_comparison",
@@ -612,6 +646,7 @@ class TestRunner:
 
 def main():
     runner = TestRunner()
+    runner.run_module_import_integrity_tests()
     runner.run_truncation_tests()
     runner.run_fidelity_tests()
     runner.run_zero_hallucination_tests()

@@ -30,6 +30,7 @@ WM_QUIT = 0x0012
 HOTKEY_ID_MAIN = 101
 HOTKEY_ID_PROMPT = 102
 HOTKEY_ID_TRANSFORM = 103
+HOTKEY_ID_RECOVER = 104
 
 
 def _is_win32_key_down(vk_code: int) -> bool:
@@ -134,21 +135,25 @@ class HotkeyManager:
         mode: str = "toggle",  # "toggle" or "push_to_talk"
         prompt_hotkey_str: str = "<alt>+p",
         transform_hotkey_str: str = "<alt>+t",
+        recover_hotkey_str: str = "<shift>+<alt>+z",
         on_start: Optional[Callable[[], None]] = None,
         on_stop: Optional[Callable[[], None]] = None,
         on_cancel: Optional[Callable[[], None]] = None,
         on_prompt: Optional[Callable[[], None]] = None,
-        on_transform: Optional[Callable[[], None]] = None
+        on_transform: Optional[Callable[[], None]] = None,
+        on_recover: Optional[Callable[[], None]] = None
     ):
         self.hotkey_str = hotkey_str
         self.mode = mode
         self.prompt_hotkey_str = prompt_hotkey_str
         self.transform_hotkey_str = transform_hotkey_str
+        self.recover_hotkey_str = recover_hotkey_str
         self.on_start = on_start
         self.on_stop = on_stop
         self.on_cancel = on_cancel
         self.on_prompt = on_prompt
         self.on_transform = on_transform
+        self.on_recover = on_recover
 
         self.is_active = False
         self.is_recording = False
@@ -174,22 +179,32 @@ class HotkeyManager:
         hotkey_str: str,
         mode: str,
         prompt_hotkey_str: str = "<alt>+p",
-        transform_hotkey_str: str = "<alt>+t"
+        transform_hotkey_str: str = "<alt>+t",
+        recover_hotkey_str: str = "<shift>+<alt>+z"
     ):
         with self._lock:
+            changed = (
+                self.hotkey_str != hotkey_str or
+                self.mode != mode or
+                self.prompt_hotkey_str != prompt_hotkey_str or
+                self.transform_hotkey_str != transform_hotkey_str or
+                self.recover_hotkey_str != recover_hotkey_str
+            )
             self.hotkey_str = hotkey_str
             self.mode = mode
             self.prompt_hotkey_str = prompt_hotkey_str
             self.transform_hotkey_str = transform_hotkey_str
+            self.recover_hotkey_str = recover_hotkey_str
             self._main_hotkey_active = False
             self._prompt_hotkey_active = False
             self._transform_hotkey_active = False
             self._last_toggle_time = 0.0
-            logger.info(f"Hotkey updated: Main={hotkey_str} ({mode}), Prompt={prompt_hotkey_str}, Transform={transform_hotkey_str}")
+            if changed:
+                logger.info(f"Hotkey updated: Main={hotkey_str} ({mode}), Prompt={prompt_hotkey_str}, Transform={transform_hotkey_str}, Recover={recover_hotkey_str}")
 
-        # Re-register Win32 kernel hotkeys with fresh configuration
-        if self.is_active:
-            self._restart_win32_thread()
+        # Re-register Win32 kernel hotkeys only if keys changed, and do it non-blocking
+        if self.is_active and changed:
+            threading.Thread(target=self._restart_win32_thread, daemon=True, name="Win32HotkeyRestart").start()
 
     def set_processing_state(self, processing: bool):
         with self._lock:
@@ -271,6 +286,12 @@ class HotkeyManager:
             if self.on_transform:
                 threading.Thread(target=self.on_transform, daemon=True, name="HotkeyTransformThread").start()
 
+    def _handle_recover_trigger(self):
+        with self._lock:
+            logger.info(f"Paste Last Transcript recovery hotkey triggered: {self.recover_hotkey_str}")
+            if self.on_recover:
+                threading.Thread(target=self.on_recover, daemon=True, name="HotkeyRecoverThread").start()
+
     # -------------------------------------------------------------------------
     # ENGINE 1: Windows Kernel-Level RegisterHotKey Thread Loop
     # -------------------------------------------------------------------------
@@ -313,6 +334,15 @@ class HotkeyManager:
                 registered_ids.append(HOTKEY_ID_TRANSFORM)
                 logger.info(f"Win32 RegisterHotKey: Successfully registered Transform ({self.transform_hotkey_str})")
 
+        # 4. Register Paste Last Transcript Recovery Hotkey
+        recover_spec = _parse_hotkey_to_win32(self.recover_hotkey_str)
+        if recover_spec:
+            mod, vk = recover_spec
+            res = user32.RegisterHotKey(0, HOTKEY_ID_RECOVER, mod, vk)
+            if res:
+                registered_ids.append(HOTKEY_ID_RECOVER)
+                logger.info(f"Win32 RegisterHotKey: Successfully registered Recovery ({self.recover_hotkey_str})")
+
         msg = MSG()
         try:
             while self.is_active:
@@ -329,6 +359,8 @@ class HotkeyManager:
                         self._handle_prompt_trigger(source="win32_register_hotkey")
                     elif hotkey_id == HOTKEY_ID_TRANSFORM:
                         self._handle_transform_trigger(source="win32_register_hotkey")
+                    elif hotkey_id == HOTKEY_ID_RECOVER:
+                        self._handle_recover_trigger()
                 elif msg.message == WM_QUIT:
                     break
         except Exception as e:

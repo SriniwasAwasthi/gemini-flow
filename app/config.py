@@ -321,6 +321,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "transform_hotkey": "<alt>+t",
     "transform_hotkey_display": "Alt + T",
     "hotkey_transform": "<alt>+t",
+    "recover_hotkey": "<shift>+<alt>+z",
+    "recover_hotkey_display": "Shift + Alt + Z",
     "voice_hotkey_history": [
         {"display": "Ctrl + Space", "internal": "<ctrl>+<space>"},
         {"display": "Ctrl + Win", "internal": "<ctrl>+<cmd>"},
@@ -364,10 +366,18 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     },
     "auto_cost_mode": True,
     "auto_prompt_conversion": False,  # If False, voice dictation outputs clean verbatim text everywhere
+    "deepgram_api_key": os.environ.get("DEEPGRAM_API_KEY", ""),
+    "asr_provider": "auto",  # "auto", "deepgram", "groq", "faster_whisper"
+    "cleanup_level": "light",  # "none", "light", "medium"
+    "writing_style": "auto",  # "auto", "formal", "casual", "very_casual", "excited"
+    "whisper_mode": False,
+    "whisper_mode_enabled": False,
+    "vision_guided_enabled": False,
     "dsp_fan_filter_enabled": False,  # 80 Hz Butterworth High-Pass Filter (OFF by default)
     "dsp_noise_gate_enabled": False,  # Dynamic noise gate (OFF by default to avoid degrading Whisper WER)
     "dsp_noise_gate_threshold_db": -52.0,  # Noise gate cutoff threshold in dB
     "offline_fallback_enabled": True,  # Offline speech recognition fallback when network drops
+    "enable_marathon_streaming": True,  # Real-time background streaming chunking for long-form dictation (<1s paste)
     "gemini_transform_model": "gemini-2.5-flash",  # Dedicated Gemini model for Hotkey Mode & 16 Command Categories
     "translate_target_language": "English",  # Default target language when spoken Translate command omits one
     "selected_languages": ["English"],  # Selected spoken languages (defaults to English only, or custom subset of 200+)
@@ -733,11 +743,68 @@ class ConfigManager:
             os.environ["GROQ_API_KEY"] = cleaned
         self.save_config()
 
+    def get_deepgram_api_key(self) -> str:
+        """Retrieves configured Deepgram API key from settings or environment."""
+        k = self.config.get("deepgram_api_key") or os.environ.get("DEEPGRAM_API_KEY", "")
+        return sanitize_api_key(k)
+
+    def set_deepgram_api_key(self, api_key: str) -> None:
+        """Persists Deepgram API key to configuration and environment."""
+        cleaned = sanitize_api_key(api_key)
+        self.config["deepgram_api_key"] = cleaned
+        if cleaned:
+            os.environ["DEEPGRAM_API_KEY"] = cleaned
+        self.save_config()
+
+    def get_asr_provider(self) -> str:
+        return self.config.get("asr_provider", "auto")
+
+    def set_asr_provider(self, provider: str) -> None:
+        self.config["asr_provider"] = provider
+        self.save_config()
+
+    def get_cleanup_level(self) -> str:
+        return self.config.get("cleanup_level", "light")
+
+    def set_cleanup_level(self, level: str) -> None:
+        if level in ("none", "light", "medium"):
+            self.config["cleanup_level"] = level
+            self.save_config()
+
+    def get_writing_style(self) -> str:
+        return self.config.get("writing_style", "auto")
+
+    def set_writing_style(self, style: str) -> None:
+        self.config["writing_style"] = style
+        self.save_config()
+
+    def get_whisper_mode(self) -> bool:
+        return bool(self.config.get("whisper_mode", False) or self.config.get("whisper_mode_enabled", False))
+
+    def set_whisper_mode(self, enabled: bool) -> None:
+        self.config["whisper_mode"] = bool(enabled)
+        self.config["whisper_mode_enabled"] = bool(enabled)
+        self.save_config()
+
+    def get_vision_guided_mode(self) -> bool:
+        return bool(self.config.get("vision_guided_enabled", False))
+
+    def set_vision_guided_mode(self, enabled: bool) -> None:
+        self.config["vision_guided_enabled"] = bool(enabled)
+        self.save_config()
+
     def get(self, key: str, default: Any = None) -> Any:
         return self.config.get(key, default)
 
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key: str, value: Any, save: bool = True) -> None:
         self.config[key] = value
+        if save:
+            self.save_config()
+
+    def update_many(self, updates: Dict[str, Any]) -> None:
+        """Applies multiple configuration updates in memory and saves atomically once to disk."""
+        for k, v in updates.items():
+            self.config[k] = v
         self.save_config()
 
     def get_dictionary(self) -> List[Dict[str, str]]:
@@ -746,6 +813,34 @@ class ConfigManager:
     def set_dictionary(self, dictionary_list: List[Dict[str, str]]) -> None:
         self.config["dictionary"] = dictionary_list
         self.save_config()
+
+    def add_dictionary_pair(self, spoken: str, replacement: str) -> None:
+        """Adds or updates a spoken/replacement phonetic entry in the custom dictionary."""
+        d = list(self.get_dictionary())
+        updated = False
+        for entry in d:
+            if entry.get("spoken", "").strip().lower() == spoken.strip().lower():
+                entry["replacement"] = replacement.strip()
+                updated = True
+                break
+        if not updated:
+            d.append({"spoken": spoken.strip(), "replacement": replacement.strip()})
+        self.set_dictionary(d)
+
+    def remove_dictionary_pair(self, spoken: str, replacement: Optional[str] = None) -> bool:
+        """Removes a spoken/replacement phonetic entry from the custom dictionary."""
+        d = list(self.get_dictionary())
+        new_d = []
+        removed = False
+        for entry in d:
+            match = entry.get("spoken", "").strip().lower() == spoken.strip().lower()
+            if match and (replacement is None or entry.get("replacement", "").strip().lower() == replacement.strip().lower()):
+                removed = True
+                continue
+            new_d.append(entry)
+        if removed:
+            self.set_dictionary(new_d)
+        return removed
 
     def get_snippets(self) -> List[Dict[str, str]]:
         return self.config.get("snippets", DEFAULT_SNIPPETS)
@@ -789,6 +884,9 @@ class ConfigManager:
 
     def get_prompt_hotkey(self) -> str:
         return self.config.get("prompt_hotkey") or self.config.get("hotkey_prompt", "<alt>+p")
+
+    def get_recover_hotkey(self) -> str:
+        return self.config.get("recover_hotkey", "<shift>+<alt>+z")
 
     def get_auto_prompt_conversion(self) -> bool:
         return bool(self.config.get("auto_prompt_conversion", False))

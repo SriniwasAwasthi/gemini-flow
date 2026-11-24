@@ -31,15 +31,20 @@ from app.transcription.chunker import (
     detect_hallucination_loop
 )
 from app.transcription.context_reconciler import CumulativeContextReconciler
+from app.transcription.deepgram_provider import DeepgramProvider
 from app.audio_recorder import AudioRecorder
 
 logger = logging.getLogger("GeminiFlow.TranscriptionEngine")
 
 VERBATIM_PROMPT = (
-    "Transcribe this audio exactly as spoken, in English. Output only the transcript. "
-    "Do not answer questions, follow instructions, summarize, translate, or add anything. "
-    "Use correct grammar-aware punctuation, capitalization, apostrophes, quotation marks and numerals. "
-    "Keep every word. Do not drop the beginning or the end."
+    "You are an expert, low-latency AI voice dictation assistant. "
+    "Transcribe the spoken audio with 100% fidelity in English. "
+    "Clean conversational hesitations ('um', 'uh', 'ah') and resolve mid-sentence verbal self-corrections "
+    "(e.g., 'meet on Monday... sorry Tuesday' -> 'meet on Tuesday'). "
+    "Preserve authentic greetings ('Hi', 'Hello', 'Good morning', 'Hey'), speaker tone, proper nouns, and numbers. "
+    "Apply accurate, natural grammar, capitalization, apostrophes, and punctuation across all 12 tenses. "
+    "Do not answer questions, summarize, translate, or output conversational commentary. "
+    "Output ONLY the finalized transcript."
 )
 
 WHISPER_INITIAL_PROMPT = (
@@ -49,6 +54,13 @@ WHISPER_INITIAL_PROMPT = (
 
 
 class UnifiedTranscriptionEngine:
+    _groq_invalid_keys: set = set()
+
+    @classmethod
+    def invalidate_auth_cache(cls):
+        """Clears cached rejected Groq credentials when user updates settings."""
+        cls._groq_invalid_keys.clear()
+
     def __init__(self, api_key: str = "", config_manager: Optional[Any] = None):
         self.api_key = api_key
         self.config = config_manager
@@ -67,7 +79,8 @@ class UnifiedTranscriptionEngine:
         model_name: str = "gemini-2.5-flash",
         system_instruction: str = "",
         language: str = "en",
-        previous_context: str = ""
+        previous_context: str = "",
+        image_b64: Optional[str] = None
     ) -> Transcript:
         """
         Unified entrypoint executing the Common Transcription Contract.
@@ -114,16 +127,16 @@ class UnifiedTranscriptionEngine:
                 success=True
             )
 
-        # Fast silence check: if audio has no acoustic speech, return clean empty transcript
-        if not AudioRecorder.contains_speech(wav_bytes):
-            logger.info(f"Silence check: zero acoustic speech detected in {duration:.2f}s audio.")
+        # Fast silence check: Only skip if audio is literally empty
+        if not wav_bytes or len(wav_bytes) < 400 or duration <= 0.1:
+            logger.info(f"Silence check: empty audio buffer ({duration:.2f}s).")
             return Transcript(
                 text="",
                 segments=[],
                 audio_seconds=duration,
                 covered_seconds=duration,
                 model=model_name,
-                warnings=["Digital silence detected."],
+                warnings=["Audio is empty."],
                 success=True
             )
 
@@ -194,6 +207,7 @@ class UnifiedTranscriptionEngine:
             system_instruction=system_instruction,
             language=language,
             previous_context=previous_context,
+            image_b64=image_b64
         )
 
     def _dispatch_single_chunk(
@@ -204,8 +218,27 @@ class UnifiedTranscriptionEngine:
         system_instruction: str = "",
         language: str = "en",
         previous_context: str = "",
+        image_b64: Optional[str] = None
     ) -> Transcript:
         model_clean = model_name.lower().strip()
+
+        # -------------------------------------------------------------
+        # Route Multimodal: Vision-Guided Voice Dynamic Routing
+        # Non-multimodal models (Groq, Deepgram, Offline Whisper) cannot process screen images.
+        # Dynamically route to gemini-2.5-flash for action-aware visual understanding.
+        # -------------------------------------------------------------
+        if image_b64 and not ("gemini" in model_clean):
+            logger.info(f"[VISION ENGINE] Non-multimodal model '{model_name}' dynamically routed to 'gemini-2.5-flash' for visual context processing.")
+            model_clean = "gemini-2.5-flash"
+            model_name = "gemini-2.5-flash"
+
+        # -------------------------------------------------------------
+        # Route -1: Deepgram Nova-3 (Streaming Cloud ASR with Dictionary Biasing)
+        # -------------------------------------------------------------
+        if "deepgram" in model_clean or "nova" in model_clean:
+            return self._transcribe_deepgram(
+                wav_bytes, duration, language=language, previous_context=previous_context
+            )
 
         # -------------------------------------------------------------
         # Route 0: Groq Whisper Large V3 Turbo (Ultra-Low Latency Cloud LPU)
@@ -260,7 +293,8 @@ class UnifiedTranscriptionEngine:
             duration=duration,
             system_instruction=system_instruction or VERBATIM_PROMPT,
             language=language,
-            previous_context=previous_context
+            previous_context=previous_context,
+            image_b64=image_b64
         )
 
     # -------------------------------------------------------------------------
@@ -324,10 +358,10 @@ class UnifiedTranscriptionEngine:
         is_streaming_chunk = audio_seconds < 3.5 or is_tiny
         if audio_seconds < 3.5:
             use_vad = False
-            vad_params = dict(threshold=0.18, min_silence_duration_ms=400, speech_pad_ms=250)
+            vad_params = dict(threshold=0.45, min_silence_duration_ms=400, speech_pad_ms=250)
         else:
             use_vad = True
-            vad_params = dict(threshold=0.18, min_silence_duration_ms=600, speech_pad_ms=350)
+            vad_params = dict(threshold=0.45, min_silence_duration_ms=500, speech_pad_ms=350)
 
         # For CPU offline execution, enforce beam_size=1, best_of=1 for ultra-low latency sub-second dictation
         beam_val = 1
@@ -337,6 +371,9 @@ class UnifiedTranscriptionEngine:
             "best_of": best_of_val,
             "temperature": 0.0,
             "condition_on_previous_text": False,
+            "no_speech_threshold": 0.6,
+            "log_prob_threshold": -1.0,
+            "compression_ratio_threshold": 2.4,
             "vad_filter": use_vad,
             "vad_parameters": vad_params,
             "initial_prompt": whisper_prompt
@@ -417,6 +454,11 @@ class UnifiedTranscriptionEngine:
             except Exception as hl_err:
                 logger.error(f"Hallucination recovery error: {hl_err}")
 
+            if detect_hallucination_loop(text_whole):
+                logger.warning(f"Persistent hallucination ghost phrase purged: '{text_whole}'")
+                text_whole = ""
+                seg_dicts = []
+
         return Transcript(
             text=text_whole,
             segments=seg_dicts,
@@ -436,16 +478,31 @@ class UnifiedTranscriptionEngine:
         duration: float,
         system_instruction: str,
         language: str = "en",
-        previous_context: str = ""
+        previous_context: str = "",
+        image_b64: Optional[str] = None
     ) -> Transcript:
         """
         Executes Google Gemini API transcription with:
         - Inline audio (<= 15MB) or Files API (> 15MB)
+        - Optional active screen image context (Vision-Guided Voice)
         - Silence-aligned chunking for recordings > 5 minutes (300s)
         - Verbatim contract prompt and temperature 0.0
         - Checking finish_reason across all candidates and parts
         - Offline detection & automatic fallback to faster-whisper
         """
+        if image_b64 and ("multimodal" not in (system_instruction or "").lower()):
+            system_instruction = (
+                "You are an expert multimodal AI voice assistant with visual screen awareness. "
+                "You have been provided with an image of the user's active screen and an audio recording of their spoken voice.\n\n"
+                "CRITICAL INSTRUCTIONS:\n"
+                "1. If the user is speaking a dictation (simply saying what they want written), transcribe and format their speech into clear, professional text.\n"
+                "2. If the user is asking an action, command, or request related to what is shown on screen "
+                "(e.g., 'reply to this email', 'compose a reply', 'fix this error', 'summarize this', 'answer this', 'write code for this', 'fill this in'):\n"
+                "   - Do NOT merely transcribe the user's spoken command!\n"
+                "   - Look at the email, error, code, form, or document visible on the screen image.\n"
+                "   - COMPOSE AND GENERATE THE ACTUAL REQUESTED CONTENT (e.g. the full, professional, impressive email reply ready to send, or the code fix).\n"
+                "3. Output ONLY the finalized text to be inserted directly at the user's cursor. Do NOT include conversational filler, meta-commentary, introductory notes, or markdown fences."
+            )
         if previous_context and previous_context.strip():
             system_instruction = f"{system_instruction or VERBATIM_PROMPT}\n\nPrevious transcription context for continuity:\n{previous_context.strip()}"
         if not self.api_key:
@@ -460,7 +517,7 @@ class UnifiedTranscriptionEngine:
             chunks = split_at_silence_boundaries(wav_bytes, max_chunk_sec=240.0, min_chunk_sec=60.0, overlap_sec=2.0)
             chunk_transcripts = []
             for _, _, c_bytes in chunks:
-                sub_t = self._transcribe_single_gemini(model, c_bytes, system_instruction)
+                sub_t = self._transcribe_single_gemini(model, c_bytes, system_instruction, image_b64=image_b64)
                 if sub_t.success and sub_t.text:
                     chunk_transcripts.append(sub_t.text)
             merged = merge_overlapping_transcripts(chunk_transcripts)
@@ -474,7 +531,7 @@ class UnifiedTranscriptionEngine:
             )
 
         # Try primary cloud model
-        t = self._transcribe_single_gemini(model, wav_bytes, system_instruction, duration=duration)
+        t = self._transcribe_single_gemini(model, wav_bytes, system_instruction, duration=duration, image_b64=image_b64)
         if t.success and t.text:
             return t
 
@@ -489,7 +546,7 @@ class UnifiedTranscriptionEngine:
             # Resilient Cloud-to-Cloud Failover (strictly for 429 quota exhaustion or transient 503):
             fallback_cloud_model = "gemini-2.5-flash" if "3.5" in model else "gemini-3.5-flash-lite"
             logger.warning(f"Gemini {model} did not succeed ({t.error_message or t.warnings}). Attempting cloud failover to {fallback_cloud_model}...")
-            t_fallback = self._transcribe_single_gemini(fallback_cloud_model, wav_bytes, system_instruction, duration=duration)
+            t_fallback = self._transcribe_single_gemini(fallback_cloud_model, wav_bytes, system_instruction, duration=duration, image_b64=image_b64)
             if t_fallback.success and t_fallback.text:
                 logger.info(f"Cloud failover to {fallback_cloud_model} succeeded!")
                 return t_fallback
@@ -505,7 +562,8 @@ class UnifiedTranscriptionEngine:
         model: str,
         wav_bytes: bytes,
         system_instruction: str,
-        duration: Optional[float] = None
+        duration: Optional[float] = None,
+        image_b64: Optional[str] = None
     ) -> Transcript:
         dur = duration if duration is not None else (len(wav_bytes) / 32000.0)
 
@@ -524,13 +582,15 @@ class UnifiedTranscriptionEngine:
         if "2.5" in model:
             gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
+        parts_list = [{"text": system_instruction}]
+        if image_b64:
+            parts_list.append({"inline_data": {"mime_type": "image/jpeg", "data": image_b64}})
+        parts_list.append({"inline_data": {"mime_type": "audio/wav", "data": audio_b64}})
+
         payload = {
             "contents": [
                 {
-                    "parts": [
-                        {"text": system_instruction},
-                        {"inline_data": {"mime_type": "audio/wav", "data": audio_b64}}
-                    ]
+                    "parts": parts_list
                 }
             ],
             "generationConfig": gen_config
@@ -680,6 +740,66 @@ class UnifiedTranscriptionEngine:
         )
 
     # -------------------------------------------------------------------------
+    # MODEL -1: DEEPGRAM NOVA-3 (STREAMING CLOUD ASR)
+    # -------------------------------------------------------------------------
+    def _transcribe_deepgram(
+        self,
+        wav_bytes: bytes,
+        audio_seconds: float,
+        language: str = "en",
+        previous_context: str = ""
+    ) -> Transcript:
+        """
+        Executes Deepgram Nova-3 transcription with Custom Dictionary keyword biasing.
+        Ultra-low latency (< 0.20s).
+        Falls back seamlessly to Groq Whisper Turbo if key is absent or network fails.
+        """
+        deepgram_key = ""
+        try:
+            if self.config and hasattr(self.config, "get_deepgram_api_key"):
+                deepgram_key = self.config.get_deepgram_api_key()
+            elif self.config and hasattr(self.config, "get"):
+                deepgram_key = self.config.get("deepgram_api_key", "")
+            if not deepgram_key:
+                deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "")
+        except Exception:
+            deepgram_key = os.environ.get("DEEPGRAM_API_KEY", "")
+
+        provider = DeepgramProvider(api_key=deepgram_key)
+        if not provider.is_available():
+            logger.info("Deepgram key not configured. Seamlessly routing to Groq Whisper Turbo...")
+            return self._transcribe_groq(wav_bytes, audio_seconds, language=language, previous_context=previous_context)
+
+        dict_terms = []
+        try:
+            if self.config and hasattr(self.config, "get_dictionary"):
+                dict_terms = [
+                    d.get("replacement") or d.get("spoken")
+                    for d in self.config.get_dictionary()
+                    if d.get("replacement") or d.get("spoken")
+                ]
+            from app.vocabulary.vocab_engine import VocabEngine
+            ve = VocabEngine.get_instance()
+            dict_terms.extend([e.canonical_term for e in ve.entries if e.enabled])
+        except Exception:
+            pass
+
+        ok, text, meta = provider.transcribe(wav_bytes, language=language, dictionary_terms=dict_terms)
+        if ok and text:
+            return Transcript(
+                text=text,
+                segments=[{"start": 0.0, "end": audio_seconds, "text": text}],
+                audio_seconds=audio_seconds,
+                covered_seconds=audio_seconds,
+                model="Deepgram Nova-3",
+                success=True,
+                warnings=[]
+            )
+        else:
+            logger.warning(f"Deepgram returned empty or failed ({text}). Falling back to Groq Whisper Turbo...")
+            return self._transcribe_groq(wav_bytes, audio_seconds, language=language, previous_context=previous_context)
+
+    # -------------------------------------------------------------------------
     # MODEL 0: GROQ WHISPER LARGE V3 TURBO (CLOUD LPU)
     # -------------------------------------------------------------------------
     def _transcribe_groq(
@@ -698,24 +818,29 @@ class UnifiedTranscriptionEngine:
         """
         # 1. Secure API Key Resolution
         groq_key = ""
-        try:
-            if self.config and hasattr(self.config, "get"):
-                groq_key = self.config.get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
-            else:
-                from app.config import ConfigManager
-                groq_key = ConfigManager.get_instance().get_all().get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
-        except Exception:
-            groq_key = os.environ.get("GROQ_API_KEY", "")
-
-        if not groq_key and str(self.api_key).startswith("gsk_"):
+        if self.api_key and str(self.api_key).startswith("gsk_"):
             groq_key = str(self.api_key)
+        else:
+            try:
+                if self.config and hasattr(self.config, "get"):
+                    groq_key = self.config.get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
+                elif self.api_key is None:
+                    from app.config import ConfigManager
+                    groq_key = ConfigManager.get_instance().get_all().get("groq_api_key") or os.environ.get("GROQ_API_KEY", "")
+                else:
+                    groq_key = os.environ.get("GROQ_API_KEY", "")
+            except Exception:
+                groq_key = os.environ.get("GROQ_API_KEY", "")
 
-        if not groq_key:
-            logger.warning("GROQ_API_KEY not configured. Falling back gracefully to Offline Whisper AI...")
+        if not groq_key or groq_key in self._groq_invalid_keys:
+            if groq_key and groq_key in self._groq_invalid_keys:
+                logger.info("Groq API key is known to be unauthorized/invalid. Fast-failing instantly to Offline Whisper AI (0ms delay).")
+            else:
+                logger.warning("GROQ_API_KEY not configured. Falling back gracefully to Offline Whisper AI...")
             t = self._transcribe_faster_whisper(
                 wav_bytes, audio_seconds, language=language, previous_context=previous_context
             )
-            t.warnings.append("GROQ_API_KEY not configured in environment or settings. Gracefully fell back to Offline Whisper AI.")
+            t.warnings.append("GROQ_API_KEY unavailable or unauthorized; rescued by Offline Whisper AI.")
             return t
 
         # 2. Audio Transmission Setup (16kHz WAV multipart payload)
@@ -733,9 +858,30 @@ class UnifiedTranscriptionEngine:
         }
         if language:
             data["language"] = language
+
+        # Inject Custom Dictionary and Vocabulary Engine terms into Groq Whisper prompt
+        prompt_hints = []
+        try:
+            if self.config and hasattr(self.config, "get_dictionary"):
+                dict_words = [d.get("replacement") or d.get("spoken") for d in self.config.get_dictionary() if d.get("replacement") or d.get("spoken")]
+                prompt_hints.extend([w for w in dict_words if w and len(w) > 1][:20])
+                from app.vocabulary.vocab_engine import VocabEngine
+                ve = VocabEngine.get_instance()
+                vocab_terms = [e.canonical_term for e in ve.entries if e.enabled and len(e.canonical_term) > 1][:20]
+                prompt_hints.extend(vocab_terms)
+        except Exception:
+            pass
+
+        combined_prompt_parts = []
+        if prompt_hints:
+            unique_terms = list(dict.fromkeys(prompt_hints))[:25]
+            combined_prompt_parts.append(f"Key terms: {', '.join(unique_terms)}.")
         if previous_context and previous_context.strip():
             ctx_tail = " ".join(previous_context.strip().split()[-40:])
-            data["prompt"] = ctx_tail[:400]
+            combined_prompt_parts.append(ctx_tail[:300])
+
+        if combined_prompt_parts:
+            data["prompt"] = " ".join(combined_prompt_parts)[:450]
 
         start_time = time.time()
         try:
@@ -744,15 +890,16 @@ class UnifiedTranscriptionEngine:
                 headers=headers,
                 files=files,
                 data=data,
-                timeout=(3.0, 15.0)
+                timeout=(2.0, 6.0)
             )
             elapsed = time.time() - start_time
 
-            # 3. Handle HTTP 401 Unauthorized
-            if resp.status_code == 401:
-                logger.warning(f"Groq API 401 Unauthorized: {resp.text}. Rescuing with Offline Whisper AI...")
+            # 3. Handle HTTP 401/403 Unauthorized
+            if resp.status_code in (401, 403):
+                logger.warning(f"Groq API {resp.status_code} Unauthorized: {resp.text}. Caching key and rescuing with Offline Whisper AI...")
+                self._groq_invalid_keys.add(groq_key)
                 t = self._transcribe_faster_whisper(wav_bytes, audio_seconds, language=language, previous_context=previous_context)
-                t.warnings.append("Groq API key invalid or unauthorized (401); rescued by Offline Whisper AI.")
+                t.warnings.append(f"Groq API key invalid or unauthorized ({resp.status_code}); rescued by Offline Whisper AI.")
                 return t
 
             # 4. Handle non-200 responses
@@ -765,6 +912,10 @@ class UnifiedTranscriptionEngine:
             # 5. Response Parsing into Transcript Contract
             resp_data = resp.json()
             raw_text = resp_data.get("text", "").strip()
+
+            if detect_hallucination_loop(raw_text):
+                logger.warning(f"Groq hallucination ghost phrase purged: '{raw_text}'")
+                raw_text = ""
             segments = resp_data.get("segments", [])
             dur = float(resp_data.get("duration", audio_seconds or 0.0))
             covered_sec = dur if dur > 0 else audio_seconds

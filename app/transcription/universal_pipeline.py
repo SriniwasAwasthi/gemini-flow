@@ -697,10 +697,31 @@ class UniversalPipeline:
         language: str = "en",
         snippets: Optional[List[Dict[str, str]]] = None,
         dictionary: Optional[List[Dict[str, str]]] = None,
-        vocab_engine: Optional[Any] = None
+        vocab_engine: Optional[Any] = None,
+        cleanup_level: Optional[str] = None,
+        app_name: Optional[str] = None,
+        app_category: Optional[str] = None
     ) -> str:
         if not raw_text or not raw_text.strip():
             return ""
+
+        level = "light"
+        if cleanup_level:
+            level = cleanup_level.lower().strip()
+        elif self.config and hasattr(self.config, "get_cleanup_level"):
+            level = self.config.get_cleanup_level().lower().strip()
+        elif self.config and hasattr(self.config, "get"):
+            level = str(self.config.get("cleanup_level", "light")).lower().strip()
+
+        # Wispr Flow Auto Cleanup Level: 'none' (Bypass all rewriting, apply only explicit dictionary & snippets)
+        if level == "none":
+            text = raw_text.strip()
+            if dictionary:
+                from app.gemini_engine import GeminiEngine
+                text = GeminiEngine.apply_dictionary(text, dictionary)
+            if snippets:
+                text = VoiceTriggerExpander.expand_triggers(text, snippets)
+            return text
 
         # Step 1: Normalize Model Output
         text = ModelOutputNormalizer.normalize_text(raw_text)
@@ -734,10 +755,39 @@ class UniversalPipeline:
         if snippets:
             text = VoiceTriggerExpander.expand_triggers(text, snippets)
 
-        # Step 8: Terminal Punctuation Enforcement (Clean Dictation mode)
+        # Step 7b: IDE File & Symbol Tagging (@filename)
+        is_dev = False
+        if app_category and app_category.lower() in ("developer", "code", "terminal"):
+            is_dev = True
+        elif app_name and any(ide in app_name.lower() for ide in ("code", "cursor", "windsurf", "visual studio", "terminal", "powershell", "cmd", "clion", "pycharm", "intellij")):
+            is_dev = True
+
+        if is_dev:
+            # Convert file mentions like "tag index.ts", "look at app.py" or file extensions to @filename
+            text = re.sub(
+                r'(\b(?:tag|file|look at|check|in|see)\s+)?\b([a-zA-Z0-9_\-]+\.(?:py|ts|tsx|js|jsx|json|md|html|css|cpp|c|h|cs|java|go|rs|sh|yaml|yml|sql))\b',
+                lambda m: f"{m.group(1) or ''}@{m.group(2)}" if not m.group(0).startswith("@") else m.group(0),
+                text,
+                flags=re.IGNORECASE
+            )
+
+        # Step 8: Terminal Punctuation Enforcement & App-Aware Writing Styles
+        is_messaging = False
+        if app_category and app_category.lower() in ("personal", "messaging", "chat"):
+            is_messaging = True
+        elif app_name and any(msg in app_name.lower() for msg in ("whatsapp", "slack", "discord", "teams", "telegram", "messages", "signal")):
+            is_messaging = True
+
         if mode == "clean_dictation" and language.lower() in ("en", "eng", "english"):
             t_strip = text.strip()
-            if t_strip and not t_strip.startswith("•") and "\n" not in t_strip and not t_strip.endswith((".", "!", "?", ":", ";", ",")) and "@" not in t_strip and not t_strip.startswith("http"):
+            if is_dev:
+                # In developer/terminal context, never force trailing period onto commands or symbols
+                pass
+            elif is_messaging and not t_strip.endswith(("!", "?")):
+                # In messaging apps, strip trailing period for clean casual flow
+                if t_strip.endswith("."):
+                    text = t_strip[:-1].rstrip()
+            elif t_strip and not t_strip.startswith("•") and "\n" not in t_strip and not t_strip.endswith((".", "!", "?", ":", ";", ",")) and "@" not in t_strip and not t_strip.startswith("http"):
                 if re.match(r'^(?:can|could|would|will|is|are|does|do|did|what|where|why|how|who|which)\b', t_strip, re.IGNORECASE):
                     text = t_strip + "?"
                 else:

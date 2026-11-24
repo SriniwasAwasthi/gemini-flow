@@ -21,10 +21,16 @@ class AppContext:
     vocabulary_priorities: List[str] = field(default_factory=list)
     icon: str = "🖥️"
     is_prompt_interface: bool = False
+    ide_file: str = ""
+    ide_ext: str = ""
+    ide_project: str = ""
 
     @property
     def system_prompt_addition(self) -> str:
-        return f"Tone: {self.tone_directive}\nFormatting: {self.formatting_directive}"
+        base = f"Tone: {self.tone_directive}\nFormatting: {self.formatting_directive}"
+        if self.ide_file:
+            base += f"\nActive Editor File: {self.ide_file} (Syntax: {self.ide_ext}, Project: {self.ide_project})"
+        return base
 
 
 APP_REGISTRY: Dict[str, Dict[str, Any]] = {
@@ -316,10 +322,71 @@ class AppIntelligenceManager:
     def __init__(self):
         self.registry = APP_REGISTRY
 
+    @staticmethod
+    def extract_ide_workspace_context(window_title: str) -> Dict[str, str]:
+        """
+        Vibe-Coding Workspace Awareness:
+        Extracts active file name, file extension, and project name from IDE window titles.
+        Supports VS Code, Cursor, Windsurf, Cline AI, Continue AI, Zed, JetBrains.
+        e.g. 'audio_recorder.py - Wisper - Visual Studio Code' -> {'file': 'audio_recorder.py', 'ext': '.py', 'project': 'Wisper'}
+             'Wisper — main.rs — Zed' -> {'file': 'main.rs', 'ext': '.rs', 'project': 'Wisper'}
+        """
+        import re
+        info = {"file": "", "ext": "", "project": ""}
+        if not window_title:
+            return info
+
+        # Normalize dash separators: em-dash " — ", en-dash " – ", standard " - "
+        norm = window_title.replace(" — ", " - ").replace(" – ", " - ")
+        parts = [p.strip() for p in norm.split(" - ") if p.strip()]
+        if len(parts) >= 2:
+            file_idx = -1
+            for idx, p in enumerate(parts):
+                clean_p = re.sub(r'^[•●* ]+', '', p.strip())
+                clean_p = re.sub(r'\s*\([^)]*\)$', '', clean_p).strip()
+                m_file = re.search(r'([A-Za-z0-9_\-\.\$]*(?: [A-Za-z0-9_\-\.\$]+)*\.[A-Za-z0-9_\-]+)', clean_p)
+                if m_file:
+                    fname = m_file.group(1).lstrip('•●* ')
+                    if fname.strip('.'):
+                        f_parts = fname.rsplit('.', 1)
+                        if len(f_parts) > 1 and re.search(r'[a-zA-Z]', f_parts[1]):
+                            info["file"] = fname
+                            info["ext"] = "." + f_parts[1].lower()
+                            file_idx = idx
+                            break
+
+            if file_idx != -1:
+                ide_keywords = (
+                    "visual studio code", "vs code", "cursor", "windsurf", "cline",
+                    "continue", "zed", "jetbrains", "intellij", "pycharm", "webstorm",
+                    "antigravity", "integrator"
+                )
+                candidates = [
+                    p for i, p in enumerate(parts)
+                    if i != file_idx and not any(kw in p.lower() for kw in ide_keywords)
+                ]
+                if candidates:
+                    info["project"] = candidates[0]
+                else:
+                    info["project"] = ""
+        elif len(parts) == 1:
+            clean_p = re.sub(r'^[•●* ]+', '', parts[0].strip())
+            clean_p = re.sub(r'\s*\([^)]*\)$', '', clean_p).strip()
+            m_file = re.search(r'([A-Za-z0-9_\-\.\$]*(?: [A-Za-z0-9_\-\.\$]+)*\.[A-Za-z0-9_\-]+)', clean_p)
+            if m_file:
+                fname = m_file.group(1).lstrip('•●* ')
+                if fname.strip('.'):
+                    f_parts = fname.rsplit('.', 1)
+                    if len(f_parts) > 1 and re.search(r'[a-zA-Z]', f_parts[1]):
+                        info["file"] = fname
+                        info["ext"] = "." + f_parts[1].lower()
+        return info
+
     def resolve_context(self, raw_app_name: str, window_title: str = "") -> AppContext:
         """Maps detected application name and window title to structured AppContext."""
         app_clean = (raw_app_name or "General").strip().lower()
         title_clean = (window_title or "").strip().lower()
+        ide_info = self.extract_ide_workspace_context(window_title)
 
         # 1. Antigravity IDE / Desktop Detection
         if "antigravity" in app_clean or "antigravity" in title_clean or "integrator" in app_clean or "integrator" in title_clean:
@@ -333,10 +400,100 @@ class AppIntelligenceManager:
                 profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg["vocabulary_priorities"],
                 icon=cfg["icon"],
-                is_prompt_interface=False
+                is_prompt_interface=False,
+                ide_file=ide_info["file"],
+                ide_ext=ide_info["ext"],
+                ide_project=ide_info["project"]
             )
 
-        # 2. VS Code & Modern Code Editors
+        # 2. AI Agent Coding Assistants (Cline, Continue) inside VS Code / standalone
+        if "cline" in app_clean or "cline" in title_clean:
+            cfg = self.registry.get("cline", self.registry["antigravity"])
+            return AppContext(
+                app_name="Cline AI",
+                category="dev",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
+                tone_directive=cfg["tone_directive"],
+                formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
+                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
+                icon="🤖",
+                is_prompt_interface=False,
+                ide_file=ide_info["file"],
+                ide_ext=ide_info["ext"],
+                ide_project=ide_info["project"]
+            )
+
+        if "continue" in app_clean or "continue" in title_clean:
+            cfg = self.registry.get("continue", self.registry["antigravity"])
+            return AppContext(
+                app_name="Continue AI",
+                category="dev",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
+                tone_directive=cfg["tone_directive"],
+                formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
+                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
+                icon="⏩",
+                is_prompt_interface=False,
+                ide_file=ide_info["file"],
+                ide_ext=ide_info["ext"],
+                ide_project=ide_info["project"]
+            )
+
+        # 3. Cursor, Windsurf & Zed AI Agent Coding Environments
+        if "cursor" in app_clean or "cursor" in title_clean:
+            cfg = self.registry.get("cursor", self.registry["antigravity"])
+            return AppContext(
+                app_name="Cursor",
+                category="dev",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
+                tone_directive=cfg["tone_directive"],
+                formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
+                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
+                icon="⚡",
+                is_prompt_interface=False,
+                ide_file=ide_info["file"],
+                ide_ext=ide_info["ext"],
+                ide_project=ide_info["project"]
+            )
+
+        if "windsurf" in app_clean or "windsurf" in title_clean:
+            cfg = self.registry.get("windsurf", self.registry["antigravity"])
+            return AppContext(
+                app_name="Windsurf",
+                category="dev",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
+                tone_directive=cfg["tone_directive"],
+                formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
+                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
+                icon="🏄",
+                is_prompt_interface=False,
+                ide_file=ide_info["file"],
+                ide_ext=ide_info["ext"],
+                ide_project=ide_info["project"]
+            )
+
+        if "zed" in app_clean or "zed" in title_clean:
+            cfg = self.registry.get("zed", self.registry["antigravity"])
+            return AppContext(
+                app_name="Zed",
+                category="dev",
+                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
+                tone_directive=cfg["tone_directive"],
+                formatting_directive=cfg["formatting_directive"],
+                profile_id=cfg.get("profile_id", "coding"),
+                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
+                icon="⚡",
+                is_prompt_interface=False,
+                ide_file=ide_info["file"],
+                ide_ext=ide_info["ext"],
+                ide_project=ide_info["project"]
+            )
+
+        # 4. VS Code & Modern Code Editors
         if (
             "vs code" in app_clean
             or "vs code" in title_clean
@@ -358,78 +515,10 @@ class AppIntelligenceManager:
                 profile_id=cfg.get("profile_id", "coding"),
                 vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
                 icon="💻",
-                is_prompt_interface=False
-            )
-
-        # 3. Cursor, Windsurf & AI Agent Coding Environments
-        if "cursor" in app_clean or "cursor" in title_clean:
-            cfg = self.registry.get("cursor", self.registry["antigravity"])
-            return AppContext(
-                app_name="Cursor",
-                category="dev",
-                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
-                tone_directive=cfg["tone_directive"],
-                formatting_directive=cfg["formatting_directive"],
-                profile_id=cfg.get("profile_id", "coding"),
-                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
-                icon="⚡",
-                is_prompt_interface=False
-            )
-
-        if "windsurf" in app_clean or "windsurf" in title_clean:
-            cfg = self.registry.get("windsurf", self.registry["antigravity"])
-            return AppContext(
-                app_name="Windsurf",
-                category="dev",
-                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
-                tone_directive=cfg["tone_directive"],
-                formatting_directive=cfg["formatting_directive"],
-                profile_id=cfg.get("profile_id", "coding"),
-                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
-                icon="🏄",
-                is_prompt_interface=False
-            )
-
-        if "cline" in app_clean or "cline" in title_clean:
-            cfg = self.registry.get("cline", self.registry["antigravity"])
-            return AppContext(
-                app_name="Cline AI",
-                category="dev",
-                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
-                tone_directive=cfg["tone_directive"],
-                formatting_directive=cfg["formatting_directive"],
-                profile_id=cfg.get("profile_id", "coding"),
-                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
-                icon="🤖",
-                is_prompt_interface=False
-            )
-
-        if "continue" in app_clean or "continue" in title_clean:
-            cfg = self.registry.get("continue", self.registry["antigravity"])
-            return AppContext(
-                app_name="Continue AI",
-                category="dev",
-                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
-                tone_directive=cfg["tone_directive"],
-                formatting_directive=cfg["formatting_directive"],
-                profile_id=cfg.get("profile_id", "coding"),
-                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
-                icon="⏩",
-                is_prompt_interface=False
-            )
-
-        if "zed" in app_clean or "zed" in title_clean:
-            cfg = self.registry.get("zed", self.registry["antigravity"])
-            return AppContext(
-                app_name="Zed",
-                category="dev",
-                preferred_model=cfg.get("preferred_model", "gemini-2.5-flash"),
-                tone_directive=cfg["tone_directive"],
-                formatting_directive=cfg["formatting_directive"],
-                profile_id=cfg.get("profile_id", "coding"),
-                vocabulary_priorities=cfg.get("vocabulary_priorities", ["Programming", "Technical"]),
-                icon="⚡",
-                is_prompt_interface=False
+                is_prompt_interface=False,
+                ide_file=ide_info["file"],
+                ide_ext=ide_info["ext"],
+                ide_project=ide_info["project"]
             )
 
         # 4. AI Chat & Prompt-Generation Interfaces
@@ -505,7 +594,10 @@ class AppIntelligenceManager:
                     profile_id=cfg.get("profile_id", "coding"),
                     vocabulary_priorities=cfg["vocabulary_priorities"],
                     icon=cfg["icon"],
-                    is_prompt_interface=cfg.get("is_prompt_interface", False)
+                    is_prompt_interface=cfg.get("is_prompt_interface", False),
+                    ide_file=ide_info["file"],
+                    ide_ext=ide_info["ext"],
+                    ide_project=ide_info["project"]
                 )
 
         # Fallback General Context
@@ -517,16 +609,22 @@ class AppIntelligenceManager:
             formatting_directive="Standard punctuation and sentence structure.",
             profile_id="coding",
             vocabulary_priorities=["Personal", "Custom"],
-            icon="🖥️"
+            icon="🖥️",
+            ide_file=ide_info["file"],
+            ide_ext=ide_info["ext"],
+            ide_project=ide_info["project"]
         )
 
     def get_prompt_directives(self, context: AppContext) -> str:
         """Returns the system prompt block representing application context."""
-        return (
+        res = (
             f"\n\nActive Application Context ({context.icon} {context.app_name} - {context.category.upper()}):\n"
             f"- Tone: {context.tone_directive}\n"
             f"- Formatting: {context.formatting_directive}\n"
         )
+        if context.ide_file:
+            res += f"- Active Editor File: {context.ide_file} (Syntax: {context.ide_ext}, Project: {context.ide_project})\n"
+        return res
 
     @classmethod
     def get_active_app_context(cls, target_hwnd: Optional[int] = None) -> AppContext:

@@ -158,6 +158,20 @@ class AIPolishBrain:
         if not text or not text.strip():
             return text
 
+        low = text.lower()
+        # Sub-millisecond fast bail-out: If text contains no correction/override cues or duplicate indicator, skip expensive regex evaluation
+        quick_cue_words = (
+            "sorry", "wait", "actually", "mean", "bad", "correction", "rather", "no,", "no ",
+            "forgot", "don't want", "dont want", "सॉरी", "माफ", "नाही", "मतलब", "म्हणजे",
+            "désolé", "pardon", "entschuldigung", "perdón"
+        )
+        if not any(k in low for k in quick_cue_words):
+            try:
+                from app.transcription.universal_pipeline import UniversalDuplicateEliminator
+                return UniversalDuplicateEliminator.eliminate_duplicates(text).strip()
+            except Exception:
+                return text.strip()
+
         try:
             from app.transcription.universal_pipeline import ContextualSelfCorrectionEngine, UniversalDuplicateEliminator
             text = UniversalDuplicateEliminator.eliminate_duplicates(text)
@@ -490,6 +504,14 @@ class AIPolishBrain:
         if not text or not text.strip():
             return text
 
+        low = text.lower()
+        bullet_triggers = (
+            "first", "second", "third", "point", "bullet", "•", "*", "advantage", "feature",
+            "steps", "reasons", "1.", "2.", "3.", "पहिला", "दुसरा"
+        )
+        if not any(k in low for k in bullet_triggers) and "\n" not in text:
+            return text
+
         # Clean stray inline bullet noise like '• application •' while preserving list separation
         text = re.sub(r'[•\*\-]\s*(?:application|app)\s*[•\*\-]\s*', 'Third is ', text, flags=re.IGNORECASE)
 
@@ -761,9 +783,8 @@ class AIPolishBrain:
         # Articles fixes: 'an user' -> 'a user', 'an unique' -> 'a unique'
         t = re.sub(r'\ban\s+(user|unique|unit|universal|useful)\b', r'a \1', t, flags=re.IGNORECASE)
 
-        # Continuous participles: 'is/are/am/was/were/be/been' + verb
+        # Continuous participles: 'is/are/am/was/were/be/been' + verb (excluding passive voice 'was/is run')
         participles = {
-            r'\b(is|was)\s+run\b': r'\1 running',
             r'\b(are|were)\s+develop\b': r'\1 developing',
             r'\b(am|was)\s+listen\b': r'\1 listening',
             r'\b(was|is)\s+record\b': r'\1 recording',

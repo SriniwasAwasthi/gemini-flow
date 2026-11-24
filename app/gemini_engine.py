@@ -583,7 +583,7 @@ class GeminiEngine:
                 "maxOutputTokens": 8192
             }
             # Optimize Gemini 3.5/2.5/2.0 for ultra-fast speech transcription by disabling thinking overhead
-            if any(k in model.lower() for k in ("2.5", "2.0")) and "3." not in model.lower() and "transcribe" not in model.lower():
+            if any(k in model.lower() for k in ("2.5", "2.0", "3.0", "3.5", "3.7", "3.8")) and "pro" not in model.lower():
                 gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
             payload = {
@@ -615,7 +615,8 @@ class GeminiEngine:
                         ]
                     }
                 ],
-                "generationConfig": gen_config
+                "generationConfig": gen_config,
+                "store": False
             }
 
             headers = {
@@ -696,7 +697,7 @@ class GeminiEngine:
                     "topP": 0.95,
                     "maxOutputTokens": 8192
                 }
-                if "2.5" in try_model.lower() or "2.0" in try_model.lower():
+                if any(v in try_model.lower() for v in ("2.0", "2.5", "3.0", "3.5", "3.7", "3.8")) and "pro" not in try_model.lower():
                     c_gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
                 c_payload = {
@@ -720,7 +721,8 @@ class GeminiEngine:
                             ]
                         }
                     ],
-                    "generationConfig": c_gen_config
+                    "generationConfig": c_gen_config,
+                    "store": False
                 }
                 c_headers = {
                     "Content-Type": "application/json",
@@ -853,7 +855,7 @@ class GeminiEngine:
                 "temperature": TransformEngine.get_preset(transform_type).temperature,
                 "maxOutputTokens": 4096
             }
-            if "2.5" in model or "2.0" in model:
+            if any(v in model for v in ("2.0", "2.5", "3.0", "3.5", "3.7", "3.8")) and "pro" not in model.lower():
                 gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
             payload = {
@@ -866,7 +868,8 @@ class GeminiEngine:
                         ]
                     }
                 ],
-                "generationConfig": gen_config
+                "generationConfig": gen_config,
+                "store": False
             }
             headers = {
                 "Content-Type": "application/json",

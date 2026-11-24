@@ -122,6 +122,37 @@ namespace GeminiFlow
                     }
                 }
 
+                // If Gemini Flow.exe was placed on Desktop/parent folder, probe adjacent Wisper directory
+                if (!File.Exists(scriptPath))
+                {
+                    string wisperDir = Path.Combine(exeDir, "Wisper");
+                    if (Directory.Exists(wisperDir))
+                    {
+                        if (File.Exists(Path.Combine(wisperDir, "main_standalone.py")))
+                            scriptPath = Path.Combine(wisperDir, "main_standalone.py");
+                        else if (File.Exists(Path.Combine(wisperDir, "app", "main.py")))
+                            scriptPath = Path.Combine(wisperDir, "app", "main.py");
+                        else if (File.Exists(Path.Combine(wisperDir, "main.py")))
+                            scriptPath = Path.Combine(wisperDir, "main.py");
+                    }
+                }
+
+                // Probe installed location in LocalAppData
+                if (!File.Exists(scriptPath))
+                {
+                    string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                    string installedDir = Path.Combine(localAppData, "Programs", "GeminiFlow");
+                    if (Directory.Exists(installedDir))
+                    {
+                        if (File.Exists(Path.Combine(installedDir, "main_standalone.py")))
+                            scriptPath = Path.Combine(installedDir, "main_standalone.py");
+                        else if (File.Exists(Path.Combine(installedDir, "app", "main.py")))
+                            scriptPath = Path.Combine(installedDir, "app", "main.py");
+                        else if (File.Exists(Path.Combine(installedDir, "main.py")))
+                            scriptPath = Path.Combine(installedDir, "main.py");
+                    }
+                }
+
                 if (!File.Exists(scriptPath))
                 {
                     MessageBox.Show(

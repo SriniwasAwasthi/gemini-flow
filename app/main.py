@@ -260,26 +260,30 @@ def terminate_other_gemini_flow_instances(exclude_pid: int = None):
             f"$currentSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; "
             f"$currentUser = [Environment]::UserName; "
             f"$canonicalDir = '{canonical_dir}'; "
-            "Get-CimInstance Win32_Process | Where-Object { "
-            "  $_.ProcessId -ne $target -and $_.ProcessId -ne $currentPid -and "
-            "  ($_.Name -eq 'python.exe' -or $_.Name -eq 'pythonw.exe' -or $_.Name -like '*Gemini Flow*') -and "
-            "  $_.CommandLine -and "
-            "  ("
-            "    $_.CommandLine -like ('*' + $canonicalDir + '*main_standalone.py*') -or "
-            "    $_.CommandLine -like ('*' + $canonicalDir + '*\\app\\main.py*') -or "
-            "    $_.CommandLine -like ('*' + $canonicalDir + '*\\main.py*') -or "
-            "    $_.CommandLine -like ('*' + $canonicalDir + '*Gemini Flow.exe*') -or "
-            "    ($_.CommandLine -like '*main_standalone.py*' -and $_.CommandLine -notlike '*test*') "
-            "  ) -and "
-            "  $_.CommandLine -notlike '*test*' -and $_.CommandLine -notlike '*pytest*' -and "
-            "  $_.CommandLine -notlike '*unittest*' -and $_.CommandLine -notlike '*run_all*' "
-            "} | Where-Object { "
-            "  $pOwner = (Invoke-CimMethod -InputObject $_ -MethodName GetOwnerSid -ErrorAction SilentlyContinue).Sid; "
-            "  if ($pOwner) { $pOwner -eq $currentSid } else { "
-            "    $uOwner = (Invoke-CimMethod -InputObject $_ -MethodName GetOwner -ErrorAction SilentlyContinue).User; "
-            "    if ($uOwner) { $uOwner -eq $currentUser } else { $true } "
-            "  } "
-            "} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+            "try { "
+            "  Get-CimInstance Win32_Process | Where-Object { "
+            "    $_.ProcessId -ne $target -and $_.ProcessId -ne $currentPid -and "
+            "    ($_.Name -eq 'python.exe' -or $_.Name -eq 'pythonw.exe' -or $_.Name -like '*Gemini Flow*') -and "
+            "    $_.CommandLine -and "
+            "    ("
+            "      $_.CommandLine -like ('*' + $canonicalDir + '*main_standalone.py*') -or "
+            "      $_.CommandLine -like ('*' + $canonicalDir + '*\\app\\main.py*') -or "
+            "      $_.CommandLine -like ('*' + $canonicalDir + '*\\main.py*') -or "
+            "      $_.CommandLine -like ('*' + $canonicalDir + '*Gemini Flow.exe*') -or "
+            "      ($_.CommandLine -like '*main_standalone.py*' -and $_.CommandLine -notlike '*test*') "
+            "    ) -and "
+            "    $_.CommandLine -notlike '*test*' -and $_.CommandLine -notlike '*pytest*' -and "
+            "    $_.CommandLine -notlike '*unittest*' -and $_.CommandLine -notlike '*run_all*' "
+            "  } | Where-Object { "
+            "    $pOwner = (Invoke-CimMethod -InputObject $_ -MethodName GetOwnerSid -ErrorAction SilentlyContinue).Sid; "
+            "    if ($pOwner) { $pOwner -eq $currentSid } else { "
+            "      $uOwner = (Invoke-CimMethod -InputObject $_ -MethodName GetOwner -ErrorAction SilentlyContinue).User; "
+            "      if ($uOwner) { $uOwner -eq $currentUser } else { $true } "
+            "    } "
+            "  } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } "
+            "} catch { "
+            "  Get-Process -Name 'python', 'pythonw', '*Gemini*' -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $target -and $_.Id -ne $currentPid } | Stop-Process -Force -ErrorAction SilentlyContinue "
+            "}"
         )
 
         subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd], capture_output=True, timeout=5)
@@ -343,150 +347,41 @@ def notify_running_instance(command: str = "SHOW") -> bool:
     return False
 
 def force_window_to_foreground(window):
-
     """
-
-    Guarantees a PyQt window is un-minimized, restored, and forced to the foreground
-
-    over active apps (Edge, Chrome, Antigravity, etc.) using native Win32 APIs with 64-bit pointer safety.
-
+    Safely brings a PyQt window to the front without corrupting Qt's internal backing store
+    or deadlocking the GUI thread with AttachThreadInput.
     """
-
     if not window:
-
         return
 
-    # 1. Qt level restore & show
-
-    from PyQt6.QtCore import Qt, QTimer
-
-    window.setWindowState(window.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
-
-    window.showNormal()
-
-    window.show()
-
-    # 2. Win32 Level Foreground Force
+    from PyQt6.QtCore import Qt
 
     try:
+        # 1. Un-minimize and activate at Qt level
+        window.setWindowState(window.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
+        window.showNormal()
+        window.show()
+        window.raise_()
+        window.activateWindow()
 
+        # 2. Native Win32 foreground activation (clean, non-blocking, and non-destructive to Qt backing store)
         import ctypes
-
-        from ctypes import c_void_p, c_int, c_uint, c_ulong, byref
-
+        from ctypes import c_void_p
         user32 = ctypes.windll.user32
-
-        kernel32 = ctypes.windll.kernel32
-
         hwnd = c_void_p(int(window.winId()))
 
-        # Ensure taskbar visibility via WS_EX_APPWINDOW so user can always see and click it
-
-        GWL_EXSTYLE = -20
-
-        WS_EX_APPWINDOW = 0x00040000
-
-        WS_EX_TOOLWINDOW = 0x00000080
-
-        get_long = getattr(user32, 'GetWindowLongPtrW', getattr(user32, 'GetWindowLongW', None))
-
-        set_long = getattr(user32, 'SetWindowLongPtrW', getattr(user32, 'SetWindowLongW', None))
-
-        if get_long and set_long:
-
-            get_long.argtypes = [c_void_p, c_int]
-
-            get_long.restype = ctypes.c_ssize_t
-
-            set_long.argtypes = [c_void_p, c_int, ctypes.c_ssize_t]
-
-            set_long.restype = ctypes.c_ssize_t
-
-            cur_style = get_long(hwnd, GWL_EXSTYLE)
-
-            set_long(hwnd, GWL_EXSTYLE, (cur_style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW)
-
-        # Un-minimize
-
         SW_RESTORE = 9
-
         user32.ShowWindow(hwnd, SW_RESTORE)
-
-        # Simulate Alt key to unlock Windows foreground lock
-
-        VK_MENU = 0x12
-
-        KEYEVENTF_KEYUP = 0x0002
-
-        user32.keybd_event(VK_MENU, 0, 0, 0)
-
-        user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
-
-        # AttachThreadInput trick to steal foreground lock from active app
-
-        fore_hwnd = c_void_p(user32.GetForegroundWindow())
-
-        cur_thread = kernel32.GetCurrentThreadId()
-
-        fore_pid = c_ulong()
-
-        fore_thread = user32.GetWindowThreadProcessId(fore_hwnd, byref(fore_pid))
-
-        if fore_thread != cur_thread and fore_thread != 0:
-
-            user32.AttachThreadInput(fore_thread, cur_thread, True)
-
-            user32.SetForegroundWindow(hwnd)
-
-            user32.BringWindowToTop(hwnd)
-
-            user32.AttachThreadInput(fore_thread, cur_thread, False)
-
-        else:
-
-            user32.SetForegroundWindow(hwnd)
-
-            user32.BringWindowToTop(hwnd)
-
-        # Set HWND_TOPMOST with 64-bit pointer safety so it pops directly on top of Antigravity / active app
-
-        HWND_TOPMOST = c_void_p(-1)
-
-        HWND_NOTOPMOST = c_void_p(-2)
-
-        SWP_NOMOVE = 0x0002
-
-        SWP_NOSIZE = 0x0001
-
-        SWP_SHOWWINDOW = 0x0040
-
-        SWP_FRAMECHANGED = 0x0020
-
-        flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_FRAMECHANGED
-
-        user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags)
-
-        # After 1200ms, demote HWND_TOPMOST back to normal so it doesn't stay permanently locked on top
-
-        def _demote_topmost():
-
-            try:
-
-                user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED)
-
-            except Exception:
-
-                pass
-
-        QTimer.singleShot(1200, _demote_topmost)
-
+        user32.BringWindowToTop(hwnd)
+        user32.SetForegroundWindow(hwnd)
     except Exception as e:
+        logger.debug(f"force_window_to_foreground note: {e}")
 
-        logger.warning(f"force_window_to_foreground note: {e}")
-
-    window.raise_()
-
-    window.activateWindow()
+    try:
+        window.raise_()
+        window.activateWindow()
+    except Exception:
+        pass
 
 def is_already_running() -> bool:
 
@@ -698,6 +593,8 @@ class GeminiFlowApp:
         )
 
         self.recorder.set_device(self.config.get("input_device_index"))
+        if hasattr(self, 'hud') and self.hud:
+            self.hud.audio_recorder = self.recorder
 
         # Global Hotkey Manager
 
@@ -711,6 +608,8 @@ class GeminiFlowApp:
 
             transform_hotkey_str=self.config.get_transform_hotkey(),
 
+            recover_hotkey_str=self.config.get_recover_hotkey(),
+
             on_start=self.on_start_speech,
 
             on_stop=self.on_stop_speech,
@@ -719,7 +618,9 @@ class GeminiFlowApp:
 
             on_prompt=self.on_prompt_hotkey,
 
-            on_transform=self.on_transform_hotkey
+            on_transform=self.on_transform_hotkey,
+
+            on_recover=self._on_recover_last_transcript
 
         )
 
@@ -870,28 +771,41 @@ class GeminiFlowApp:
 
                 return
 
+        if hasattr(self, 'recorder') and self.recorder and self.recorder.is_recording:
+            logger.debug("on_start_speech called while already recording. Keeping active recording state.")
+            return
+
         self._is_cancelled = False
 
         self.hotkey_mgr.set_recording_state(True)
         self._context_reconciler.reset()
 
-        # 1. Capture active foreground window and any highlighted text for command triggers
-
+        # 1. Capture active foreground window immediately with zero lag
         self.text_injector.capture_active_window()
-
         self._pre_recorded_selected_text = ""
 
+        # 1b. Password Field Guard & Caret Context Inspection
         try:
+            from app.intelligence.caret_context_reader import CaretContextReader
+            self._active_caret_context = CaretContextReader.get_context()
+            if self._active_caret_context and self._active_caret_context.is_password:
+                logger.warning("[PASSWORD GUARD] Focused control is a password field. Blocking dictation for security.")
+                self.hotkey_mgr.set_recording_state(False)
+                if hasattr(self, 'hud') and self.hud:
+                    self.hud.show_state(FloatingHUD.STATE_ERROR, "🔒 Password Field - Blocked")
+                return
+        except Exception as e:
+            logger.debug(f"Password guard check error: {e}")
+            self._active_caret_context = None
 
-            sel = self.text_injector.get_selected_text(require_selection=True)
-
-            if sel and len(sel.strip()) >= 2:
-
-                self._pre_recorded_selected_text = sel.strip()
-
-        except Exception:
-
-            pass
+        # 1c. Screen-Aware Vision Dictation (Vision-Guided Voice)
+        self._active_screen_b64 = None
+        try:
+            from app.intelligence.vision_engine import VisionEngine
+            if VisionEngine.is_vision_mode_active(self.config):
+                self._active_screen_b64 = VisionEngine.capture_active_screen(self.text_injector.last_target_hwnd)
+        except Exception as ve_err:
+            logger.debug(f"Vision capture check error: {ve_err}")
 
         # 2. Audio feedback (subtle high beep)
 
@@ -908,10 +822,52 @@ class GeminiFlowApp:
         # 3. Start Recording
 
         device_idx = self.config.get("input_device_index")
+        dev_name = self.config.get("input_device_name", "")
 
         self.recorder.set_device(device_idx)
 
         success = self.recorder.start_recording()
+
+        # Resilient Audio Device Fallback & Recovery Architecture
+        if not success:
+            # Step A: Check if the preferred device shifted to a different index
+            if dev_name and dev_name != "Default System Microphone":
+                try:
+                    for d in AudioRecorder.get_input_devices():
+                        curr_name = d.get("name", "").strip().lower()
+                        target_name = dev_name.strip().lower()
+                        if (curr_name in target_name or target_name in curr_name) and d.get("index") != device_idx:
+                            logger.info(f"Microphone '{dev_name}' index relocated from {device_idx} -> {d['index']}. Reconnecting...")
+                            self.recorder.set_device(d['index'])
+                            success = self.recorder.start_recording()
+                            if success:
+                                self.config.set("input_device_index", d['index'])
+                                break
+                except Exception as ex_reloc:
+                    logger.debug(f"Device name relocation note: {ex_reloc}")
+
+            # Step B: Graceful fallback to Default System Microphone
+            if not success and device_idx is not None:
+                logger.warning(
+                    f"Configured microphone (ID: {device_idx}) is unavailable. "
+                    "Rescuing audio capture via Default System Microphone..."
+                )
+                self.recorder.set_device(None)
+                success = self.recorder.start_recording()
+                if success:
+                    logger.info("Successfully recovered audio capture using Default System Microphone.")
+
+            # Step C: If even default fails, exhaustively search available input devices
+            if not success:
+                try:
+                    for d in AudioRecorder.get_input_devices():
+                        self.recorder.set_device(d['index'])
+                        if self.recorder.start_recording():
+                            logger.info(f"Successfully rescued audio capture using alternative device: {d['name']} (ID: {d['index']})")
+                            success = True
+                            break
+                except Exception as ex_all:
+                    logger.error(f"Exhaustive microphone fallback error: {ex_all}")
 
         if success:
 
@@ -919,9 +875,8 @@ class GeminiFlowApp:
 
             self.tray.update_status("🎙️ Recording Speech...", state="recording")
 
-            # Step 2: Single-Shot In-Memory Buffer (Zero CPU chunking overhead during recording)
-            # Only start rolling chunk coordinator if marathon streaming mode is explicitly enabled
-            if self.config.get("enable_marathon_streaming", False):
+            # Step 2: Background Rolling Chunk Coordinator (Instant <1s paste regardless of speech length)
+            if self.config.get("enable_marathon_streaming", True):
                 self._start_streaming_chunk_worker()
         else:
 
@@ -998,6 +953,21 @@ class GeminiFlowApp:
                         c_text = t_res.text.strip() if (t_res and t_res.success) else ""
                         with self._streaming_lock:
                             if c_text:
+                                # Apply VocabEngine phonetic normalization
+                                try:
+                                    from app.vocabulary.vocab_engine import VocabEngine
+                                    c_text = VocabEngine.get_instance().normalize(c_text)
+                                except Exception:
+                                    pass
+                                # Apply Quick Text expansion
+                                try:
+                                    from app.transcription.universal_pipeline import VoiceTriggerExpander
+                                    snips = self.config.get_snippets()
+                                    if snips:
+                                        c_text = VoiceTriggerExpander.expand_triggers(c_text, snips)
+                                except Exception:
+                                    pass
+
                                 reconciled_so_far = self._context_reconciler.add_chunk(
                                     chunk_id=c_id,
                                     raw_text=c_text,
@@ -1215,15 +1185,26 @@ class GeminiFlowApp:
 
                 else:
 
-                    err = res.error_message or "Gemini AI Prompt enhancement failed."
-
-                    logger.warning(f"Alt+P Gemini Prompt Enhancement failed: {err}")
-
-                    self.signals.prompt_finished.emit(False, err, raw_text)
+                    from app.transformation.transform_engine import TransformEngine
+                    rescued = TransformEngine.convert_to_prompt(raw_text)
+                    if rescued and rescued.strip():
+                        self.signals.prompt_finished.emit(True, rescued.strip(), raw_text)
+                    else:
+                        err = res.error_message or "AI Prompt enhancement failed."
+                        logger.warning(f"Alt+P Prompt Enhancement failed: {err}")
+                        self.signals.prompt_finished.emit(False, err, raw_text)
 
             except Exception as e:
 
                 logger.error(f"Error enhancing prompt: {e}")
+                try:
+                    from app.transformation.transform_engine import TransformEngine
+                    rescued = TransformEngine.convert_to_prompt(raw_text)
+                    if rescued and rescued.strip():
+                        self.signals.prompt_finished.emit(True, rescued.strip(), raw_text)
+                        return
+                except Exception:
+                    pass
 
                 self.signals.prompt_finished.emit(False, f"Prompt enhancement error: {e}", raw_text)
 
@@ -1369,19 +1350,39 @@ class GeminiFlowApp:
 
                 else:
 
-                    err = res.error_message or "Gemini text transformation failed."
-
-                    logger.warning(f"Universal Text Transform failed: {err}")
-
-                    self.signals.transform_finished.emit(
-                        False,
-                        err,
-                        "Universal Text Transform",
-                    )
+                    # Guaranteed fallback rescue via TransformEngine so user is NEVER stranded
+                    from app.transformation.transform_engine import TransformEngine
+                    rescued = TransformEngine.transform_text(selected_text)
+                    if rescued and rescued.strip():
+                        self.signals.transform_finished.emit(
+                            True,
+                            rescued.strip(),
+                            "Universal Text Transform",
+                        )
+                    else:
+                        err = res.error_message or "Text transformation failed."
+                        logger.warning(f"Universal Text Transform failed: {err}")
+                        self.signals.transform_finished.emit(
+                            False,
+                            err,
+                            "Universal Text Transform",
+                        )
 
             except Exception as e:
 
                 logger.error(f"Error transforming text: {e}")
+                try:
+                    from app.transformation.transform_engine import TransformEngine
+                    rescued = TransformEngine.transform_text(selected_text)
+                    if rescued and rescued.strip():
+                        self.signals.transform_finished.emit(
+                            True,
+                            rescued.strip(),
+                            "Universal Text Transform",
+                        )
+                        return
+                except Exception:
+                    pass
 
                 self.signals.transform_finished.emit(
                     False,
@@ -1443,6 +1444,35 @@ class GeminiFlowApp:
 
             self.tray.update_status("⚠️ Transform Failed", state="ready")
 
+    def _on_recover_last_transcript(self):
+        """Instant Undo AI Edit / Recovery Shortcut (Shift+Alt+Z).
+        If the last dictation was edited by AI, reverts back to verbatim acoustic transcript.
+        Otherwise, pastes the last finalized transcript directly at cursor.
+        """
+        logger.info("Executing Undo AI Edit / Paste Last Transcript (Shift+Alt+Z)...")
+        raw_text = getattr(self, '_last_raw_transcript', None)
+        pasted_text = getattr(self, '_last_pasted_text', None)
+
+        if raw_text and pasted_text and raw_text.strip() != pasted_text.strip():
+            logger.info("Reverting AI polish back to verbatim acoustic speech...")
+            try:
+                # Send Ctrl+Z to undo previous AI paste
+                self.text_injector.send_keystroke_combination([0x11, 0x5A]) # Ctrl + Z
+                time.sleep(0.06)
+                ok = self.text_injector.paste_text(raw_text)
+                if ok:
+                    self.hud.show_state(FloatingHUD.STATE_PASTED, "↩️ Reverted to Verbatim!")
+                    self._last_pasted_text = raw_text
+                    return
+            except Exception as rev_err:
+                logger.debug(f"Undo AI edit error: {rev_err}")
+
+        ok = self.text_injector.paste_last_transcript()
+        if ok:
+            self.hud.show_state(FloatingHUD.STATE_PASTED, "Last Transcript Pasted! 📋")
+        else:
+            self.hud.show_state(FloatingHUD.STATE_READY, "No Prior Transcript Found ⚠️")
+
     def _process_speech_worker(self, wav_target: any, wav_bytes: bytes, duration: float):
 
         """
@@ -1503,31 +1533,33 @@ class GeminiFlowApp:
             active_model = self.config.get("model_name") or ("groq-whisper-turbo" if self.config.get("groq_api_key") else "Offline Local Speech (Whisper AI)")
 
             if not active_model or active_model == "auto":
-
                 active_model = "groq-whisper-turbo" if self.config.get("groq_api_key") else "Offline Local Speech (Whisper AI)"
+
+            # Dynamic Vision Routing: If Vision-Guided Voice is enabled, route to Gemini 2.5 Flash
+            # because local Whisper and Groq cannot process image inputs!
+            if getattr(self, '_active_screen_b64', None) and "gemini" not in str(active_model).lower():
+                if self.config.get_api_key():
+                    logger.info(f"[VISION ROUTING] Vision-Guided Voice active with screenshot payload. Routing model from '{active_model}' -> 'gemini-2.5-flash'.")
+                    active_model = "gemini-2.5-flash"
+                else:
+                    logger.warning("[VISION ROUTING] Vision-Guided Voice active but no Gemini API key configured. Screen input cannot be processed.")
 
             primary_lang = self.config.get_primary_language_code() if hasattr(self.config, 'get_primary_language_code') else "en"
 
-            # 2. Fast Acoustic Silence Check
-
-            if duration <= 0.1 or not AudioRecorder.contains_speech(wav_bytes):
-
-                logger.info(f"Acoustic check: Audio contains zero speech energy ({duration:.2f}s). Skipping AI call.")
-
+            # 2. Fast Acoustic Silence Check: Allow all recorded audio through to Whisper ASR
+            if duration <= 0.1 or not wav_bytes or len(wav_bytes) < 400:
+                logger.info(f"Acoustic check: Audio is empty ({duration:.2f}s). Skipping AI call.")
                 self.signals.finished.emit(True, "", duration, active_mode, app_name, active_model, "")
-
                 return
 
             # 3. Transcribe via Unified Transcription Engine
             api_key = self.config.get_api_key()
             self.transcription_engine.set_api_key(api_key)
 
-            # Step 2: Ultra-Fast Single-Shot In-Memory Buffer (Kill the 18-second queue drain)
-            # For standard dictation (<= 45s or when using Groq/Cloud LPU), bypass queue draining entirely
-            # and transcribe full in-memory audio atomically in ~0.1s - 0.7s with zero lag.
-            is_cloud_lpu = any(k in active_model.lower() for k in ("groq", "turbo", "whisper-large"))
-            use_single_shot = (duration <= 45.0) or is_cloud_lpu
-            streaming_used = (not use_single_shot) and hasattr(self.recorder, 'rolling_chunks_were_emitted') and self.recorder.rolling_chunks_were_emitted()
+            # Step 2: Intelligent Sequential Chunk Processing & Cumulative Context Reconciliation
+            # For continuous speech where rolling chunks were emitted, finalize sequential cumulative stream.
+            # If no chunks were emitted (< 2.5s quick utterance), transcribe in-memory buffer directly.
+            streaming_used = hasattr(self.recorder, 'rolling_chunks_were_emitted') and self.recorder.rolling_chunks_were_emitted()
             if streaming_used and (getattr(self, '_streaming_chunks', None) or getattr(self, '_streaming_pending_futures', None) or getattr(self, '_reorder_buffer', None)):
                 logger.info(f"[CONTEXT RECONCILER] Finalizing cumulative stream for {duration:.2f}s dictation...")
                 # 1. Dynamic Queue Draining: wait for sequential consumer to process all remaining audio chunks
@@ -1541,7 +1573,7 @@ class GeminiFlowApp:
                     pending_threads = list(getattr(self, '_streaming_pending_futures', []))
 
                 whisper_sz = str(self.config.get("whisper_model", "small.en")).lower()
-                max_drain_wait = 3.0 if "tiny" in whisper_sz else (8.0 if "base" in whisper_sz else 18.0)
+                max_drain_wait = 2.0 if "tiny" in whisper_sz else (3.5 if "base" in whisper_sz else 4.5)
                 drain_start = time.time()
                 if q_ref is not None:
                     while not q_ref.empty() and (time.time() - drain_start) < max_drain_wait:
@@ -1617,11 +1649,16 @@ class GeminiFlowApp:
                     )
             else:
                 logger.info(f"Ultra-Fast Single-Shot In-Memory Transcription for {duration:.2f}s audio with model '{active_model}' (Lang: '{primary_lang}')...")
+                screen_img = getattr(self, '_active_screen_b64', None)
+                if screen_img and "gemini" not in str(active_model).lower():
+                    logger.info(f"[VISION ENGINE] Dynamically routing active model '{active_model}' -> 'gemini-2.5-flash' for multimodal screen awareness.")
+                    active_model = "gemini-2.5-flash"
                 transcript = self.transcription_engine.transcribe(
                     wav_path_or_bytes=wav_bytes if (wav_bytes and len(wav_bytes) > 800) else wav_target,
                     model_name=active_model,
                     language=primary_lang,
-                    previous_context=context_prompt
+                    previous_context=context_prompt,
+                    image_b64=screen_img
                 )
 
             # Resilient offline fallback if online model failed
@@ -1716,36 +1753,85 @@ class GeminiFlowApp:
 
             # Tier-2 Cognitive Grammar & Professional English Polish Layer (Always-On Wispr Flow Standard)
             # Guarantees 100% grammar accuracy across all 12 tenses, filler removal, self-corrections, and formatting
-            if raw_result and len(raw_result.strip()) > 1 and active_mode not in ("raw_verbatim", "verbatim"):
-                try:
-                    service = getattr(self, "gemini_transform_service", None)
-                    if service is None:
-                        from app.transformation.gemini_transform_service import GeminiTransformService
-                        service = GeminiTransformService(config_manager=self.config)
-                        self.gemini_transform_service = service
-                    ctx_dict = {
-                        "app_name": app_name,
-                        "window_title": window_title,
-                        "category": category,
-                        "custom_vocab": vocab_str if ('vocab_str' in locals() and vocab_str) else ""
-                    }
-                    polish_res = service.transform_universal_text(
-                        text=raw_result,
-                        app_context=ctx_dict
-                    )
-                    if polish_res.success and polish_res.text:
-                        raw_result = polish_res.text.strip()
-                    else:
-                        from app.intelligence.ai_polish_brain import AIPolishBrain
-                        raw_result = AIPolishBrain.polish_speech(raw_result)
-                        logger.info("[OFFLINE POLISH] Polished via local on-device AIPolishBrain.")
-                except Exception as polish_err:
-                    logger.warning(f"Tier-2 Polish fallback to local pipeline: {polish_err}")
+            cleanup_lvl = self.config.get_cleanup_level() if hasattr(self.config, 'get_cleanup_level') else self.config.get("cleanup_level", "light")
+            if raw_result and len(raw_result.strip()) > 1 and active_mode not in ("raw_verbatim", "verbatim") and cleanup_lvl != "none":
+                words_list = raw_result.strip().split()
+                is_short_utterance = len(words_list) <= 15
+                is_standard_dictation = active_mode in ("clean_dictation", "light", "default", "standard") or not active_mode
+                has_complex_mode = any(m in str(active_mode).lower() for m in ("smart_polish", "code_dev", "prompt_enhancer", "executive", "translate"))
+                has_bullet_command = any(k in raw_result.lower() for k in ("bullet point", "new line", "next line", "format as", "create a table", "table:"))
+
+                if is_short_utterance and is_standard_dictation and not has_complex_mode and not has_bullet_command and cleanup_lvl != "heavy":
                     try:
                         from app.intelligence.ai_polish_brain import AIPolishBrain
-                        raw_result = AIPolishBrain.polish_speech(raw_result)
-                    except Exception:
-                        pass
+                        fast_polished = AIPolishBrain.polish_speech(raw_result)
+                        if fast_polished and fast_polished.strip():
+                            logger.info(f"[FAST-PATH] Short dictation ({len(words_list)} words) polished via local AIPolishBrain in <1ms (0ms cloud latency).")
+                            raw_result = fast_polished.strip()
+                    except Exception as fp_err:
+                        logger.debug(f"Fast-path polish note: {fp_err}")
+                elif "gemini" in str(active_model).lower():
+                    # Single-Turn Efficiency: Gemini models already perform unified ASR + grammar cleanup in 1 turn
+                    # Skipping redundant second network call cuts latency by 50-70% and preserves authentic greetings
+                    logger.info(f"[SINGLE-TURN GEMINI] '{active_model}' completed transcription and polish in a single unified turn.")
+                else:
+                    try:
+                        service = getattr(self, "gemini_transform_service", None)
+                        if service is None:
+                            from app.transformation.gemini_transform_service import GeminiTransformService
+                            service = GeminiTransformService(config_manager=self.config)
+                            self.gemini_transform_service = service
+                        ctx_dict = {
+                            "app_name": app_name,
+                            "window_title": window_title,
+                            "category": category,
+                            "custom_vocab": vocab_str if ('vocab_str' in locals() and vocab_str) else ""
+                        }
+                        polish_res = service.transform_universal_text(
+                            text=raw_result,
+                            app_context=ctx_dict
+                        )
+                        if polish_res.success and polish_res.text:
+                            raw_result = polish_res.text.strip()
+                        else:
+                            # Try local Ollama Qwen 2.5 3B first for intelligent offline 12-tense polish
+                            ollama_success = False
+                            try:
+                                from app.intelligence.ollama_engine import OllamaEngine
+                                if OllamaEngine.ensure_daemon_running(timeout=0.3) and OllamaEngine.is_available():
+                                    active_ollama_model = self.config.get("ollama_model") or "qwen2.5:3b"
+                                    ok, qwen_text = OllamaEngine.polish_text(raw_result, model_name=active_ollama_model)
+                                    if ok and qwen_text:
+                                        raw_result = qwen_text.strip()
+                                        ollama_success = True
+                                        logger.info(f"[OFFLINE POLISH] Polished via local Ollama ({active_ollama_model}).")
+                            except Exception as ollama_ex:
+                                logger.debug(f"Ollama offline polish check: {ollama_ex}")
+
+                            if not ollama_success:
+                                from app.intelligence.ai_polish_brain import AIPolishBrain
+                                raw_result = AIPolishBrain.polish_speech(raw_result)
+                                logger.info("[OFFLINE POLISH] Polished via local on-device AIPolishBrain.")
+                    except Exception as polish_err:
+                        logger.warning(f"Tier-2 Polish fallback to local pipeline: {polish_err}")
+                        ollama_success = False
+                        try:
+                            from app.intelligence.ollama_engine import OllamaEngine
+                            if OllamaEngine.ensure_daemon_running(timeout=0.3) and OllamaEngine.is_available():
+                                active_ollama_model = self.config.get("ollama_model") or "qwen2.5:3b"
+                                ok, qwen_text = OllamaEngine.polish_text(raw_result, model_name=active_ollama_model)
+                                if ok and qwen_text:
+                                    raw_result = qwen_text.strip()
+                                    ollama_success = True
+                                    logger.info(f"[OFFLINE POLISH] Rescued via local Ollama ({active_ollama_model}).")
+                        except Exception:
+                            pass
+                        if not ollama_success:
+                            try:
+                                from app.intelligence.ai_polish_brain import AIPolishBrain
+                                raw_result = AIPolishBrain.polish_speech(raw_result)
+                            except Exception:
+                                pass
 
             from app.transcription.universal_pipeline import UniversalPipeline
 
@@ -1761,7 +1847,13 @@ class GeminiFlowApp:
 
                 snippets=self.config.get_snippets(),
 
-                dictionary=self.config.get_dictionary()
+                dictionary=self.config.get_dictionary(),
+
+                cleanup_level=self.config.get_cleanup_level(),
+
+                app_name=app_name,
+
+                app_category=category
 
             )
 
@@ -2052,6 +2144,21 @@ class GeminiFlowApp:
 
                 self.settings_dialog.sync_active_profile(active_prof)
 
+            # Apply Caret Context formatting (leading space, quote capitalization harmony)
+            caret_ctx = getattr(self, '_active_caret_context', None)
+            if caret_ctx and text_or_error and isinstance(text_or_error, str):
+                if caret_ctx.needs_leading_space and not text_or_error.startswith((' ', '\n', '\t', '.', ',', '!', '?', ';', ':')):
+                    text_or_error = ' ' + text_or_error
+                if not caret_ctx.should_capitalize and caret_ctx.is_within_quotes:
+                    l_spaces = len(text_or_error) - len(text_or_error.lstrip())
+                    actual_txt = text_or_error[l_spaces:]
+                    if len(actual_txt) > 0 and not actual_txt.startswith(('http', 'https')) and not re.match(r"^I(\b|['’])", actual_txt):
+                        text_or_error = text_or_error[:l_spaces] + actual_txt[0].lower() + actual_txt[1:]
+
+            # Store for Instant Undo AI Edit (Shift + Alt + Z)
+            self._last_raw_transcript = raw_spoken_text or text_or_error
+            self._last_pasted_text = text_or_error
+
             # 3. AI Prompt Pasting, Voice Command Pasting & Normal Speech Clipboard Management:
 
             is_prompt_mode = (mode == "prompt_generation" and raw_spoken_text and raw_spoken_text.strip() != text_or_error.strip())
@@ -2102,6 +2209,22 @@ class GeminiFlowApp:
 
                         self.hud.show_state(FloatingHUD.STATE_OFFLINE, "Offline Dictation Pasted! 🎙️")
 
+                        # Start Auto-Learning Dictionary 5s post-paste listener
+                        if self.config.get("auto_learn_enabled", True):
+                            try:
+                                from app.vocabulary.auto_learner import AutoLearner
+                                def _on_offline_learned(target, replacement):
+                                    if hasattr(self, 'hud') and self.hud:
+                                        self.hud.show_state(FloatingHUD.STATE_OFFLINE, f"Learned: '{replacement}' 💡")
+                                AutoLearner.start_post_paste_monitor(
+                                    text_or_error,
+                                    config_manager=self.config,
+                                    on_learned_callback=_on_offline_learned,
+                                    timeout_seconds=5.0
+                                )
+                            except Exception as al_err:
+                                logger.debug(f"Offline auto-learner monitor note: {al_err}")
+
                     else:
 
                         self.hud.show_state(FloatingHUD.STATE_COPIED, "Copied (Offline Mode) 📋")
@@ -2113,6 +2236,22 @@ class GeminiFlowApp:
                     if paste_ok:
 
                         self.hud.show_state(FloatingHUD.STATE_PASTED, "Pasted!")
+
+                        # Start Auto-Learning Dictionary 5s post-paste listener
+                        if self.config.get("auto_learn_enabled", True):
+                            try:
+                                from app.vocabulary.auto_learner import AutoLearner
+                                def _on_learned(target, replacement):
+                                    if hasattr(self, 'hud') and self.hud:
+                                        self.hud.show_state(FloatingHUD.STATE_PASTED, f"Learned: '{replacement}' 💡")
+                                AutoLearner.start_post_paste_monitor(
+                                    text_or_error,
+                                    config_manager=self.config,
+                                    on_learned_callback=_on_learned,
+                                    timeout_seconds=5.0
+                                )
+                            except Exception as al_err:
+                                logger.debug(f"Auto-learner monitor note: {al_err}")
 
                     else:
 
@@ -2204,7 +2343,7 @@ class GeminiFlowApp:
 
                 b_dur = time.time() - getattr(self, '_busy_start_time', 0.0) if getattr(self, '_busy_start_time', 0.0) > 0 else 999.0
 
-                if b_dur > 20.0:
+                if b_dur > 8.0:
 
                     logger.warning(f"Watchdog: speech processing stuck for {b_dur:.1f}s. Resetting state.")
 
@@ -2340,9 +2479,11 @@ class GeminiFlowApp:
 
         trans_hk = self.config.get_transform_hotkey()
 
+        recover_hk = self.config.get_recover_hotkey()
+
         disp_name = self.config.get("hotkey_display", "Ctrl + Space")
 
-        self.hotkey_mgr.update_config(hotkey, mode, prompt_hk, trans_hk)
+        self.hotkey_mgr.update_config(hotkey, mode, prompt_hk, trans_hk, recover_hk)
 
         api_key = self.config.get_api_key()
 
@@ -2410,9 +2551,11 @@ class GeminiFlowApp:
 
         trans_hk = self.config.get_transform_hotkey()
 
+        recover_hk = self.config.get_recover_hotkey()
+
         disp_name = self.config.get("hotkey_display", "Ctrl + Space")
 
-        self.hotkey_mgr.update_config(hotkey, mode, prompt_hk, trans_hk)
+        self.hotkey_mgr.update_config(hotkey, mode, prompt_hk, trans_hk, recover_hk)
 
         api_key = self.config.get_api_key()
 

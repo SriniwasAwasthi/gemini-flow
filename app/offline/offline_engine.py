@@ -62,7 +62,7 @@ class OfflineSpeechEngine:
                 logger.info(f"Initializing WhisperModel('{model_target}', device='{device}', compute_type='{compute_type}')...")
                 t0 = time.time()
                 cpu_count = os.cpu_count() or 4
-                optimal_threads = cpu_count
+                optimal_threads = min(4, cpu_count)
                 optimal_workers = 1
                 try:
                     instance = WhisperModel(

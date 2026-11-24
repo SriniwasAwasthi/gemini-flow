@@ -241,10 +241,10 @@ class CumulativeContextReconciler:
                 return f"{conj} {past}"
             aligned = coord_re.sub(_replace_verb, aligned)
 
-        # 2. Plural noun alignment after plural quantifiers
+        # 2. Plural noun alignment strictly after explicit plural quantifiers ('all the', 'many', 'several', 'multiple')
         nouns_pat = "|".join(self._PLURAL_NOUNS)
         plural_re = re.compile(
-            rf'\b(all\s+the|all|many|several|multiple|both|these|those|various)\s+(?:(new|old|active|failed|remaining)\s+)?({nouns_pat})\b',
+            rf'\b(all\s+the|many|several|multiple|both|these|those|various)\s+(?:(new|old|active|failed|remaining)\s+)?({nouns_pat})\b',
             re.IGNORECASE
         )
         def _pluralize(m: re.Match) -> str:
@@ -254,10 +254,6 @@ class CumulativeContextReconciler:
             plural = noun + "s"
             return f"{quant} {adj} {plural}" if adj else f"{quant} {plural}"
         aligned = plural_re.sub(_pluralize, aligned)
-
-        # Also handle "the new test" when preceded by "wrote" / "ran" / "all" in a plural/past context
-        if re.search(r'\b(?:wrote|ran|all|many|several|new)\b', aligned, re.IGNORECASE):
-            aligned = re.sub(r'\b(the\s+new)\s+(test|endpoint|feature|service)\b', r'\1 \2s', aligned, flags=re.IGNORECASE)
 
         return aligned
 

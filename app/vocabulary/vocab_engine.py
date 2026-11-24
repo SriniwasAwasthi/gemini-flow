@@ -227,6 +227,30 @@ class VocabularyEngine:
             logger.error(f"Failed to save vocabulary: {e}")
             return False
 
+    def add_pair(self, spoken: str, replacement: str, category: str = "Technical") -> bool:
+        """Adds or updates a spoken/replacement phonetic entry in the vocabulary engine."""
+        entry = self.add_entry(canonical_term=replacement, aliases=[spoken], category=category)
+        return entry is not None
+
+    def remove_pair(self, spoken: str, replacement: str) -> bool:
+        """Removes a learned spoken/replacement phonetic entry or alias from the vocabulary engine."""
+        target = replacement.strip().lower()
+        alias_clean = spoken.strip().lower()
+        changed = False
+        for e in list(self.entries):
+            if e.canonical_term.lower() == target:
+                new_aliases = [a for a in e.aliases if a.lower() != alias_clean]
+                if len(new_aliases) != len(e.aliases):
+                    e.aliases = new_aliases
+                    changed = True
+                if not e.aliases and e.category in ("Technical", "Custom", "Personal"):
+                    self.entries.remove(e)
+                    changed = True
+                break
+        if changed:
+            self.save_vocabulary()
+        return changed
+
     def add_entry(
         self,
         canonical_term: Any,

@@ -23,6 +23,8 @@ from typing import List, Dict, Any, Optional, Callable, Tuple, Union
 import numpy as np
 from scipy import signal, interpolate
 
+from app.audio.noise_suppressor import NoiseSuppressor, condition_audio_for_transcription
+
 logger = logging.getLogger("GeminiFlow.AudioRecorder")
 
 try:
@@ -179,11 +181,13 @@ def apply_dsp_filters(
     high_pass_hz: float = 80.0,
     peak_norm_enabled: bool = True,
     peak_target: float = 0.95,
-    target_peak: Optional[float] = None
+    target_peak: Optional[float] = None,
+    whisper_mode: bool = False,
+    noise_gate_enabled: bool = False
 ) -> np.ndarray:
-    """Applies high-pass Butterworth filter and peak normalization if enabled.
-    Normalizes low-amplitude distant speech (50cm-100cm) to standard operating amplitude.
-    Returns unmodified audio when filters are disabled to preserve clean speech.
+    """Applies high-pass Butterworth filter, Whisper Mode gain boost, and peak normalization.
+    Preserves unvoiced consonants (s, t, th, f) with full acoustic clarity by keeping the 
+    destructive 10ms time-domain noise gate disabled by default.
     """
     if audio_data is None or len(audio_data) == 0:
         return audio_data
@@ -191,26 +195,33 @@ def apply_dsp_filters(
     if target_peak is not None:
         peak_target = target_peak
 
-    if not high_pass_enabled and not peak_norm_enabled:
-        return audio_data
+    suppressor = NoiseSuppressor(
+        sample_rate=sample_rate,
+        high_pass_hz=high_pass_hz,
+        whisper_mode=whisper_mode
+    )
 
     filtered = audio_data.copy().astype(np.float32)
 
-    if high_pass_enabled and len(filtered) >= 32:
-        try:
-            sos = signal.butter(4, high_pass_hz, btype='highpass', fs=sample_rate, output='sos')
-            filtered = signal.sosfilt(sos, filtered).astype(np.float32)
-        except Exception as e:
-            logger.warning(f"High-pass DSP filtering failed, using raw audio: {e}")
-            filtered = audio_data.copy().astype(np.float32)
+    # 1. 80Hz Butterworth High-Pass Filter (strips DC bias, electrical hum, desk thumps)
+    if high_pass_enabled:
+        filtered = suppressor.filter_highpass(filtered)
 
+    # 2. Smooth noise gate to suppress background fans and room acoustics
+    if noise_gate_enabled:
+        filtered = suppressor.apply_soft_noise_gate(filtered)
+
+    # 3. Whisper Mode: Soft-saturation gain boost for whispered / quiet dictation
+    if whisper_mode:
+        filtered = suppressor.apply_whisper_mode_gain(filtered)
+
+    # 4. Standard peak normalization with noise-floor guard
     if peak_norm_enabled and len(filtered) > 0:
         max_val = float(np.max(np.abs(filtered)))
         rms = float(np.sqrt(np.mean(filtered ** 2) + 1e-9))
         
         # Noise floor guard: only scale if audio energy indicates active speech
-        if rms >= 0.008 and max_val >= 0.03:
-            # Cap gain multiplier so background hiss is not boosted into speech
+        if rms >= 0.006 and max_val >= 0.02:
             scale_factor = min(peak_target / max_val, 2.5)
             filtered = np.clip(filtered * scale_factor, -1.0, 1.0).astype(np.float32)
 
@@ -228,7 +239,7 @@ class AudioRecorder:
         on_safety_cap: Optional[Callable[[], None]] = None,
         on_speech_silence_cut: Optional[Callable[[], None]] = None,
         config_manager: Optional[Any] = None,
-        enable_dsp: bool = True
+        enable_dsp: bool = False
     ):
         self.target_sample_rate = 16000
         self.target_channels = 1
@@ -237,6 +248,11 @@ class AudioRecorder:
         self.on_speech_silence_cut = on_speech_silence_cut
         self.config = config_manager
         self.enable_dsp = enable_dsp
+        if self.config:
+            self.enable_dsp = bool(self.config.get("dsp_fan_filter_enabled", False))
+        self.whisper_mode: bool = False
+        if self.config:
+            self.whisper_mode = bool(self.config.get("whisper_mode", False))
 
         self.device_index: Optional[int] = None
         self.device_sample_rate: int = 16000
@@ -316,9 +332,23 @@ class AudioRecorder:
         try:
             if dev_idx is not None:
                 info = sd.query_devices(dev_idx)
+                if int(info.get("max_input_channels", 0)) <= 0:
+                    raise ValueError(f"Device index {dev_idx} is not an input device (max_input_channels=0)")
             else:
                 info = sd.query_devices(kind="input")
                 dev_idx = info.get("index", None)
+                # If default device appears to be an unplugged/headset mic while an array exists, prefer the array
+                name_lower = str(info.get("name", "")).lower()
+                if "headset" in name_lower:
+                    try:
+                        for d_i, d in enumerate(sd.query_devices()):
+                            if d.get("max_input_channels", 0) > 0 and "array" in str(d.get("name", "")).lower():
+                                dev_idx = d_i
+                                info = d
+                                logger.info(f"Auto-selected working built-in microphone array (Index {dev_idx}: {d.get('name')})")
+                                break
+                    except Exception:
+                        pass
             native_rate = int(info.get("default_samplerate", 16000))
             max_ch = int(info.get("max_input_channels", 1))
 
@@ -497,6 +527,8 @@ class AudioRecorder:
                 return False
 
             self.is_recording = True
+            if self.config:
+                self.whisper_mode = bool(self.config.get("whisper_mode", False) or self.config.get("whisper_mode_enabled", False))
             self.start_time = time.time()
             self._current_amplitude = 0.0
             # Prepend pre-roll buffer so initial phonemes / syllables are never clipped
@@ -523,6 +555,18 @@ class AudioRecorder:
         self.device_sample_rate = native_rate
         self.device_channels = channels
 
+        # Safely dispose of any leaked or residual stream from an earlier session
+        if self.stream is not None:
+            try:
+                self.stream.stop()
+            except Exception:
+                pass
+            try:
+                self.stream.close()
+            except Exception:
+                pass
+            self.stream = None
+
         self._writer_thread = threading.Thread(target=self._writer_worker, daemon=True, name="AudioCaptureWorker")
         self._writer_thread.start()
 
@@ -544,6 +588,16 @@ class AudioRecorder:
                 f"Safe disconnection guard active: NOT silently redirecting to unintended microphone."
             )
             self.device_disconnected = True
+            if self.stream is not None:
+                try:
+                    self.stream.stop()
+                except Exception:
+                    pass
+                try:
+                    self.stream.close()
+                except Exception:
+                    pass
+                self.stream = None
             with self._buffer_lock:
                 self.is_recording = False
                 self._stop_event.set()
@@ -557,8 +611,7 @@ class AudioRecorder:
         Returns (wav_path, wav_bytes, duration_seconds, sample_count, rms).
         """
         with self._buffer_lock:
-            if not self.is_recording:
-                return "", b"", 0.0, 0, 0.0
+            was_recording = self.is_recording
             self.is_recording = False
 
         wall_duration = max(0.1, time.time() - self.start_time)
@@ -570,10 +623,14 @@ class AudioRecorder:
                 self.stream = None
         except Exception as e:
             logger.error(f"Error stopping audio stream: {e}")
+            self.stream = None
 
         self._stop_event.set()
         if self._writer_thread and self._writer_thread.is_alive():
             self._writer_thread.join(timeout=2.0)
+
+        if not was_recording:
+            return "", b"", 0.0, 0, 0.0
 
         with self._buffer_lock:
             if self._accumulated_16k_samples:
@@ -586,15 +643,22 @@ class AudioRecorder:
 
         # Active DSP filtering on speech blocks before VAD and transcription handoff
         if self.enable_dsp and sample_count > 0:
-            full_16k = apply_dsp_filters(full_16k, sample_rate=16000, high_pass_enabled=True, peak_norm_enabled=True)
+            full_16k = apply_dsp_filters(
+                full_16k,
+                sample_rate=16000,
+                high_pass_enabled=True,
+                peak_norm_enabled=True,
+                whisper_mode=self.whisper_mode
+            )
             sample_count = len(full_16k)
 
-        # High-Performance Silero VAD Silence Trimming (OpenWhispr Standard)
+        # High-Performance Silero VAD Silence Trimming & Pure Silence Gating (Calibrated to 0.45)
+        is_pure_silence = False
         if sample_count > 3200:
             try:
                 import faster_whisper.vad as fvad
-                # snakers4/silero-vad & whisperX: Distant speech thresholding at 50 cm
-                vad_opt = fvad.VadOptions(threshold=0.18, min_silence_duration_ms=600, speech_pad_ms=350)
+                # Standard robust Silero VAD threshold (0.45) eliminates keyboard clicks and breath triggers
+                vad_opt = fvad.VadOptions(threshold=0.45, min_silence_duration_ms=500, speech_pad_ms=350)
                 timestamps = fvad.get_speech_timestamps(full_16k, vad_opt)
                 if timestamps:
                     # Pad 350ms (5600 samples) before speech and after speech to prevent clipping sentence boundaries
@@ -605,8 +669,15 @@ class AudioRecorder:
                         full_16k = full_16k[start_sample:end_sample]
                         sample_count = len(full_16k)
                         logger.info(f"Silero VAD silence trimming (50cm calibrated): {raw_duration_sec:.2f}s -> {sample_count / 16000.0:.2f}s")
+                else:
+                    # Silero VAD did not partition speech (e.g. whispered or continuous speech); retain full audio
+                    calc_rms = float(np.sqrt(np.mean(full_16k ** 2) + 1e-9))
+                    logger.debug(f"Silero VAD had no timestamps (RMS={calc_rms:.5f}). Retaining full audio for Whisper ASR.")
             except Exception as vad_err:
                 logger.debug(f"VAD post-trim note: {vad_err}")
+
+        if sample_count == 0:
+            return "", b"", 0.0, 0, 0.0
 
         duration_sec = sample_count / 16000.0 if sample_count > 0 else raw_duration_sec
         rms = float(np.sqrt(np.mean(full_16k ** 2) + 1e-9)) if sample_count > 0 else 0.0
@@ -671,15 +742,20 @@ class AudioRecorder:
         overlap_sec: float = 0.4
     ) -> Optional[bytes]:
         """
-        Wispr Flow Architecture: Extracts rolling audio chunk while speech is actively happening.
-        Searches for silence dip between min_sec and max_sec to prevent cutting words.
-        Leaves overlap_sec at the end for smooth boundary stitching.
+        Wispr Flow Standard:
+        1. Speech under 25.0 seconds is never sliced; it is preserved as a single continuous 
+           acoustic buffer to ensure 100% natural grammar and zero boundary syllable truncation.
+        2. Marathon dictations (> 25s) slice cleanly at natural silence pauses (> 500ms).
         """
         with self._buffer_lock:
             if not self.is_recording or not self._accumulated_16k_samples:
                 return None
 
             total_samples = sum(len(c) for c in self._accumulated_16k_samples)
+            # Guard against artificial chunking for normal human dictations (< 25 seconds)
+            if (total_samples / 16000.0) < 25.0:
+                return None
+
             available = total_samples - self._last_chunk_sample_offset
             if available < int(min_sec * 16000):
                 return None
@@ -712,7 +788,7 @@ class AudioRecorder:
             self._rolling_chunks_emitted = True
 
             if self.enable_dsp and len(chunk_arr) > 0:
-                chunk_arr = apply_dsp_filters(chunk_arr, sample_rate=16000, high_pass_enabled=True, peak_norm_enabled=True)
+                chunk_arr = apply_dsp_filters(chunk_arr, sample_rate=16000, high_pass_enabled=True, peak_norm_enabled=True, whisper_mode=self.whisper_mode)
 
             bio = io.BytesIO()
             with wave.open(bio, 'wb') as wf:
@@ -738,7 +814,7 @@ class AudioRecorder:
                 return None
 
             if self.enable_dsp and len(tail_arr) > 0:
-                tail_arr = apply_dsp_filters(tail_arr, sample_rate=16000, high_pass_enabled=True, peak_norm_enabled=True)
+                tail_arr = apply_dsp_filters(tail_arr, sample_rate=16000, high_pass_enabled=True, peak_norm_enabled=True, whisper_mode=self.whisper_mode)
 
             bio = io.BytesIO()
             with wave.open(bio, 'wb') as wf:

@@ -177,16 +177,30 @@ def detect_hallucination_loop(text: str) -> bool:
         "please subscribe",
         "like and subscribe",
         "amara.org",
-        "translated by"
+        "translated by",
+        "see you next time",
+        "english subtitles",
+        "closed captions",
+        "subtitles created by",
+        "bye bye",
+        "watching!",
+        "thank you.",
+        "thank you"
     ]
-    if any(gp in lower for gp in ghost_phrases) and len(text.split()) < 15:
+    if any(gp == lower or gp in lower for gp in ghost_phrases) and len(text.split()) < 8:
         return True
 
     words = lower.split()
+    if len(words) >= 3:
+        # Check single word looping (e.g., "you you you" or "and and and")
+        for w in set(words):
+            if words.count(w) >= 3 and len(set(words)) <= 2:
+                return True
+
     if len(words) >= 6:
         triplets = [" ".join(words[i:i+3]) for i in range(len(words)-2)]
         for t in triplets:
-            if triplets.count(t) >= 3:
+            if triplets.count(t) >= 2:
                 return True
 
     return False

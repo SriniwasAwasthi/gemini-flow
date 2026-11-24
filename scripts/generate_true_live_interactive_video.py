@@ -14,7 +14,7 @@ import math
 import subprocess
 import shutil
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 PROJECT_ROOT = Path(r"E:\W c One Drive\Wisper")
 if str(PROJECT_ROOT) not in sys.path:
@@ -321,6 +321,14 @@ def build_all_scenes():
             base = frame_s01_show
         else:
             base = frame_s01_verified
+
+        # Privacy credential blur: visibly blur the API key field during insertion demonstration
+        if 0.15 <= t_norm < 0.60:
+            base = base.copy()
+            blur_box = (max(0, pos_api_input[0] - 260), max(0, pos_api_input[1] - 24), min(1920, pos_api_input[0] + 260), min(1080, pos_api_input[1] + 24))
+            region = base.crop(blur_box).filter(ImageFilter.GaussianBlur(radius=10))
+            base.paste(region, blur_box)
+
         cx, cy, c_prog = interpolate_trajectory(waypoints_01, t_norm)
         return draw_cursor_and_ripple(base, cx, cy, c_prog)
     
@@ -341,6 +349,8 @@ def build_all_scenes():
     dlg.mic_level_label.setText("0%")
     dlg.cb_dsp_fan_filter.setChecked(False)
     dlg.cb_dsp_noise_gate.setChecked(False)
+    if hasattr(dlg, 'cb_whisper_mode') and dlg.cb_whisper_mode:
+        dlg.cb_whisper_mode.setChecked(False)
     app.processEvents()
     
     pos_audio_nav = get_widget_frame_pos(dlg, dlg.nav_buttons[9])
@@ -349,15 +359,17 @@ def build_all_scenes():
     pos_level_bar = get_widget_frame_pos(dlg, dlg.mic_level_bar)
     pos_fan_filter = get_widget_frame_pos(dlg, dlg.cb_dsp_fan_filter)
     pos_noise_gate = get_widget_frame_pos(dlg, dlg.cb_dsp_noise_gate)
+    pos_whisper_mode = get_widget_frame_pos(dlg, dlg.cb_whisper_mode) if hasattr(dlg, 'cb_whisper_mode') and dlg.cb_whisper_mode else pos_noise_gate
     
     waypoints_02 = [
         (0.00, pos_audio_nav[0], pos_audio_nav[1], True),  # Switches to Audio tab
-        (0.18, pos_mic_combo[0], pos_mic_combo[1], False), # Inspects mic combo
-        (0.32, pos_test_mic[0], pos_test_mic[1], True),    # Clicks Test Mic button
-        (0.50, pos_level_bar[0], pos_level_bar[1], False), # Watches live VU meter pulse
-        (0.70, pos_fan_filter[0], pos_fan_filter[1], True),# Clicks 85Hz High-Pass filter
-        (0.85, pos_noise_gate[0], pos_noise_gate[1], True),# Clicks Noise Gate
-        (1.00, pos_test_mic[0], pos_test_mic[1], False)
+        (0.16, pos_mic_combo[0], pos_mic_combo[1], False), # Inspects mic combo
+        (0.28, pos_test_mic[0], pos_test_mic[1], True),    # Clicks Test Mic button
+        (0.48, pos_level_bar[0], pos_level_bar[1], False), # Watches live VU meter pulse
+        (0.65, pos_fan_filter[0], pos_fan_filter[1], True),# Clicks 80Hz High-Pass filter
+        (0.78, pos_noise_gate[0], pos_noise_gate[1], True),# Clicks Noise Gate
+        (0.90, pos_whisper_mode[0], pos_whisper_mode[1], True), # Highlights & checks Whisper Mode (+12dB)
+        (1.00, pos_whisper_mode[0], pos_whisper_mode[1], False)
     ]
     
     # Capture base frames
@@ -375,6 +387,8 @@ def build_all_scenes():
     # Frame with filters checked
     dlg.cb_dsp_fan_filter.setChecked(True)
     dlg.cb_dsp_noise_gate.setChecked(True)
+    if hasattr(dlg, 'cb_whisper_mode') and dlg.cb_whisper_mode:
+        dlg.cb_whisper_mode.setChecked(True)
     dlg.mic_level_bar.setValue(0)
     dlg.mic_level_label.setText("0%")
     app.processEvents()
@@ -413,15 +427,17 @@ def build_all_scenes():
     pos_radio_toggle = get_widget_frame_pos(dlg, dlg.radio_toggle)
     pos_trans_btn = get_widget_frame_pos(dlg, dlg.transform_hotkey_btn)
     pos_prompt_btn = get_widget_frame_pos(dlg, dlg.prompt_hotkey_btn)
+    pos_recover_btn = get_widget_frame_pos(dlg, dlg.recover_hotkey_btn) if hasattr(dlg, 'recover_hotkey_btn') and dlg.recover_hotkey_btn else pos_prompt_btn
     
     waypoints_03 = [
         (0.00, pos_hotkeys_nav[0], pos_hotkeys_nav[1], True),
-        (0.20, pos_hotkey_btn[0], pos_hotkey_btn[1], True),   # Clicks Voice Hotkey
-        (0.40, pos_radio_ptt[0], pos_radio_ptt[1], True),     # Selects Push-to-Talk
-        (0.60, pos_radio_toggle[0], pos_radio_toggle[1], True),# Selects Toggle mode
-        (0.78, pos_trans_btn[0], pos_trans_btn[1], True),     # Highlights Alt+T
-        (0.90, pos_prompt_btn[0], pos_prompt_btn[1], True),   # Highlights Alt+P
-        (1.00, pos_hotkey_btn[0], pos_hotkey_btn[1], False)
+        (0.18, pos_hotkey_btn[0], pos_hotkey_btn[1], True),   # Clicks Voice Hotkey
+        (0.35, pos_radio_ptt[0], pos_radio_ptt[1], True),     # Selects Push-to-Talk (35ms hardware watchdog)
+        (0.52, pos_radio_toggle[0], pos_radio_toggle[1], True),# Selects Toggle mode
+        (0.68, pos_trans_btn[0], pos_trans_btn[1], True),     # Highlights Alt+T
+        (0.82, pos_prompt_btn[0], pos_prompt_btn[1], True),   # Highlights Alt+P
+        (0.92, pos_recover_btn[0], pos_recover_btn[1], True), # Highlights Shift+Alt+Z Paste Last Transcript
+        (1.00, pos_recover_btn[0], pos_recover_btn[1], False)
     ]
     
     frame_s03_toggle = grab_dialog_to_pil(dlg)
@@ -692,13 +708,15 @@ def build_all_scenes():
     pos_hist_tree = get_widget_frame_pos(dlg, dlg.history_tree)
     pos_detail_tabs = get_widget_frame_pos(dlg, dlg.history_detail_tabs)
     pos_copy_btn = get_widget_frame_pos(dlg, dlg.btn_copy_selected)
+    pos_filter_by = get_widget_frame_pos(dlg, dlg.btn_filter_by) if hasattr(dlg, 'btn_filter_by') and dlg.btn_filter_by else pos_copy_btn
     
     waypoints_10 = [
         (0.00, pos_hist_nav[0], pos_hist_nav[1], True),
-        (0.28, pos_hist_tree[0] - 80, pos_hist_tree[1] - 40, True), # Selects top history entry
-        (0.55, pos_detail_tabs[0] - 40, pos_detail_tabs[1], True),   # Clicks 'Converted AI Prompt'
-        (0.75, pos_detail_tabs[0] + 50, pos_detail_tabs[1], True),   # Clicks 'Raw Spoken Speech'
-        (0.90, pos_copy_btn[0], pos_copy_btn[1], True),              # Clicks Copy button
+        (0.22, pos_filter_by[0], pos_filter_by[1], True),           # Highlights Filter by Model button
+        (0.42, pos_hist_tree[0] - 80, pos_hist_tree[1] - 40, True), # Selects top history entry
+        (0.65, pos_detail_tabs[0] - 40, pos_detail_tabs[1], True),   # Clicks 'Converted AI Prompt'
+        (0.82, pos_detail_tabs[0] + 50, pos_detail_tabs[1], True),   # Clicks 'Raw Spoken Speech'
+        (0.94, pos_copy_btn[0], pos_copy_btn[1], True),              # Clicks Copy button
         (1.00, pos_detail_tabs[0], pos_detail_tabs[1], False)
     ]
     

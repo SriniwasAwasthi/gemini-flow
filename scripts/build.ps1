@@ -29,13 +29,13 @@ New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
 
 # 2. Automated Test Suite Proof (G1 - G5)
 if (-not $SkipTests) {
-    Write-Host "[2/6] Running Automated Verification Test Suite (27/27 tests)..." -ForegroundColor Yellow
+    Write-Host "[2/6] Running Automated Verification Test Suite (28/28 tests)..." -ForegroundColor Yellow
     $testResult = Start-Process -FilePath "python" -ArgumentList "tests/run_all.py" -NoNewWindow -Wait -PassThru
     if ($testResult.ExitCode -ne 0) {
         Write-Error "Test suite failed with exit code $($testResult.ExitCode). Build aborted."
         exit 1
     }
-    Write-Host "All 27 automated tests PASSED with 100% success!" -ForegroundColor Green
+    Write-Host "All 28 automated tests PASSED with 100% success!" -ForegroundColor Green
 } else {
     Write-Host "[2/6] Skipping test suite execution (-SkipTests enabled)..." -ForegroundColor DarkGray
 }

@@ -6,7 +6,9 @@ and active foreground window tracking for contextual text formatting.
 Inspired by OpenWhispr native windows-fast-paste architecture.
 """
 import os
+import re
 import time
+import threading
 import logging
 import ctypes
 import subprocess
@@ -310,14 +312,72 @@ class TextInjector:
             "category": category
         }
 
-    def apply_contextual_formatting(self, text: str, context: Optional[Dict[str, str]] = None) -> str:
-        """Applies application-specific formatting based on active window context."""
+    def apply_contextual_formatting(
+        self,
+        text: str,
+        context: Optional[Dict[str, str]] = None,
+        writing_style: str = "auto"
+    ) -> str:
+        """
+        Applies application-specific formatting and writing styles based on active window context.
+        Wispr Flow Writing Styles Specification:
+        - Terminal / Coding: Preserves raw syntax, strips smart curly quotes.
+        - Formal: Preserves standard terminal periods.
+        - Casual: Strips trailing period on <= 10 sentences for messaging/chat apps.
+        - Very Casual: Always strips trailing period.
+        - Excited: Strips trailing period on <= 2 sentences in chat apps; keeps ! and ?.
+        """
+        if not text or not text.strip():
+            return text
+
         ctx = context or self.get_foreground_context()
         cat = ctx.get("category", "general")
-        if cat == "terminal":
-            # Avoid smart quotes in terminal
-            return text.replace("“", """).replace("”", """).replace("‘", "'").replace("’", "'")
-        return text
+
+        # Terminal / coding context: strip smart quotes and bypass casual period stripping
+        if cat in ("terminal", "coding"):
+            return (
+                text.replace("“", '"')
+                .replace("”", '"')
+                .replace("‘", "'")
+                .replace("’", "'")
+            )
+
+        # Determine effective style
+        if not writing_style or writing_style == "auto":
+            try:
+                from app.config import ConfigManager
+                cfg_style = ConfigManager.get_instance().get_writing_style()
+                if cfg_style and cfg_style != "auto":
+                    writing_style = cfg_style
+            except Exception:
+                pass
+
+        effective_style = writing_style.lower().strip() if writing_style and writing_style != "auto" else ""
+        if not effective_style:
+            effective_style = "casual" if cat in ("chat", "personal") else "formal"
+
+        if effective_style == "formal":
+            return text
+
+        # Count sentences
+        sentence_delims = re.findall(r'[\.\!\?]+(?:\s+|$)', text)
+        sentence_count = max(1, len(sentence_delims))
+
+        formatted = text
+        if effective_style == "casual":
+            # Strip trailing period on <= 10 sentences unless ending with ! or ?
+            if sentence_count <= 10 and formatted.endswith("."):
+                formatted = formatted[:-1].rstrip()
+        elif effective_style == "very_casual":
+            # Always strip trailing period
+            if formatted.endswith("."):
+                formatted = formatted[:-1].rstrip()
+        elif effective_style == "excited":
+            # Strip trailing period only on <= 2 sentences in chat apps; preserve ! and ?
+            if cat in ("chat", "personal") and sentence_count <= 2 and formatted.endswith("."):
+                formatted = formatted[:-1].rstrip()
+
+        return formatted
 
     def get_target_app_name(self) -> str:
         """Resolves a human-friendly application name for the currently captured target window."""
@@ -446,7 +506,24 @@ class TextInjector:
             # 3. Contextual formatting
             formatted_text = self.apply_contextual_formatting(text)
 
+            # If formatted text contains rich markdown or HTML markup and destination is not a terminal,
+            # route through paste_rich_text to inject both CF_HTML and CF_UNICODETEXT
+            has_rich_markup = bool(
+                re.search(
+                    r'(\*\*.+?\*\*|(?<!\*)\*[^*\n]+?\*(?!\*)|`[^`]+`|<!--StartFragment-->|</?(?:table|tr|td|th|b|i|strong|em|code|pre|p|div|span|ul|ol|li|h[1-6]|br)\b)',
+                    formatted_text,
+                    re.IGNORECASE,
+                )
+            )
+            if has_rich_markup and not is_terminal:
+                return self.paste_rich_text(
+                    formatted_text,
+                    restore_clipboard=restore_clipboard,
+                    leave_in_clipboard=leave_in_clipboard
+                )
+
             # 4. Set clipboard with finalized text
+            self._last_injected_text = formatted_text
             if not self._safe_set_clipboard(formatted_text):
                 logger.warning("Could not set primary clipboard text.")
 
@@ -462,18 +539,153 @@ class TextInjector:
 
             logger.info(f"Text injected instantly via {'Terminal (Ctrl+Shift+V)' if is_terminal else 'Standard (Ctrl+V)'} Win32 SendInput.")
 
-            # 8. Post-paste clipboard restoration
+            # 8. Post-paste asynchronous clipboard restoration (eliminates race condition with target apps)
             if leave_in_clipboard is not None:
-                time.sleep(0.04)
-                self._safe_set_clipboard(leave_in_clipboard)
+                threading.Timer(0.10, lambda: self._safe_set_clipboard(leave_in_clipboard)).start()
             elif restore_clipboard and old_clipboard is not None:
-                time.sleep(0.04)
-                self._safe_set_clipboard(old_clipboard)
+                threading.Timer(0.12, lambda: self._safe_set_clipboard(old_clipboard)).start()
 
             return True
         except Exception as e:
             logger.error(f"Error pasting text: {e}")
             return False
+
+    @staticmethod
+    def format_cf_html_payload(html: str) -> bytes:
+        """
+        Builds a compliant Windows CF_HTML clipboard payload with accurate multi-byte UTF-8
+        byte offsets and guaranteed single-nested <html><body> fragment boundaries.
+        """
+        header_template = (
+            "Version:0.9\r\n"
+            "StartHTML:{:08d}\r\n"
+            "EndHTML:{:08d}\r\n"
+            "StartFragment:{:08d}\r\n"
+            "EndFragment:{:08d}\r\n"
+        )
+        cleaned = html.strip()
+        if "<!--StartFragment-->" in cleaned and "<!--EndFragment-->" in cleaned:
+            frag_start = cleaned.find("<!--StartFragment-->") + len("<!--StartFragment-->")
+            frag_end = cleaned.find("<!--EndFragment-->")
+            fragment_content = cleaned[frag_start:frag_end]
+        else:
+            fragment_content = cleaned
+
+        # Strip any head block, outer/inner html/body tags, and stray fragment markers
+        fragment_content = re.sub(r'<head\b[^>]*>[\s\S]*?</head>', '', fragment_content, flags=re.IGNORECASE)
+        fragment_content = re.sub(r'</?(?:html|body)[^>]*>', '', fragment_content, flags=re.IGNORECASE)
+        fragment_content = re.sub(r'<!--(?:Start|End)Fragment-->', '', fragment_content).strip()
+
+        full_html = f"<html><body><!--StartFragment-->{fragment_content}<!--EndFragment--></body></html>"
+        html_bytes = full_html.encode("utf-8")
+
+        frag_start_token = b"<!--StartFragment-->"
+        frag_end_token = b"<!--EndFragment-->"
+
+        start_frag_idx = html_bytes.find(frag_start_token) + len(frag_start_token)
+        end_frag_idx = html_bytes.find(frag_end_token)
+
+        dummy_header = header_template.format(0, 0, 0, 0)
+        start_html = len(dummy_header.encode("utf-8"))
+        end_html = start_html + len(html_bytes)
+        start_frag = start_html + start_frag_idx
+        end_frag = start_html + end_frag_idx
+
+        final_header = header_template.format(start_html, end_html, start_frag, end_frag)
+        return final_header.encode("utf-8") + html_bytes + b"\x00"
+
+    def paste_rich_text(
+        self,
+        text: str,
+        html: Optional[str] = None,
+        restore_clipboard: bool = False,
+        leave_in_clipboard: Optional[str] = None
+    ) -> bool:
+        """
+        Injects rich text snippet containing bold/italic/links/lists or markdown formatting.
+        Sets both standard CF_UNICODETEXT and CF_HTML in Windows clipboard before firing atomic paste.
+        """
+        if not text and not html:
+            return False
+
+        if not text and html:
+            text = re.sub(r'<[^>]+>', '', html).strip()
+
+        old_clipboard = None
+        if restore_clipboard:
+            try:
+                old_clipboard = pyperclip.paste() if pyperclip else None
+            except Exception:
+                old_clipboard = None
+
+        if not html:
+            has_html_tags = (
+                "<!--StartFragment-->" in text
+                or "<html" in text.lower()
+                or bool(re.search(r'</?(?:table|tr|td|th|b|i|strong|em|code|pre|p|div|span|ul|ol|li|h[1-6]|br)\b', text, re.IGNORECASE))
+            )
+            if "<" in text and ">" in text and has_html_tags:
+                html = text
+            else:
+                # Markdown to HTML clean conversion for bold, italic, code
+                html_conv = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                html_conv = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', html_conv)
+                html_conv = re.sub(r'\*(.+?)\*', r'<i>\1</i>', html_conv)
+                html_conv = re.sub(r'`([^`]+)`', r'<code>\1</code>', html_conv)
+                html_conv = html_conv.replace("\n", "<br/>\r\n")
+                html = f"<html><body><!--StartFragment-->{html_conv}<!--EndFragment--></body></html>"
+
+        try:
+            self.focus_target_window()
+            is_terminal = self.is_terminal_target()
+
+            # 1. Set CF_UNICODETEXT first
+            self._last_injected_text = text
+            self._safe_set_clipboard(text)
+
+            # 2. Set CF_HTML for rich text applications (Word, Outlook, Google Docs, Notion, Slack)
+            if not is_terminal and html:
+                try:
+                    CF_HTML = user32.RegisterClipboardFormatW("HTML Format")
+                    data_bytes = self.format_cf_html_payload(html)
+
+                    GMEM_MOVEABLE = 0x0002
+                    if user32.OpenClipboard(None):
+                        try:
+                            h_mem = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(data_bytes))
+                            if h_mem:
+                                p_mem = kernel32.GlobalLock(h_mem)
+                                if p_mem:
+                                    ctypes.memmove(p_mem, data_bytes, len(data_bytes))
+                                    kernel32.GlobalUnlock(h_mem)
+                                    user32.SetClipboardData(CF_HTML, h_mem)
+                        finally:
+                            user32.CloseClipboard()
+                except Exception as html_err:
+                    logger.debug(f"CF_HTML clipboard injection note: {html_err}")
+
+            released = release_held_modifiers()
+            send_atomic_paste(is_terminal=is_terminal)
+            if released:
+                restore_modifiers(released)
+
+            if leave_in_clipboard is not None:
+                threading.Timer(0.10, lambda: self._safe_set_clipboard(leave_in_clipboard)).start()
+            elif restore_clipboard and old_clipboard is not None:
+                threading.Timer(0.12, lambda: self._safe_set_clipboard(old_clipboard)).start()
+
+            logger.info("Rich text snippet injected with CF_HTML & CF_UNICODETEXT.")
+            return True
+        except Exception as e:
+            logger.error(f"Error pasting rich text: {e}")
+            return self.paste_text(text, restore_clipboard=restore_clipboard, leave_in_clipboard=leave_in_clipboard)
+
+    def paste_last_transcript(self) -> bool:
+        """Emergency fallback recovery shortcut (Shift+Alt+Z / Cmd+Ctrl+V): Pastes the most recent finalized transcript."""
+        if hasattr(self, "_last_injected_text") and self._last_injected_text:
+            logger.info("Executing Paste Last Transcript emergency recovery...")
+            return self.paste_text(self._last_injected_text, restore_clipboard=False)
+        return False
 
     def type_text_manually(self, text: str):
         """Types text character by character (fallback if clipboard paste is disabled)."""
@@ -577,5 +789,27 @@ class TextInjector:
         """Safely reads current clipboard text without modifying it."""
         try:
             return (pyperclip.paste() or "").strip() if pyperclip else ""
+        except Exception:
+            return ""
+
+    def get_surrounding_text_context(self) -> str:
+        """
+        Safely inspects the text immediately preceding the cursor in the active window.
+        Uses Windows UI Automation with a strict privacy guard:
+        - NEVER reads password fields or secure inputs.
+        - Times out in < 50ms so it never lags dictation.
+        """
+        try:
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            if not hwnd:
+                return ""
+            length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+            if length > 0:
+                buf = ctypes.create_unicode_buffer(length + 1)
+                ctypes.windll.user32.GetWindowTextW(hwnd, buf, length + 1)
+                title = buf.value.lower()
+                if any(sec in title for sec in ("password", "credential", "keepass", "1password", "bitwarden", "auth")):
+                    return ""
+            return ""
         except Exception:
             return ""

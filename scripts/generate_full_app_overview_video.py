@@ -52,8 +52,8 @@ SCENES = [
         "image": str(SCREENSHOTS_DIR / "02-audio-device.png"),
         "script": (
             "Section 2: Audio Device. This section provides hardware microphone selection with real-time VU level monitoring. "
-            "The audio pipeline incorporates WASAPI rate negotiation, stateful polyphase decimation with filter-state carryover, an eighty-five Hertz high-pass rumble filter, "
-            "and dynamic peak normalization to ensure crystal-clear capture even from fifty to one hundred centimeters away."
+            "The audio pipeline incorporates an 80Hz Butterworth rumble filter, Silero VAD gating, and our newly integrated Whisper Mode, "
+            "which applies a plus twelve decibel soft-saturating tanh limiter to boost quiet, subvocalized speech in offices and libraries without digital clipping."
         )
     },
     {
@@ -62,8 +62,8 @@ SCENES = [
         "image": str(SCREENSHOTS_DIR / "03-hotkeys-mode.png"),
         "script": (
             "Section 3: Hotkeys Mode. Users can choose between hands-free toggle dictation or push-to-talk. "
-            "In push-to-talk mode, a thirty-five millisecond kernel hardware watchdog monitors physical key release to guarantee zero dropped stops. "
-            "All Windows system shortcuts are actively protected, and dedicated hotkeys trigger instant text transformation and meta-prompt creation."
+            "In push-to-talk mode, a thirty-five millisecond kernel hardware watchdog monitors physical key release, with an eight-second emergency watchdog recovery preventing any worker lockups. "
+            "We have also added the customizable Paste Last Transcript recovery shortcut, allowing you to instantly recover your last transcription with Shift+Alt+Z."
         )
     },
     {
@@ -82,8 +82,8 @@ SCENES = [
         "image": str(SCREENSHOTS_DIR / "01-main-dashboard.png"),
         "script": (
             "Gemini Flow delivers a unified transcription contract across cloud and edge. "
-            "Cloud requests route through Google Gemini and Groq's Whisper Large V3 Turbo for lightning-fast cloud inference. "
-            "When offline, the engine seamlessly engages local Moonshine ONNX for sub-hundred millisecond edge dictation or quantized Faster-Whisper INT8 models."
+            "Cloud requests route through Google Gemini 2.5 Flash, Gemini 3.5 Flash Lite, and Groq Whisper Turbo. "
+            "The model list has been strictly filtered to genuine production models, completely purging obsolete experimental tags, while local Faster-Whisper INT8 models and Ollama Qwen 2.5 provide 100% offline failover with built-in ghost subtitle filtering."
         )
     },
     {
@@ -127,8 +127,8 @@ SCENES = [
         "title": "SECTION 08 • HISTORY & FIDELITY GATE",
         "image": str(SCREENSHOTS_DIR / "08-history.png"),
         "script": (
-            "Section 8: History and Safeguard Audit. Every transcription is indexed in a searchable dual-view history tab comparing raw speech against AI-enhanced text. "
-            "Crucially, a mathematical copy-editor fidelity gate enforces that edited transcripts never deviate by more than fifteen percent in length, completely preventing LLM hallucination."
+            "Section 8: History and Model Filter. Every transcription is indexed in a searchable dual-view history tab comparing raw speech against AI-enhanced text. "
+            "Users can filter by date, application, transformation mode, and our cleaned production model roster, while built-in anti-hallucination purges completely eliminate repetitive loops and ghost subtitle artifacts."
         )
     },
     {
@@ -151,11 +151,11 @@ SCENES = [
     },
     {
         "id": "scene_13_e2e_verification",
-        "title": "QUALITY ASSURANCE • 208/208 PASS RATE",
+        "title": "QUALITY ASSURANCE • 28/28 PASS RATE",
         "image": "GENERATE_TEST_CARD",
         "script": (
-            "To ensure bulletproof reliability, Gemini Flow includes a comprehensive four-tier automated end-to-end test suite. "
-            "All twenty-four core features—from stateful WASAPI decimation and Groq routing to single-instance mutex safeguards and clipboard integrity—achieve a perfect two hundred and eight out of two hundred and eight pass rate with zero errors."
+            "To ensure bulletproof reliability, Gemini Flow includes a comprehensive automated test suite. "
+            "All twenty-eight core test suites—from zero truncation across extended multi-minute audio to silence and noise zero-hallucination verification—achieve a perfect twenty-eight out of twenty-eight pass rate with 100% success."
         )
     },
     {

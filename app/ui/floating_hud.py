@@ -463,6 +463,17 @@ class FloatingHUD(QWidget):
         """)
         action_move = menu.addAction("✥ Move HUD (Drag to reposition)")
         action_reset = menu.addAction("🔄 Reset Position to Bottom-Center")
+        menu.addSeparator()
+
+        # Whisper Mode Toggle Action
+        is_whisper = bool(self.config.get("whisper_mode", False) or self.config.get("whisper_mode_enabled", False))
+        whisper_label = "🤫 Whisper Mode (Active - 3.5x Gain)" if is_whisper else "🤫 Whisper Mode (Off)"
+        action_whisper = menu.addAction(whisper_label)
+
+        # Vision Mode Toggle Action
+        is_vision = bool(self.config.get("vision_guided_enabled", False))
+        vision_label = "👁️ Vision-Guided Voice (Active)" if is_vision else "👁️ Vision-Guided Voice (Off)"
+        action_vision = menu.addAction(vision_label)
 
         chosen = menu.exec(global_pos)
         if chosen == action_move:
@@ -475,6 +486,28 @@ class FloatingHUD(QWidget):
             self.config.set("hud_position", "bottom_center")
             self.reposition(force_default=True)
             logger.info("HUD position reset to default bottom-center.")
+        elif chosen == action_whisper:
+            new_val = not is_whisper
+            self.config.set("whisper_mode", new_val)
+            self.config.set("whisper_mode_enabled", new_val)
+            # Update AudioRecorder directly if attached
+            if hasattr(self, "audio_recorder") and self.audio_recorder:
+                self.audio_recorder.whisper_mode = new_val
+            msg = "Whisper Mode ON" if new_val else "Whisper Mode OFF"
+            self.show_state(self.STATE_PROCESSING, msg)
+            self.hide_timer.start(1200)
+        elif chosen == action_vision:
+            new_val = not is_vision
+            self.config.set("vision_guided_enabled", new_val)
+            try:
+                from app.intelligence.vision_engine import VisionEngine
+                VisionEngine.set_enabled(new_val)
+                VisionEngine.set_vision_mode(new_val)
+            except Exception:
+                pass
+            msg = "Vision Voice ON" if new_val else "Vision Voice OFF"
+            self.show_state(self.STATE_PROCESSING, msg)
+            self.hide_timer.start(1200)
 
     # -------------------------------------------------------------------------
     # 80% Translucent Glassmorphic Paint Engine

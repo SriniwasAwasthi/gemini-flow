@@ -291,6 +291,44 @@ class TestPhase1AudioCapture(unittest.TestCase):
             except Exception:
                 pass
 
+    def test_output_device_zero_channels_rejection(self):
+        """Verifies that an output-only device (max_input_channels=0) is cleanly caught and fails safely."""
+        recorder = AudioRecorder(sample_rate=16000, channels=1)
+        # Mock device query to return output-only device
+        with unittest.mock.patch("sounddevice.query_devices") as mock_query:
+            mock_query.return_value = {
+                "name": "Headphones (Realtek Audio)",
+                "index": 3,
+                "max_input_channels": 0,
+                "default_samplerate": 44100
+            }
+            recorder.set_device(3)
+            started = recorder.start_recording()
+            self.assertFalse(started, "Starting recording on 0-channel device must return False")
+            self.assertTrue(recorder.device_disconnected)
+
+    def test_stale_stream_disposal_on_start(self):
+        """Verifies that residual stream handles are safely closed before opening a new session."""
+        recorder = AudioRecorder(sample_rate=16000, channels=1)
+        mock_old_stream = unittest.mock.MagicMock()
+        recorder.stream = mock_old_stream
+
+        with unittest.mock.patch("sounddevice.InputStream") as mock_input_stream:
+            mock_new_stream = unittest.mock.MagicMock()
+            mock_input_stream.return_value = mock_new_stream
+
+            recorder.set_device(None)
+            started = recorder.start_recording()
+            self.assertTrue(started)
+            mock_old_stream.stop.assert_called_once()
+            mock_old_stream.close.assert_called_once()
+            mock_new_stream.start.assert_called_once()
+
+            recorder.stop_recording()
+            mock_new_stream.stop.assert_called_once()
+            mock_new_stream.close.assert_called_once()
+
+
 
 if __name__ == "__main__":
     unittest.main()
